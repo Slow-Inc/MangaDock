@@ -105,3 +105,10 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - ตัวเลข judge ยังคง raw **1.44** / strict-adjusted **1.55–1.60** (v4 ไม่ได้ re-judge; การเปลี่ยนกระทบเฉพาะ OCR source และ retry ที่หายาก)
 - CI เขียวทุก job (Vercel เหลือ external rate limit); PR #794 draft/mergeable, base #642 ยังไม่ merge
 - **`consider_as_please` (2026-10-23):** `CONSIDER BUYING ...` -> `กรุณาซื้อ...` (suggestion -> request) เกิด 2/6 renderings; predicate ตรวจ exact licence (src CONSIDER ไม่มี PLEASE, Thai กรุณา ไม่มี พิจารณา) — สแกน 19,327 regions เจอเฉพาะ 2 เคสจริง **FP 0**; natural run guard ยิงแล้ว retry ได้ `ลองพิจารณาซื้อฉบับพิมพ์`
+### v5 end state + late fixes (2026-10-23, round 160s)
+
+- **v5 sweep**: 39 หน้า/369 region, **leftover 0 ทุก scan**, **guard triggers 4 (ต่ำสุด)**, wall 7.80/6.62s; gate 3 จุดที่อธิบายครบ (lost `!` จริง 1, rhetorical retort ตั้งใจ, name variance ที่ series_context แก้)
+- **series memory bug (#1065)**: `apply_glossary` เช็ค substring ทำให้ variant ที่มีชื่อเดิมฝังอยู่ (`ทสึคุโยมิ` มี `สึคุโยมิ` ข้างใน) ไม่ถูกแก้ → แก้เป็น token-level; production run ยืนยัน page 2 `applied 2 name fix(es)` และสะกดตรง page 1
+- **Vercel deploy (#1064)**: docs function trace รูปใน `docs/` รวม 253MB → เกิน limit; เพิ่ม `outputFileTracingExcludes` ให้ `/docs` แล้ว deploy ผ่าน (คืนรูปต้นฉบับ)
+- **omission pass (opt-in)**: schema 2 passes, replay proof clause กลับมา, clean-page FP 0/19, cost ~2 verifier requests + re-ask
+- suite **979 passed**; PR #794: CI เขียว (Vercel ติด external quota เป็นช่วง)

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 228 — team memory updated with v5 and the late fixes (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vault `project-translation-eval-set.md` now records the v5 sweep numbers, the #1065 series-memory bug/fix with its production verification, the #1064 deploy fix, the opt-in omission pass evidence and the current suite count.
+- CI watcher started on the latest head. No code change.
+
+---
+
 ## MIT quality loop, round 227 — PR body/comment carry the round-7 state (v5, #1064, #1065) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
