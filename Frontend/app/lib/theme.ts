@@ -32,13 +32,18 @@ export function nextTheme(theme: Theme): Theme {
 
 /** Inlined in <head>: the same rules as readTheme/attributeFor, plus the `js` class, before first paint
  *  (no flash; Strata P2). Built from the constants above so the list and the default live in one place. */
-export const themeBootScript = `(function(){var h=document.documentElement;h.classList.add("js");var t=${JSON.stringify(DEFAULT_THEME)};try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(${JSON.stringify(THEMES)}.indexOf(s)>=0)t=s}catch(e){}if(t==="system")h.removeAttribute("data-theme");else h.setAttribute("data-theme",t)})();`;
+/** The browser bar colour for each painted theme: the `--bg` of each (globals.css). */
+export const THEME_COLOR = { light: "#f5f5f7", dark: "#0b0b0d" } as const;
+
+export const themeBootScript = `(function(){var h=document.documentElement;h.classList.add("js");var t=${JSON.stringify(DEFAULT_THEME)};try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(${JSON.stringify(THEMES)}.indexOf(s)>=0)t=s}catch(e){}if(t==="system")h.removeAttribute("data-theme");else h.setAttribute("data-theme",t);try{var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d?${JSON.stringify(THEME_COLOR.dark)}:${JSON.stringify(THEME_COLOR.light)})}catch(e){}})();`;
 
 export function applyTheme(theme: Theme) {
   const attr = attributeFor(theme);
   const html = document.documentElement;
   if (attr) html.setAttribute("data-theme", attr);
   else html.removeAttribute("data-theme");
+  const dark = attr === "dark" || (!attr && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? THEME_COLOR.dark : THEME_COLOR.light);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {

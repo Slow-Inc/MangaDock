@@ -11,7 +11,7 @@ import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
 import { applyCoinBalanceUpdate, type CoinBalanceUpdate } from "../lib/coinBalanceEvent";
 import NotificationBell from "./NotificationBell";
-import ThemeToggle from "./ThemeToggle";
+import ThemeToggle, { ThemeMenuRow } from "./ThemeToggle";
 import Coin from "./ui/Coin";
 import { UidMascot } from "./mascot/Mascot";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
@@ -53,8 +53,11 @@ export default function NavbarActions() {
     <>
       <div className="flex items-center gap-1.5 sm:gap-2">
         <SearchBar />
-        {/* light mode is on now that every user-facing route is token-clean (#778) */}
-        <ThemeToggle />
+        {/* light mode is on now that every user-facing route is token-clean (#778). Signed in on a phone the bar also
+            holds the bell, coins and avatar, so the theme moves into the account menu there. */}
+        <span className={user ? "hidden sm:contents" : "contents"}>
+          <ThemeToggle />
+        </span>
 
         {loading ? (
   /* ── Skeleton while auth session restores ── */
@@ -119,6 +122,8 @@ export default function NavbarActions() {
                   </p>
                   <p className="truncate text-xs text-ink-3">{user.email}</p>
                 </div>
+                {/* phones: the theme lives here, not on the crowded top bar (#778) */}
+                <ThemeMenuRow className="sm:hidden" />
                 <button
                   onClick={() => { setMenuOpen(false); router.push(`/community/profile/${user.uid}`); }}
                   className="flex w-full items-center gap-2 px-4 py-3 text-sm text-ink-2 transition hover:bg-fill hover:text-ink"
