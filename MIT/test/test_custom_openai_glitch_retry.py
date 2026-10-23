@@ -212,3 +212,12 @@ def test_a_dropped_source_question_counts_as_glitched_1056():
     t = CustomOpenAiTranslator()
     assert t._is_glitched("FOR NO REASON? I WONT LEND.", "ไม่มีเหตุผลเลย! ฉันจะไม่ยืม", "THA")
     assert not t._is_glitched("FOR NO REASON? I WONT LEND.", "ไม่มีเหตุผลเลยหรือ ฉันจะไม่ยืม", "THA")
+
+def test_the_untranslated_word_guard_is_opt_in_1057(monkeypatch):
+    """#1057: an English source word left inside Thai triggers only with the opt-in flag."""
+    t = CustomOpenAiTranslator()
+    src, dst = "DID ANYONE BRING THE RESOURCE MATERIALS?", "มีใครเอามATERIALS มาบ้างไหม?"
+    monkeypatch.delenv('MIT_LEAK_LATIN_GUARD', raising=False)
+    assert not t._is_glitched(src, dst, 'THA')
+    monkeypatch.setenv('MIT_LEAK_LATIN_GUARD', '1')
+    assert t._is_glitched(src, dst, 'THA')

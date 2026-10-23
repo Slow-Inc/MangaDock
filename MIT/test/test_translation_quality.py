@@ -295,3 +295,14 @@ def test_a_dropped_source_question_is_flagged_1060():
     assert not dropped_question("WHY?", "ทำไม?")
     assert not dropped_question("NO REASON", "ไม่มีเหตุผล")
     assert not dropped_question("WHY?", "Why", "ENG")
+
+
+def test_an_english_word_left_inside_thai_is_an_untranslated_leak_1057():
+    from manga_translator.translation_quality import untranslated_source_word as u
+    assert u("DID ANYONE BRING THE RESOURCE MATERIALS?", "มีใครเอามATERIALS มาบ้างไหม?")
+    assert u("DID ANYONE BRING THE RESOURCE MATERIALS?", "มีใครเอา MATERIALS มาบ้างไหม?")
+    assert not u("TRANSLATED BY DALE", "แปลโดย DALE")
+    assert not u("EMINENCE IN SHADOW", "EMINENCE IN SHADOW-")
+    assert not u("RTSD IS THE PUBLISHER", "RTSD คือสำนักพิมพ์")
+    assert not u("SHE SAID HELLO", "เธอทักทาย")
+    assert not u("DID ANYONE BRING THE MATERIALS?", "Materials อยู่ไหน")

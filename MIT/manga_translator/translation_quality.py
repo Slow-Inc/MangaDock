@@ -370,3 +370,51 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     if '?' not in src and '？' not in src:
         return False
     return _THAI_Q_MARKERS.search(dst or '') is None
+
+
+#: #1057: Latin words that survived into a Thai line (the model left an English word untranslated).
+_LATIN_WORD = re.compile(r'[A-Za-z]{4,}')
+_THAI_CHAR = re.compile('[\u0E00-\u0E7F]')
+_CREDIT_SRC = re.compile(
+    r'(TRANSLAT|TRANSLATED BY|WRIT|DRAW|DESIGN|LETTER|EDITING|EDITOR|AUTHOR|STORY|THANKS|SPECIAL|CREDIT|CLEAN|TYPESET|PUBLISH|ART BY)',
+    re.I)
+_VOWELS = set('AEIOUaeiou')
+
+
+def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
+    """True when a Thai answer kept an English source word instead of translating it (#1057).
+
+    Observed: `DID ANYONE BRING THE RESOURCE MATERIALS?` -> `มีใครเอามATERIALS มาบ้างไหม?` (the word glued to
+    Thai). Licensed-copy rules keep the known benign cases out:
+
+    - the answer must be mostly Thai (credits/titles/logos that stay Latin are skipped),
+    - credit lines are skipped (`TRANSLATED BY DALE` legitimately keeps the name),
+    - words without a vowel (`RTSD`, `TV`) are acronyms and skipped,
+    - only words that the SOURCE actually contains count (words the source never had are the gate's
+      `added_latin` class).
+    """
+    if to_lang and str(to_lang).upper() not in ('THA', 'TH'):
+        return False
+    src, dst = src or '', dst or ''
+    if not src or not dst:
+        return False
+    thai = _THAI_CHAR.findall(dst)
+    if len(thai) < max(4, len(dst) // 2):
+        return False  # mostly-Latin answer: title/credit/logo/licensed copy
+    if _CREDIT_SRC.search(src):
+        return False
+    src_words = {w.upper() for w in _LATIN_WORD.findall(src)}
+    for word in _LATIN_WORD.findall(dst):
+        upper = word.upper()
+        # exact source word, or a partial copy glued into the Thai (observed: MATERIALS -> 'ATERIALS' after the
+        # Thai 'ม' swallowed the M). Partial copies must cover most of the source word to stay specific.
+        matched = upper in src_words or any(
+            len(upper) >= 4 and upper in src_word and len(upper) >= 0.6 * len(src_word)
+            for src_word in src_words)
+        if not matched:
+            continue
+        if not (set(word) & _VOWELS):
+            continue
+        return True
+    return False
+

@@ -7,7 +7,7 @@ from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
                                    runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
-                          dropped_question)
+                          dropped_question, untranslated_source_word)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -295,6 +295,9 @@ class CommonTranslator(InfererModule):
             reasons.append('lost_as_rare')
         if dropped_question(query, trans, to_lang):
             reasons.append('dropped_question')
+        if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+                and untranslated_source_word(query, trans, to_lang)):
+            reasons.append('untranslated_word')
         if reasons and os.environ.get('MIT_LOG_GLITCH'):
             print(f'[glitch] {",".join(reasons)} | src={query[:44]!r} -> dst={trans[:44]!r}', flush=True)
         return bool(reasons)
@@ -304,6 +307,10 @@ class CommonTranslator(InfererModule):
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #1057 (opt-in): the answer kept an English word that the source says; ask for a translation.
+        if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+                and untranslated_source_word(query, trans)):
+            return query + ('\n\n[note: the answer kept an English word from the source untranslated (possibly glued to Thai). Translate it into Thai in this answer; proper names and credits may stay as they are.]')
         # #1056: a source question whose answer lost every question marker.
         if dropped_question(query, trans):
             return query + ("\n\n[note: the source line asks a question ('?'); keep the question in the translation, e.g. end it with a Thai question particle such as ไหม or หรือเปล่า.]")

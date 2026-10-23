@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 107 — opt-in guard for an untranslated English word inside Thai (#1057) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the licence-based predicate `untranslated_source_word`: Thai target, mostly-Thai answer (credits/titles skipped), non-credit source line, an answer word matching a source word exactly **or a partial copy covering >= 60 %** (the observed `ATERIALS` case), with a vowel (`RTSD`/`TV` skipped).
+- Wired as an **opt-in** (`MIT_LEAK_LATIN_GUARD=1`) retry trigger + note, same predicate -> trigger -> note discipline as the other guards; tests cover the observed mangled line, the intact English word, credit line, title-only Latin, acronym and absent-word cases, plus the env gating (heavy glitch suite 18 passed).
+- **False-positive sweep:** Otome p0 (credits), Kage p0 (title) and Horimiya p1 with the flag on: **0 triggers, gate 0 violations**. Stays opt-in until a forced-injection proof and a wider sweep; benchmark `2026-10-23-1057-untranslated-word-guard.md`.
+
 ## MIT quality loop, round 106 — sweep 43 (full 39-page coverage) + dropped-question retry guard (#1056) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
