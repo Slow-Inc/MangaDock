@@ -77,6 +77,22 @@
 
 ---
 
+## #1081 Profile banner controls and the password hint reachable from the keyboard (2026-10-23)
+
+**What:** a hover-only sweep turned up two real cases.
+- **Profile banner controls.** The upload and reposition buttons sat in an `opacity-0 group-hover` wrapper. They now
+  also show on `group-focus-within` and on `@media(hover:none)`.
+- **AccountsTab "ไม่ได้ตั้งค่า" hint.** It was `hidden group-hover:block`, and its link was a `<strong onClick>`. The
+  chip is now a button that goes to the password tab, with the hint as its `aria-describedby`, shown on
+  focus-within too.
+
+**Validated:** production-build probe, fake session, API answered locally.
+- **Before:** the banner button was opacity 0 on focus, and the chip wasn't a button.
+- **After:** opacity 1, the hint shows on focus, and Enter goes to `/settings/password`.
+- Real tsc is clean, and eslint matches main.
+
+---
+
 ## #1078 / #1079 Form fields have names; login modal's hidden forms leave the Tab order (2026-10-23)
 
 **What:**
