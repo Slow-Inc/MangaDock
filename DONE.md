@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 181 — production acceptance with the OCR pass default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two production-style pages with the default (no env): **gate 0 violations**, one spacing repair accepted (`towardsme that` -> `towards me that`), no errors/layout change. With `MIT_OCR_REREAD=0` the same pages reproduce baseline timings/text.
+- Cost on these pages: +0.5 s wall/page average (range +0.2 to +0.8), consistent with the 39-page +0.33 s/page average. Benchmark `2026-10-23-ocr-reread-prod-acceptance.md`.
+- Default is production-safe.
+
+---
+
 ## MIT quality loop, round 180 — PR #794 body/comment updated with round-3; CI green on the new head (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
