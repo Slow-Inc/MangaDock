@@ -332,6 +332,8 @@ every GPT-family translator appends it to its system prompt. Absent -> prompts b
     api_url: Optional[str] = None
     """#893: per-request endpoint (LLM_BASE_URL) for the same path. Absent -> .env base."""
     concise_bubbles: bool = False
+    temperature: Optional[float] = None
+    """#762 follow-up: per-request sampling temperature. Absent -> the translator keeps its default (0.5)."""
     """#892 (P7/#526): ask the translator for the shortest faithful phrasing — the #1 render defect
     on tight bubbles is a translation physically too long for the balloon. The Backend has sent this
     flag since #526 but Pydantic dropped it because the field was missing; it rides the same
@@ -383,6 +385,8 @@ every GPT-family translator appends it to its system prompt. Absent -> prompts b
         if self.concise_bubbles:
             # #892: the Backend flag used to die here; carry it to the OmegaConf ConfigGPT reads.
             overrides['concise_bubbles'] = True
+        if self.temperature is not None:
+            overrides['temperature'] = float(self.temperature)
         if overrides:
             ctx = OmegaConf.create(overrides)
             return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx

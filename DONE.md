@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 139 — temperature A/B completed: 0.2 within noise, kept opt-in as MIT_TEMPERATURE (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Full-corpus paired A/B:** 0.5 -> 38 pages/376 segs raw 1.41, strict-adjusted 1.51, 13 zeros, 10 guard hits; 0.2 -> 37/364 raw 1.45, adjusted 1.58, 14 zeros, 6 guard hits. Paired per-page: 0.2 wins 17 / 0.5 wins 12 / ties 8 — exactly the loop's noise boundary (≤5-page margin).
+- **Default stays 0.5** (no evidence clearing the noise bar); the lever is now an **opt-in config**: `MIT_TEMPERATURE` (Backend) -> `translator.temperature` -> `ConfigGPT.temperature`; absent -> translator default 0.5 and byte-identical config. MIT passthrough test added; Backend mit-config spec 27 passed.
+- Benchmark `2026-10-23-temperature-ab.md` updated with the full table and decision.
+
+---
+
 ## MIT quality loop, round 138 — temperature 0.5 vs 0.2 A/B launched; pilot favours 0.2 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

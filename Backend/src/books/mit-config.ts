@@ -233,6 +233,11 @@ export function buildMitConfig(
   const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
   const lamaReground = fracEnv('MIT_LAMA_LUM_REGROUND');
   const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
+  // #762 follow-up: sampling temperature. Absent -> MIT keeps its translator default (0.5).
+  const temperatureRaw = Number(env.MIT_TEMPERATURE);
+  const temperature = env.MIT_TEMPERATURE !== undefined && Number.isFinite(temperatureRaw) && temperatureRaw >= 0 && temperatureRaw <= 2
+    ? temperatureRaw
+    : undefined;
   const model = imageModelKey(imageModel);
   const provider = env.LLM_PROVIDER ?? 'gemini';
   return JSON.stringify({
@@ -248,6 +253,7 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      ...(temperature !== undefined ? { temperature } : {}),
       ...(provider !== 'gemini'
         ? {
             translator: 'chatgpt',
