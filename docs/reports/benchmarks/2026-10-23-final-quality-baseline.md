@@ -248,3 +248,15 @@ Every one of the 11 triggers was caught by a guard (gate and leftover stayed emp
 is exactly the whole-page retry cost measured in round 265-266 (each glitch re-sends the page twice). This run also
 confirms the retry-cost analysis with natural data rather than a forced harness: the model's variance in this window, not
 the SFX change, drove the latency.
+## v10 sweep (2026-10-23 late; bad model window, but gate clean after the round-274 livences)
+
+| metric | v9 | **v10** |
+|---|---|---|
+| pages / regions | 39 / 370 | 39 / **371** |
+| guard triggers | 11 | **14** (same bad model window: foreign-script Chinese leaks, spurious ทน, content-loss) |
+| dashboard gate (after round-274 licence fixes) | `{}` | **`{}`** |
+| dashboard leftover | `{}` | **`{}`** |
+| wall avg | 10.3 s | **10.1 s** |
+
+Quality held again in a degraded window (every trigger caught; the two gate items turned out to be licence gaps and are
+fixed). The wall time is retry-bound as analysed in rounds 265-267.

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 274 — digit-name + strong-negation gate licences; v10 re-scan gate {} (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v10 (39 pages) hit a bad model window again (14 guard triggers, wall 10.1 s) but every trigger was caught; the two gate findings were false positives: `ZER0` for the source credit `ZERO` (digit-suffixed kept name) and a strong Thai negation (`ไม่ใช่อย่างนั้น`) carrying a source `!`.
+- Fixed `added_latin` to normalise lookalike digits across whole alphanumeric tokens (genuine added Latin still flagged) and extended the emphasis licence with `ไม่ใช่`. Re-scan of v10: **gate {} and leftover {}**. Tests added; dashboard fixture updated; suite **995 passed**. Issue #1099; v10 row recorded.
+
+---
+
 ## MIT quality loop, round 273 — merge re-verified against main 1a7ed2e6: 3 docs conflicts, merged suite 993 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

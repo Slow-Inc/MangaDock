@@ -16,7 +16,9 @@ def test_the_dashboard_aggregates_real_payload_shapes():
     report = summarise(payloads)
     assert report['pages'] == 2
     assert report['regions'] == 19  # 8 + 11 rendered regions in the fixtures
-    assert report['gate_violations'].get('dropped_!') == 1  # the Iruma nuance
+    # Both fixture payloads were the pre-licence false positives (the Iruma `!` nuance); after the precision
+    # licences (round 274) they aggregate clean, which is the expected end state.
+    assert report['gate_violations'] == {}
     assert report['leftover'] == {}  # the loop guards left nothing
     assert report['timing_ms']['wall'] > 0
 

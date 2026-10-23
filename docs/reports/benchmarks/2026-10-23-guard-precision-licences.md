@@ -72,3 +72,15 @@ Unseen Kaiju pages surfaced two false positives that cost retries but changed no
 
 Evidence: the three affected pages re-run with **no guard triggers and gate 0**; translation 2.7-4.7 s vs 6.6-11.1 s
 before. Tests added; suite **993 passed**.
+## Digit-suffixed kept names and strong negation (round 274, #1099)
+
+v10's two gate findings were false positives:
+
+- `TYPESETTING BY RTSD, ZERO` -> `จัดหน้าโดย RTSD, ZER0`: the model kept the same credit but wrote a lookalike digit;
+  the gate's letter token `ZER` looked like added Latin. `added_latin` now compares the whole alphanumeric token with
+  lookalike digits normalised (`ZER0` -> `ZERO`); genuinely new Latin (`BONJOUR`) is still flagged.
+- `T THATS NOT IT!` -> `ฉ- ไม่ใช่อย่างนั้น`: the strong negation carries the emphasis; the emphasis licence now accepts
+  `ไม่ใช่`.
+
+Re-scanning the v10 outputs with the fixed rules gives **gate `{}` and leftover `{}`**. Tests added; the dashboard fixture
+was updated because its Iruma payload is one of the licensed cases; suite **995 passed**.

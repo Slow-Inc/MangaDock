@@ -141,3 +141,17 @@ def test_reader_site_credit_and_rhetorical_exclamation_are_not_flagged_1067():
     assert check_page([rhetorical]) == []
     plain = check_page([{'src': 'SUCCESS!', 'dst': 'ความสำเร็จ'}])
     assert any(v['kind'] == 'dropped_!' for v in plain), plain
+
+
+def test_digit_suffixed_names_are_not_added_latin_1099():
+    from manga_translator.quality_gate import check_page
+    # measured: the source says ZERO, the model kept the name as ZER0; both are the same kept name
+    assert check_page([{'src': 'TYPESETTING BY RTSD, ZERO', 'dst': 'จัดหน้าโดย RTSD, ZER0'}]) == []
+    assert any(v['kind'] == 'added_latin'
+               for v in check_page([{'src': 'HELLO', 'dst': 'สวัสดี BONJOUR'}])), 'genuine added Latin must stay flagged'
+
+
+def test_strong_negation_carries_the_exclamation_1099():
+    from manga_translator.quality_gate import check_page
+    # measured: "T THATS NOT IT!" -> the Thai strong negation carries the emphasis
+    assert check_page([{'src': 'T THATS NOT IT!', 'dst': 'ฉ- ไม่ใช่อย่างนั้น'}]) == []
