@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 283 — seventh unseen series (Death Note): gate 0 on dense dialogue pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four dialogue-dense Death Note pages: gate 0 everywhere, render telemetry clean; two triggers caught (a Korean-syllable leak and a content-loss retry). The glitched page's translation stage cost 41 s - a concrete natural example of the retry-bound latency (quality held).
+- Unseen aggregate now 6 series / 31 pages, 30/31 gated clean (the exception is legitimate Latin names on Bocchi). No code change.
+
+---
+
 ## MIT quality loop, round 282 — production path re-verified after all licences: gate 0, names consistent (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

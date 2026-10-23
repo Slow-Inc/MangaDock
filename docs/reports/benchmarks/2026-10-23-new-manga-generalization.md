@@ -104,3 +104,25 @@ looks solid on unseen series, and the SFX batching bounds the worst merge time.
   class (free-standing text near a panel edge), now logged on #642.
 - Unseen data now: Kaguya 8 pages (2 spill instances), Bocchi 4 (3 legitimate-name gate findings), Yotsuba 4, Oshi 4,
   Kaiju 7 -> **27 unseen pages, 26 gated clean**, two render spills.
+## Seventh series: Death Note (4 dialogue-dense pages)
+
+- **4/4 pages: gate 0**, render telemetry clean.
+- Two guard triggers on one page (both caught): a Korean syllable `길드` leaked into `คู่แข่งร่วม길ด์ของฉัน` (foreign-script
+  retry), and `ITS BEEN A LONG TIME, HASNT IT!` tripped content-loss (the Thai kept the tag as `นะ`).
+- Latency note: that page's translation stage took **41 s** because the retry policy re-sends the whole page and the page
+  carries dense long lines - a concrete example of the retry-bound latency analysed in rounds 265-267 (quality held,
+  gate 0).
+
+## Aggregate on unseen data (6 series, 31 pages)
+
+| series | pages | gate | render | guard notes |
+|---|---|---|---|---|
+| Kaguya-sama (2 chapters) | 8 | 0 | two spills | none after the licences |
+| Bocchi the Rock! | 4 | 3 (legitimate Latin names) | clean | retry churn on names (queued) |
+| Yotsuba to! | 4 | 0 | clean | one content-loss retry on credits |
+| Oshi no Ko | 4 | 0 | clean | rare dropped-question sample caught |
+| Kaiju No. 8 | 7 | 0 | clean | none after the credit-URL licence |
+| Death Note | 4 | 0 | clean | Korean leak + content-loss retry (41 s page) |
+
+**30/31 unseen pages gated clean**; the exceptions are legitimate Latin proper names. Quality generalises across art and
+dialogue styles; the remaining costs are render spills on free-standing text and the whole-page retry policy.
