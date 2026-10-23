@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 188 — gate aligned with the tag licence; v3 end state gate/leftover clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The deterministic gate had its own question-marker check and still flagged the YKNOW tag line; exported `is_tag_question` and made both `dropped_question` and the gate use it. Dashboard on the same outputs: gate `{dropped_! : 1}` (real lost exclamation), **leftover {}**.
+- Gate test added; suite 963 passed. Final baseline doc gained the v3 row (369 regions, wall 8.03 s single run, judge range unchanged).
+
+---
+
 ## MIT quality loop, round 187 — dropped_question tag-question licence clears the only leftover (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

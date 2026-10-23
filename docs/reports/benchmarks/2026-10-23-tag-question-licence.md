@@ -19,3 +19,11 @@ questions whose Thai marker exists were never flagged).
 
 - Re-ran the dashboard on the same outputs: **leftover `{}`** (was `dropped_question: 1`), gate unchanged otherwise.
 - Tests: tag licence + real-question control (`test_tag_questions_are_licensed_1024`); full suite 962 passed.
+## Gate alignment
+
+The deterministic gate had its **own** question-marker check and still flagged the same line. It now imports the same
+licence (`is_tag_question`) before flagging `dropped_?`. Re-ran the dashboard on the same outputs:
+
+- gate: `{dropped_?: 1}` -> **`{dropped_!: 1}`** (the one remaining is a real lost exclamation),
+- leftover: `{}`.
+- Gate test added (`test_tag_questions_are_licensed_in_the_gate_1025`); full suite 963 passed.

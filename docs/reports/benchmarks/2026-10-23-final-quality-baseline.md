@@ -81,3 +81,17 @@ judge segments 370 raw 1.44 / noise_flags 77 / adjusted 1.60
 So the strict-adjusted end state is **1.55-1.60** depending on the run (v1 1.55, v2 dashboard 1.60); the raw number is
 stable at 1.44 and the movement sits in the judge-noise flag count (77 vs 138), i.e. inside the classifier's own
 variance, not a proven OCR-pass gain. Quote the range, not a single decimal.
+## v3 end state (2026-10-23, tuned OCR threshold + tag-question licence)
+
+Same corpus with the final tuned defaults (`PROB_THRESHOLD 0.75`, cap 8) and the gate/guard tag-question licence:
+
+| metric | v2 | v3 |
+|---|---|---|
+| pages / regions | 39 / 370 | 39 / **369** |
+| gate violations | 3 name + 1 dropped_? | **1 (`dropped_!`)** |
+| leftover | {} | **{}** |
+| wall avg | 7.64 s | **8.03 s** (single run; translation/OCR variance, +69 ms OCR by design) |
+| OCR text A/B on changed lines | 88 % better | unchanged (same machinery) |
+
+Judge was not re-run for v3 (the change only affects 20 more OCR lines, A/B-verified 11 better / 3 worse); the raw
+1.44 / adjusted 1.55-1.60 range from v2 remains the reference.

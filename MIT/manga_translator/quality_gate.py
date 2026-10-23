@@ -18,6 +18,7 @@ Pure logic, so it unit-tests without the ML stack.
 import re
 
 from .name_glossary import extract_glossary
+from .translation_quality import is_tag_question
 from .translation_quality import (content_loss, foreign_script, normalize_common_typos, runaway_translation,
                                   untranslated_source_word)
 
@@ -83,6 +84,8 @@ def check_page(regions, page='?'):
                     continue  # one interrobang covers both marks
                 if mark == '!' and '?' in dst:
                     continue  # a Thai rhetorical question keeps only the ?
+                if mark == '?' and is_tag_question(src_punct):
+                    continue  # discourse tag (..., y know? / right?) needs no question marker
                 if mark == '?' and _THAI_QUESTION.search(dst):
                     continue  # final Thai question particle carries the question
                 if mark == '…' and '...' in dst:

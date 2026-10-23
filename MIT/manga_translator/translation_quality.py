@@ -415,6 +415,11 @@ _THAI_Q_MARKERS = re.compile(
     r'\?|หรือ(?:เปล่า|ไม่|ไง)|ไหม|มั้ย|เหรอ|หรอ|หรือ|อะไร|ทำไม|ยังไง|อย่างไร|เท่าไหร่|แค่ไหน|ที่ไหน|ใคร|เมื่อไหร่')
 
 
+def is_tag_question(src: str) -> bool:
+    """True when a question mark in the source is a discourse tag (..., y know? / right?), not a question."""
+    return bool(_EN_TAG_QUESTIONS.search((src or '').strip()))
+
+
 def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     """True when the source asks a question but the target has no question marker at all.
 
@@ -428,7 +433,7 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     standalone = re.sub(r'(?<=[A-Za-z0-9])\?+(?=[A-Za-z0-9])', '', src or '')
     if '?' not in standalone and '？' not in standalone:
         return False
-    if _EN_TAG_QUESTIONS.search(standalone.strip()):
+    if is_tag_question(standalone):
         return False
     return _THAI_Q_MARKERS.search(dst or '') is None
 

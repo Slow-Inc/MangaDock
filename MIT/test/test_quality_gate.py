@@ -109,3 +109,9 @@ def test_the_gate_flags_a_common_thai_typo_1023():
     clean = check_page([{"src": "IS THAT SO", "dst": "ใช่แล้ว."}])
     assert not clean, clean
 
+
+def test_tag_questions_are_licensed_in_the_gate_1025():
+    from manga_translator.quality_gate import check_page
+    assert check_page([{'src': 'ITS JUST AINT FAIR, YKNOW?', 'dst': 'มันไม่แฟร์เลยนะเนี่ย!'}]) == []
+    viol = check_page([{'src': 'IS THAT SO?', 'dst': 'มันเป็นอย่างนั้นจริงๆ'}])
+    assert any(v['kind'] == 'dropped_?' for v in viol), viol
