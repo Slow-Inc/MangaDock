@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 112 — issue bodies refreshed to current state (DoD handoff) + PR status comment (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a dated **bilingual status section** to the bodies of #905, #980, #1047, #1051, #1055, #1056, #1057, #1058 (what shipped, commits, evidence, default-vs-opt-in state, escape flags) so the next reader/agent gets the current state from the body instead of replaying comments.
+- Posted the refreshed overall status (quality baseline 1.44-1.48/2, default guards list, performance profile, opt-ins with tradeoffs, remaining work) on PR #794 for review.
+- No code change; suite stays green (last run 929 passed).
+
 ## MIT quality loop, round 111 — final post-default regression: 1.48/2 with all guards on (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
