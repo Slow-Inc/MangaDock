@@ -172,3 +172,11 @@ the quality-first default - temperature stays 0.5 and `MIT_TEMPERATURE` remains 
 v10 has only two source-`!` lines whose Thai carries no punctuation/emphasis particle: one is the licensed strong
 negation (`T THATS NOT IT!` -> `ฉ- ไม่ใช่อย่างนั้น`), the other keeps the surpresa nuance with `หรือ?`
 (`IT WONT KILL ME?!` -> `มันไม่ทำให้ฉันตายหรือ?`). The licence is narrow; no shipped defect is hidden by it.
+### Retry-cost revisit condition (2026-10-23, round 240): dense pages make it worth a hybrid test
+
+The earlier attempt-3-subset A/B was neutral **on a 17-line page** (one gateway call either way). A natural dense-page
+case now exists: a Death Note page (long lines, dense dialogue) spent **41 s in the translation stage** for two retries,
+i.e. each retry re-sends the whole page (~13 s). Here a hybrid - whole-page for attempt 2, flagged subset for attempt 3 -
+would save roughly a third of that stage. It still needs a forced-glitch A/B **on a dense page** (the small-page result
+does not transfer); if that is quality-neutral, the hybrid could become a default for pages above a segment-count
+threshold, leaving small pages untouched.

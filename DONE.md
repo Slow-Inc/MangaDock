@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 284 — dense-page retry hybrid queued with natural evidence (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Death Note's dense page (41 s translation for two whole-page retries) is the natural case where the previously-rejected attempt-3-subset hybrid would save about a third of the stage; recorded that the test must be repeated on a dense page (the small-page A/B does not transfer) before it could become a default above a segment-count threshold. No code change.
+
+---
+
 ## MIT quality loop, round 283 — seventh unseen series (Death Note): gate 0 on dense dialogue pages (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
