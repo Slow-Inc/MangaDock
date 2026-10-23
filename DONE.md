@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 243 — v7 sweep: page gate `{}`, leftover `{}`, 3 guard triggers (lowest) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Post-fix sweep: dashboard gate **`{}`** and leftover **`{}`** (the rare `ATERIAL` did not recur), only the expected chapter name variance remains; guard triggers **3**, the lowest of any sweep; wall 7.83 s.
+- OCR suspicious singles dropped 7 -> 6 and the survivors are legitimate stammers/truncations (`W-`, `T THATS`, `R..`, `U-UM`, a cut `S`) — the `N`->`NOT` line is fixed. Final baseline gained the v7 row. No further code change.
+
+---
+
 ## MIT quality loop, round 242 — suspicious OCR lines re-read with a wider crop (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

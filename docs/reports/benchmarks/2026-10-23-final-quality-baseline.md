@@ -175,3 +175,17 @@ distribution 0/1/2 = 10 / 155 / 205  (broken 2.7 % / partial 41.9 % / perfect 55
 Raw is stable at **1.44** across every sweep (v1-v6). The strict-adjusted value depends on how many segments the judge
 flags as typo/note noise that run: 49 flags here vs 65-138 earlier, so the adjusted mean ranges **1.53-1.60**. Quote the
 band and the raw value; do not treat the adjusted movement as a pipeline change.
+## v7 end state (2026-10-23, after the OCR single-letter garble fixes)
+
+| metric | v6 | **v7** |
+|---|---|---|
+| pages / regions | 39 / 370 | 39 / **369** |
+| page gate violations (dashboard) | `{untranslated_word: 1, added_latin: 1}` | **`{}`** |
+| leftovers (dashboard classes) | `{untranslated_word: 1}` | **`{}`** |
+| chapter name check | 1 (`TSUKUYOMI`; no `series_context` in doctor runs) | 1 (same, expected) |
+| guard triggers | 4 | **3 (lowest of any sweep)** |
+| wall avg | 7.80 s | 7.83 s |
+| OCR garbled single letters in raw OCR | 7 regions | **6, all legitimate stammers/truncations** (`W-`, `T THATS`, `R..`, `U-UM`, a cut `S`) — the `N`->`NOT` line is gone |
+
+This is the cleanest end state so far: the page gate and leftover sets are empty, and the remaining OCR oddities are
+real stammers/truncations that must stay as-is.
