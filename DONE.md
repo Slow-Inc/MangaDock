@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 269 — remaining merge outliers profiled: panel/bubble layout + SFX vision wait (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v9 merge outliers (5.7-9.2 s) were profiled on the Mushoku page: Kumiko panel detection 2.13 s (`_cached_split` 1.46 s over 16 panels), bubble detection 0.78 s, and the (already concurrent) SFX vision wait on candidate pages.
+- Neither can shrink without a quality tradeoff (dropping SFX candidates or changing the panel contract that rendering relies on; the panel-downscale campaign was already rejected). Recorded and closed for this loop. No code change.
+
+---
+
 ## MIT quality loop, round 268 — final report includes the SFX batching fix and the v9 latency note (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -146,3 +146,11 @@ wrong) but send only the flagged subset for **attempt 3** - at that point the wh
 context, so page-mates are not the variable. Needs the forced-glitch harness to compare final quality attempt-3
 subset vs whole-page before it can be a default; if that A/B is neutral, the default saves ~2-4 s on pages whose glitch
 survives the first retry.
+### Measured 2026-10-23 (round 220): remaining merge outliers are panel/bubble detection plus SFX prefetch
+
+v9 per-page timings: `textline_merge` averages 1.8 s with outliers 5.7-9.2 s (Mushoku, Kage, Tsuki p1). Profiling the
+Mushoku outlier: Kumiko panel detection **2.13 s** (`_cached_split` 1.46 s over 16 panels), bubble detection **0.78 s**,
+and on pages with SFX candidates the vision prefetch (already concurrent) adds its gateway wait. The SFX part cannot
+shrink further without dropping candidates (quality tradeoff), and the panel/bubble work is the layout contract that
+the render stage relies on (a downscale/disable campaign was already rejected earlier for panel-order changes). Close this
+for the current loop.
