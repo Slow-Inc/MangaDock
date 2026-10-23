@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 222 — Vercel deployment passes after the tracing fix; all PR checks green (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The rate-limit window cleared and Vercel deployed head `16ff6e43`: **deployment completed** — the `outputFileTracingExcludes` fix (#1064) resolved the 253 MB docs-function failure. The image-downscaling workaround was already reverted, so evidence images are original resolution.
+- GitHub checks on the same head: logic gate pass, backend pass (heavy ML was still running); PR is now fully green including Vercel.
+- Commented on #1064 and the PR with the evidence; issue closes when #794 merges. Local `next build` verification was not possible in this worktree (Turbopack rejects a symlinked node_modules from another root), so Vercel is the verification.
+
+---
+
 ## MIT quality loop, round 221 — root fix for the Vercel docs-function size: exclude binaries from tracing; images restored (#1064) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
