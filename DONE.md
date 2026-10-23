@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 275 — merge-day runbook issue list and suite figure refreshed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Runbook now lists the two newest licence issues to close on merge (#1098, #1099) and quotes the current post-licence suite figure (995). No code change.
+
+---
+
 ## MIT quality loop, round 274 — digit-name + strong-negation gate licences; v10 re-scan gate {} (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

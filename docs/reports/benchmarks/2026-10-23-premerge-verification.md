@@ -59,11 +59,13 @@ pytest (logic gate) / heavy ML / backend must pass; Vercel must deploy (it passe
 # 4) close the loop issues with their evidence (they were fixed in this PR)
 #    #898 #901 #903 #1039 #1052 #1056 #1057 #1058 #980 #1006 #1026 #1047 #1050(closed) #1051 #1055
 #    #1064 (docs function size) #1065 (name glossary) #1071 (guard precision licences) #1059 (breakpoint)
+#    #1098 (reader-site credit + rhetorical exclamation licences) #1099 (digit-name + strong negation gate licences)
 # 5) after merge: mark the PR ready, then delete the branch
 ```
 
 Notes: the branch is currently 0 behind `integrate/render-reconcile`; the merge simulation earlier proved the code
-auto-merges with `main` and the merged fast suite passes (944 at the time, 982 now).
+auto-merges with `main` and the merged fast suite passes (993 at the last re-verification, 995 after the round-274
+licences; keep the closed-issue list above in sync as new licence issues land).
 ## Re-verification against main `cb30e950` (2026-10-23, round 182)
 
 - `git merge-tree --write-tree origin/main HEAD`: conflicts are **still exactly the three append-only docs**
