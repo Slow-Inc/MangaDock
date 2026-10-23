@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 215 — omission pass clean-page sample: 19 candidates, 0 false flags (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four more pages with the schema fast path (1/6/2/1 candidates, all agreed=[]); cumulative clean-page sample is now **10 pages / 19 candidates / 0 flags**, while every flag seen (1) was the replay true positive.
+- Consistent with the class being safe as opt-in; a small sample for any default. No code change; benchmark updated.
+
+---
+
 ## MIT quality loop, round 214 — omission pass: schema-enforced batch verification cuts cost to 24.8 s on the replay page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

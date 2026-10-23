@@ -150,3 +150,15 @@ candidate count. If it does not, the pass falls back to the proven per-line path
 
 Direct verifier probe with six candidates still flags only the omitted line (`agreed={5: THIS PIQUED MY CURIOSITY}`),
 and the unit suite (11 omission tests) covers the fast path, the item-count fallback and the object/array parser.
+## Cumulative clean-page false-positive sample (10 pages, 19 candidates)
+
+Four more pages (Otome, Maou, Kage, Anta) with the schema fast path: 1/6/2/1 candidates, **agreed=[] on all four**.
+Combined with the earlier six-page sweep:
+
+| sample | candidates | flags |
+|---|---|---|
+| 10 clean pages (live translations complete) | **19** | **0** |
+| replay page with a known omission | 6 | 1 (the true positive) |
+
+So on this corpus, every flag the pass produced was a real omission (1/1), and 19 clean candidates produced no false
+flag. That is still a small sample for a default, but it is consistent with the class being safe to expose as opt-in.
