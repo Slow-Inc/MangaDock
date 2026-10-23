@@ -16,3 +16,14 @@ Quality/perf/rendering state carried by this branch: noise-adjusted **1.68/2** (
 covering every class with 0 violations on the corpus dashboard, 9 natural guard saves with **0 leftovers** on the 39-page
 sweep, render telemetry all-zero across 39 pages, serial default filter-before-translation (+1.5 s/page on mixed pages),
 and the measured opt-in levers (batch 1.46x with payload parity, preload, widen columns, segment retry).
+## Merge-conflict forecast against current `main` (2026-10-23)
+
+`git merge-tree --write-tree --name-only origin/main HEAD` (read-only dry-run):
+
+- **Code merges cleanly** — no conflicts in `MIT/`, `Backend/` or `Frontend/`.
+- Conflicts are limited to three append-heavy **docs** files: `DONE.md`, `docs/adr/README.md`,
+  `docs/reports/system-impact-report.md` (all take-both / ordering fixes).
+
+Delivery note: #794 is based on `integrate/render-reconcile` (#642, still an open draft). Retarget #794 to `main`
+**after** #642 merges (or before it if the base branch is about to be deleted); at that point only the three docs
+conflicts need resolving — the code is conflict-free.

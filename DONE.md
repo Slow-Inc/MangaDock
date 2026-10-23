@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 149 — merge-conflict forecast vs main: code clean, only 3 docs files (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `git merge-tree --write-tree origin/main HEAD` dry-run: **no code conflicts** (MIT/Backend/Frontend all auto-merge); conflicts only in `DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md` (append-heavy docs, take-both fixes).
+- Recorded in `2026-10-23-premerge-verification.md` with the delivery sequence: retarget #794 to `main` after #642 merges; only the three docs conflicts remain to resolve.
+- Base #642 is still an open draft and the base branch exists, so nothing needs retargeting yet.
+
+---
+
 ## MIT quality loop, round 148 — quality-loop env knobs documented in the env examples (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
