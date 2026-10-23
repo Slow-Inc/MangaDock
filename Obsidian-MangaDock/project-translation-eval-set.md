@@ -54,6 +54,7 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 
 ### ตัวเลขที่ต้องใช้
 - **Judge typo noise ~30%:** judge ลดคะแนนให้สตริงที่เหมือนกัน (`ฉัน→ฉัน`) = Thai tokenizer artefact. ใช้ `MIT/tools/audit_summary.py` แยก noise → บน 480 segment: raw **1.44/2** → **adjusted 1.70/2**, distribution **10/125/345 = broken 2.1% / partial 26% / perfect 72%**. Quote ค่า adjusted เสมอ
+- **Final end-state baseline (2026-10-23, 39-page sweep, 367 segment):** raw **1.44/2** → **adjusted 1.68/2**, distribution **11/97/259 = broken 3.0% / partial 26.4% / perfect 70.6%**; 1 หน้าไม่มี segment ที่ judge ให้คะแนนได้ (all-filtered)
 - Final full-corpus sweep (39/39 หน้า, defaults สุดท้าย): **guard ยิงจริง 9 ครั้ง** (foreign_script 3, content_loss 3, untranslated_word 2, dropped_question 1) และ **leftover 0**; gate เหลือ 2 (dropped_! nuance + name inconsistency ที่ต้องมี series_context); wall avg 7.65s / median 6.96s
 
 ### Guard inventory (default ON ทั้งหมด, มี env ปิด)

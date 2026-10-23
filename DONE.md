@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 124 — definitive end-state quality baseline: adjusted 1.68/2, 71 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the **final 39-page sweep outputs** (the exact end-state defaults): 38 pages scorable, **367 segments**, raw mean 1.44/2, **98 noise flags (27 %)**, **noise-adjusted 1.68/2** with distribution **11/97/259 = broken 3.0 % / partial 26.4 % / perfect 70.6 %**.
+- Real remaining classes: clause omission the ratio guard cannot see (model ceiling), transliteration/word-taste; no corruption-class defects remain — consistent with the earlier 480-segment profile. One page had no scorable segment (all filtered), not a failure.
+- Benchmark `2026-10-23-final-quality-baseline.md`; vault note carries the end-state number for future sessions.
+
 ## MIT quality loop, round 123 — deterministic gate now covers content-loss and untranslated-word (#1057/#1058) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
