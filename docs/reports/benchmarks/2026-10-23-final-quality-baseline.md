@@ -110,3 +110,14 @@ The v4 sweep was run with every default as shipped now (OCR second pass on, tag-
 `spurious_filler` note, name-safe typo normalizer, interjection filter) and is the **first end state with zero gate
 violations and zero leftovers**. Raw judge was not re-run (same 1.44 / 1.55-1.60 range by construction; the changes
 only touch OCR-source lines and rare retries).
+### v4 official judge run (`tools/judge_translations.py` + `audit_summary.py`)
+
+```
+segments 363 (6 lines could not be scored: parse-fail on 2 pages)
+raw mean 1.44/2 | noise flags 65 | strict-adjusted 1.58/2
+distribution 0/1/2 = 13 / 125 / 225  (broken 3.6 % / partial 34.4 % / perfect 62.0 %)
+```
+
+Raw is stable at 1.44 across every sweep (v1/v2/v4), and the strict-adjusted value stays inside the established
+**1.55-1.60** band; v4 lands at 1.58 with 62 % perfect segments. The band remains the honest quote because the
+noise-flag count moves with which lines the judge happens to note (65-138 across runs), not with the pipeline.

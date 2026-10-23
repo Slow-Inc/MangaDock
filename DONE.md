@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 202 — v4 official judge: raw 1.44, strict-adjusted 1.58, 62 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v4 outputs (363 scored segments; 6 lines unscorable on 2 pages): raw **1.44**, noise flags 65, stale-adjusted **1.58**, distribution 0/1/2 = **13/125/225** (3.6 % broken / 34.4 % partial / 62.0 % perfect).
+- Raw is stable across v1/v2/v4 and 1.58 sits inside the 1.55-1.60 band; the final baseline doc now records the official v4 block. No code change.
+
+---
+
 ## MIT quality loop, round 201 — v4 end state propagated to PR body and team memory (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
