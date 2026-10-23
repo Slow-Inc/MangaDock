@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 127 — pre-merge hygiene + PR body refreshed with round 2 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Hygiene scan** of everything the branch adds vs the base: 196 added files, **17.1 MB total — 16.9 MB docs** (34 benchmark evidence images), MIT code +0.2 MB, **zero** files under `tmp/`, `result/` or `Backend/uploads/`. No corpus renders or model files committed.
+- **PR body** was still the round-1 description; appended a bilingual round-2 section (guards/gate/filter/series memory with defaults + evidence, the noise-adjusted **1.68/2 / 70.6 % perfect** baseline, opt-ins with tradeoffs, render telemetry clean, and the CI status: logic gate + heavy ML + backend jest green, Vercel external rate-limit only).
+- PR remains **MERGEABLE**; no code change.
+
+---
+
 ## MIT quality loop, round 126 — fixed the heavy-CI regression our branch introduced in test_stages (#1006 follow-up) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
