@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 183 — v2 end-state sweep with the OCR pass default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 39-page default sweep with the new OCR pass: **370 regions, leftovers 0/0/0, 9 guard triggers, gate 3** (all `inconsistent_name`, expected without `series_context`), judge raw **1.435**, wall avg **7.64 s / median 6.63 s**.
+- Versus v1 (1.44 / 7.65 s): the pass is invisible in aggregates (repairs ~10 % of source strings) and costs no measurable wall time after batching; its value is deterministic (OCR A/B 30/34 = 88 % better on changed lines, `DEEEND`/destroy fixed by default).
+- `2026-10-23-final-quality-baseline.md` now carries the v2 table; remaining defects are the known model-ceiling class plus production-fixable name variance.
+
+---
+
 ## MIT quality loop, round 182 — global OCR box padding rejected and experiment removed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

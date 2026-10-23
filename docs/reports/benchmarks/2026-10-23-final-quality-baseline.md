@@ -46,3 +46,26 @@ quality numbers above.
 ## Classifier note (updated)
 
 The noise classifier now treats **any real typo pair** (left != right) as a real finding, which is conservative: the judge's Thai-tokenizer artefacts often pair near-identical strings, so some of those 37.6 % partial flags are still noise. The honest range is **raw 1.44 / strict-adjusted 1.55 / lenient-adjusted 1.68**, with the 58.9-70.6 % perfect range; the earlier single number (1.68) was the lenient cut.
+
+## v2 end state (2026-10-23, OCR second pass default ON)
+
+Full 39-page sweep with every default as shipped now (no env overrides):
+
+| metric | v1 (pre-OCR) | **v2 (current)** |
+|---|---|---|
+| pages / regions | 39 / 368 | 39 / **370** |
+| gate violations | 1 (`dropped_!`) | **3, all `inconsistent_name`** (HEHE/TSUKUYOMI spellings in doctor runs without `series_context`) |
+| leftovers (foreign script / content loss / typo tokens) | 0 / 0 / 0 | **0 / 0 / 0** |
+| guard triggers | 9 | 9 |
+| judge raw mean | 1.44 (367 segs) | **1.435 (370 segs)** |
+| judge distribution 0/1/2 | — | 10 / 189 / 171 |
+| wall avg / median | 7.65 s / 6.96 s | **7.64 s / 6.63 s** |
+| OCR text-level A/B on changed lines | — | **30/34 (88 %) better** |
+
+The OCR second pass is invisible in the aggregate numbers (it repairs ~10 % of source strings, which moves few judge
+segments) and adds no measurable wall time at the corpus level after batching (+0.33 s OCR stage, inside page variance).
+Its value is deterministic: on the changed lines the OCR read is better 88 % of the time, and the opposite-meaning
+`DEEEND`/`destroy` case is fixed by default.
+
+Remaining defects are the same class as before: model-ceiling nuance/sense on fluent lines (judge 'notes' are the
+known typo-noise) plus the name spelling variance that `series_context` fixes in production.
