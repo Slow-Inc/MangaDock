@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 184 — official dashboard on v2: adjusted 1.60, leftover {}, wall 7.64 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran `tools/quality_dashboard.py` on the v2 outputs: 39 pages/370 regions, gate **dropped_? x1**, **leftover {}**, wall total 297.9 s (avg 7.64 s), OCR 1.56 s/page with the second pass (baseline 1.26 s), judge raw 1.44 / noise flags 77 / **adjusted 1.60**.
+- Honest reading: raw is stable at 1.44 and the adjusted 1.55 -> 1.60 movement tracks the noise-flag count (77 vs 138), i.e. classifier variance rather than a proven OCR gain; the end-state doc and hand-off now quote the **1.55-1.60 range**.
+
+---
+
 ## MIT quality loop, round 183 — v2 end-state sweep with the OCR pass default ON (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

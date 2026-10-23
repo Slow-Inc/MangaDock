@@ -69,3 +69,15 @@ Its value is deterministic: on the changed lines the OCR read is better 88 % of 
 
 Remaining defects are the same class as before: model-ceiling nuance/sense on fluent lines (judge 'notes' are the
 known typo-noise) plus the name spelling variance that `series_context` fixes in production.
+### Official dashboard run on the v2 outputs (`tools/quality_dashboard.py`)
+
+```
+pages 39 / regions 370
+gate_violations {dropped_?: 1}    leftover {}    (chapter-level name check excluded from the page gate)
+timing_ms wall 297937 (avg 7.64 s/page); ocr 60973 (1.56 s/page with the second pass; baseline 1.26 s)
+judge segments 370 raw 1.44 / noise_flags 77 / adjusted 1.60
+```
+
+So the strict-adjusted end state is **1.55-1.60** depending on the run (v1 1.55, v2 dashboard 1.60); the raw number is
+stable at 1.44 and the movement sits in the judge-noise flag count (77 vs 138), i.e. inside the classifier's own
+variance, not a proven OCR-pass gain. Quote the range, not a single decimal.
