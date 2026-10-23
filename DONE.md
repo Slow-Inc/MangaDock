@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 245 — pre-merge re-verified against main cb30e950: 3 docs conflicts, merged suite 985 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `git merge-tree` against current main: conflicts remain exactly the three append-only files (`DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md`).
+- Extracted the merged tree and ran the fast suite there: **985 passed, 4 skipped**, identical to the branch. The merge-day runbook is still accurate after main advanced (#1077). No code change.
+
+---
+
 ## MIT quality loop, round 244 — v7 judge: raw 1.42, adjusted 1.56, broken share 2.2 % (lowest) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

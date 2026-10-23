@@ -64,3 +64,9 @@ pytest (logic gate) / heavy ML / backend must pass; Vercel must deploy (it passe
 
 Notes: the branch is currently 0 behind `integrate/render-reconcile`; the merge simulation earlier proved the code
 auto-merges with `main` and the merged fast suite passes (944 at the time, 982 now).
+## Re-verification against main `cb30e950` (2026-10-23, round 182)
+
+- `git merge-tree --write-tree origin/main HEAD`: conflicts are **still exactly the three append-only docs**
+  (`DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md`) and nothing else auto-merge fails.
+- The merged tree was extracted and its fast suite run in place: **985 passed, 4 skipped** — identical to the branch,
+  so the runbook below remains valid even though main advanced (e.g. #1077 icon-button fixes).
