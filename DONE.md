@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 144 — MIT_TEMPERATURE documented in Backend env example (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the new opt-in to `Backend/.env.example` with the one-line evidence (A/B inside the noise bar, guard hits 10 -> 6, default stays 0.5) so operators can discover it without reading the benchmark.
+- Docs-only change.
+
+---
+
 ## MIT quality loop, round 143 — textline_merge #872 hypothesis closed with measurements (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
