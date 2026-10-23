@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import asyncio
@@ -251,14 +252,29 @@ class CommonTranslator(InfererModule):
         return False
 
     def _is_glitched(self, query: str, trans: str, to_lang: str) -> bool:
-        """A translation that leaks a script foreign to the target ('甚至连' inside Thai) — LLM
-        code-switching measured at random on real pages (quality loop, 2026-10-20) — or that DROPS a
-        Japanese clausal negation (#898, 2 of 4 runs inverted 可愛くない on the real JP->TH path).
-        Counts as invalid so the repeat above re-asks it."""
+        """A translation that leaks a script foreign to the target, drops a Japanese clausal negation
+        (#898), repeats itself into a runaway length (#901), adds Thai filler the source never says
+        (#1039), or swaps LOST for หายาก/rare (#1052). Counts as invalid so the repeat above re-asks it.
+
+        NOTE (round 83): the #1039/#1052 predicates were previously only wired into the retry *note*,
+        not into this trigger, so those re-asks never fired. The direct unit tests below pin the trigger.
+        """
         if not trans:
             return False
-        return (foreign_script(trans, to_lang, query) or negation_lost(query, trans, to_lang)
-                or runaway_translation(query, trans))
+        reasons = []
+        if foreign_script(trans, to_lang, query):
+            reasons.append('foreign_script')
+        if negation_lost(query, trans, to_lang):
+            reasons.append('negation_lost')
+        if runaway_translation(query, trans):
+            reasons.append('runaway')
+        if spurious_filler(trans, query):
+            reasons.append('spurious_filler')
+        if lost_as_rare(trans, query):
+            reasons.append('lost_as_rare')
+        if reasons and os.environ.get('MIT_LOG_GLITCH'):
+            print(f'[glitch] {",".join(reasons)} | src={query[:44]!r} -> dst={trans[:44]!r}', flush=True)
+        return bool(reasons)
 
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
         """

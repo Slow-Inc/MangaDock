@@ -59,3 +59,7 @@ def test_a_punctuation_marble_inside_an_ocr_word_is_not_a_question_990e():
 
 def test_a_question_mark_covers_an_exclamation_in_thai_990f():
     assert check_page([_r("IT WONT KILL ME?!", "มันจะฆ่าข้าไม่ได้งั้นเหรอ?")]) == []
+
+
+def test_ocr_punctuation_between_letters_and_digits_is_not_a_question_990g():
+    assert check_page([_r("Episode?3", "ตอนที่ 3")]) == []

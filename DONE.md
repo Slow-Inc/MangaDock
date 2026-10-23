@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 83 — found and fixed our own guard-wiring bug: filler/lost were notes-only, not retry triggers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Bug in our own #1039/#1052 work:** `_is_glitched` is the retry trigger, but the filler/lost predicates had been wired only into `_modify_invalid_translation_query` (the retry *note*), so those segments were never re-asked. A live `MIT_LOG_GLITCH=1` audit exposed it; the mocked tests for both guards failed at HEAD.
+- **Fix:** `_is_glitched` now evaluates all five predicates (foreign_script, negation_lost, runaway, spurious_filler, lost_as_rare), with an env-gated `[glitch]` reason log for future precision audits. Added a **direct regression test** pinning the trigger for both guards (true for the real error examples, false for clean output and a real RARE source) so it cannot silently regress to notes-only. Mocked retry tests pass again (`call_count == 2`).
+- **Live audit after the fix:** 5 fresh pages, **0 trigger hits, 0 retries** (clean runs; both guards target intermittent errors, so the mocked tests are the deterministic coverage).
+- **Gate companion fix:** `Episode?3` (OCR punctuation between a letter and a digit) was a false dropped-`?`; the OCR-embedded rule now covers digits too, with a test. Full suite **908+ passed**.
+- Benchmark `2026-10-23-guard-trigger-fix.md`; corrections posted on #1039 and #1052.
+
 ## MIT quality loop, round 82 — fresh 6-page judge audit + fixed LOST->หายาก (rare) intermittent swap (#1052) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

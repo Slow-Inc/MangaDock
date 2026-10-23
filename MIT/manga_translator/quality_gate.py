@@ -25,7 +25,7 @@ _THAI = re.compile(r'[\u0E00-\u0E7F]')
 _PUNCT = ('!', '?', '…')
 #: Thai manga often drops the '?' when the sentence ends on a question particle; those count as preserved.
 #: OCR sometimes lands punctuation INSIDE a word ('IF?YOU THINK') - not a real question mark.
-_OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z])\?(?=[A-Za-z])')
+_OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z0-9])\?(?=[A-Za-z0-9])')
 _THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|รึเปล่า|เปล่า|ไหน|งั้นเหรอ|จริงเหรอ)\s*[.!…]*$')
 
 
