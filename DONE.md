@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 258 — stylised heading: ruled out resolution, documented as a detector gap (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the Tsuki page at detection_size 3200 and 3840 (default 2560): **no region** for the `2ND NIGHT` heading in any run, so resolution is not the cause. It needs a detector/preprocessing class for outlined display text (separate campaign, own FP risk), not a translation-loop fix. Recorded in the backlog. No code change.
+
+---
+
 ## MIT quality loop, round 257 — visual acceptance of rendered pages; stylised-heading limitation identified (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -123,3 +123,12 @@ Scanned all v8 pages for a name that appears on multiple lines with different Th
 **0 of 39 pages**. The model is already consistent within a page; the observed variance (TSUKUYOMI) is cross-page and is
 covered by the production series memory plus the token-level fix (#1065). Adding a page-level normaliser would be
 complexity without a defect to fix.
+### Measured 2026-10-23 (round 207): stylised display headings are a detection gap, not a resolution problem
+
+The Tsuki page's `2ND NIGHT: WHAT LIES AHEAD OF THE EDGE OF THE WORLD?` heading is never translated. It is absent from
+both `regions` and `dropped` in the doctor payload. Re-running the page at `detector.detection_size=3200` and `3840`
+(default 2560) still produced **no region** containing `NIGHT`, so raising resolution does not recover it.
+
+Closing this as out-of-scope for the translation loop: it needs a detector/preprocessing change (outlined display
+lettering class, e.g. an inverted/edge-enhanced second detector pass), which is a separate render/detection campaign with
+its own false-positive risk (logos, SFX, art text).
