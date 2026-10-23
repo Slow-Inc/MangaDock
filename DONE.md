@@ -77,6 +77,26 @@
 
 ---
 
+## #959 Image proxy is limited to MangaDex image hosts, with no redirects (2026-10-24)
+
+**What:** `fetchProxiedImage` accepted any `https://` URL and followed redirects. It now fetches only from
+`uploads.mangadex.org` and `*.mangadex.network` (MangaDex@Home nodes, any port). Any other host gets 403 before any
+request is made, and `redirect: 'error'` means a redirect can't leave the list.
+
+The list comes from the data, not a guess. A Supabase query over every image-URL column found covers only on
+`uploads.mangadex.org`. Profile photos (Google, Facebook, DiceBear) and our own uploads (relative paths) never pass
+through the proxy. Chapter pages come from the at-home `baseUrl`.
+
+**Validated:**
+- Jest: 7 new cases red first, then 23/23. They cover look-alike, userinfo, loopback and subdomain-suffix hosts, the
+  at-home node with its own port, and the redirect mode. The backend is 1188/1188, and the build passes.
+- Live, through the frontend's `/api/img-proxy` with the real local backend: a MangaDex cover returns 200 image/jpeg
+  (134 KB); `example.com` and the userinfo trick return 403.
+- In the reader, every proxied page returns 200 (`uploads.mangadex.org` ×10, a `*.mangadex.network` node ×1), with
+  no 403.
+
+---
+
 ## #1088 Book popup buttons show one spinner while chapters load (2026-10-24)
 
 **What:** the developer reported "( ( กำลังโหลด". The buttons already swap their icon for a spinner while loading,
