@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 98 — #1051 implemented correctly: filter after the noise strip, default ON; unblocks #1050 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Moved the source-language filter from `_finish_patches` (post-translation) into `_run_text_translation`, immediately after `_strip_source_noise` — i.e. on exactly the text the translator is about to send; the finish stage reuses that list instead of filtering again. Guarded by `ctx.patch_mode`, so the full-page `translate()` API is untouched; `MIT_FILTER_AFTER_STRIP=0` restores the old path.
+- **Replay A/B: rendered PNG byte-identical** on Boku p0 (kept 12 of 17), Otome p0 (kept 10 of 11) and Horimiya p0 (no drops).
+- **Live latency on the mixed page:** translation **3.62 -> 2.12 s** and **1.96 -> 1.74 s** (12 prompt lines instead of 17); two-page sanity run at HEAD gate-clean.
+- **Default ON** for the patch/batch path: the rendered set is identical under replay and the model simply stops receiving non-source lines it could never render (fewer tokens/latency). Benchmark `2026-10-23-filter-after-strip.md`.
+- **It unblocks #1050:** the region list is now stable between translation and rendering, the precondition the mask+inpaint overlap needed (next step).
+
 ## MIT quality loop, round 97 — consolidated status report of the whole loop (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

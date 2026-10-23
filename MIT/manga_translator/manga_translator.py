@@ -923,6 +923,17 @@ class MangaTranslator:
         if not ctx.text_regions:
             return []
         self._strip_source_noise(ctx.text_regions, config)
+
+        # #1051 (opt-in): drop regions that are not the requested source language right AFTER the noise strip,
+        # i.e. on exactly the text the translator is about to send. The finish stage then reuses this list
+        # instead of filtering again, so the rendered set equals the translated set and langdetect cannot flip
+        # between two calls. Falling back to the old behaviour when the env flag is unset.
+        if (str(os.environ.get('MIT_FILTER_AFTER_STRIP', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and bool(getattr(config.translator, 'source_lang_only', False))
+                and bool(getattr(ctx, 'patch_mode', False))):
+            ctx.text_regions = self._apply_source_lang_filter(ctx, config)
+            ctx.source_lang_filtered = True
+            print(f'[filter-after-strip] kept={len(ctx.text_regions or [])}', flush=True)
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  
@@ -1327,6 +1338,7 @@ class MangaTranslator:
         if finished:
             return ctx
 
+        ctx.patch_mode = True  # patch/batch paths only: enables the early source-lang filter
         # 保存当前图片上下文到ctx中，用于并发翻译时的路径管理
         if self._image_debug.current:
             ctx.image_context = self._image_debug.current.copy()
@@ -1606,7 +1618,12 @@ class MangaTranslator:
         """
         img_h, img_w = ctx.img_rgb.shape[:2]
         _n_before_filter = len(ctx.text_regions or [])
-        regions = self._apply_source_lang_filter(ctx, config)
+        if getattr(ctx, 'source_lang_filtered', False):
+            # #1051: the filter already ran on exactly the translated texts; re-running it here would re-run
+            # langdetect on a possibly different snapshot.
+            regions = list(ctx.text_regions or [])
+        else:
+            regions = self._apply_source_lang_filter(ctx, config)
         if os.environ.get('MIT_LOG_REGION_FILTER'):
             # #1050 probe: can a pre-translation mask be built safely? Needs the region list to be stable
             # between the front stage and this point.
