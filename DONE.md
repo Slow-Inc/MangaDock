@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 120 — JP path issue closed as evaluated; PR updated with adjusted quality numbers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Closed #897** (JP→TH path unevaluated) as **completed**: the evaluation is done — layout squeeze measured with the opt-in fix (#1006), inversion fixed in #898, fresh JP run gate-clean with judge 1.57/2, rhetorical-prompt A/B showed no difference (not shipped), and the repo has only one real JP page (uploaded twice) so no further evaluation is possible without new data.
+- Posted the corrected quality measurement on PR #794: **noise-adjusted 1.70/2, 72 % perfect / 2.1 % broken**, plus the final full-corpus sweep (39/39 pages, 9 guard saves, 0 leftovers), latency (avg 7.65 s), guard cost 0.43 ms/page and the verified production wiring for `series_context`.
+- No code change; tree clean.
+
 ## MIT quality loop, round 119 — final full-corpus sweep: 39/39 pages, 9 guard saves, 0 leftovers (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
