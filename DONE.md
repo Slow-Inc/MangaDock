@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 135 — one-command quality dashboard added (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/quality_dashboard.py`: gate violations per class + leftover guard-class scan + stage-timing sums + raw/noise-adjusted judge mean in one reproducible command; pure aggregation with 2 unit tests.
+- End-state run on the 39-page final sweep: 368 rendered regions, gate only `dropped_!` ×1, **leftover {}**, judge 367 segments raw **1.44** / strict-adjusted **1.55**. Documented in `2026-10-23-quality-dashboard-tool.md`.
+
+---
+
 ## MIT quality loop, round 134 — quality classifier tightened + numbers corrected everywhere (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
