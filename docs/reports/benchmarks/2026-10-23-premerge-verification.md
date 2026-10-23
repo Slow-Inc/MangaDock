@@ -27,3 +27,15 @@ and the measured opt-in levers (batch 1.46x with payload parity, preload, widen 
 Delivery note: #794 is based on `integrate/render-reconcile` (#642, still an open draft). Retarget #794 to `main`
 **after** #642 merges (or before it if the base branch is about to be deleted); at that point only the three docs
 conflicts need resolving — the code is conflict-free.
+## Merge simulation into current `main` (2026-10-23, temp worktree)
+
+Executed a real merge in a throwaway worktree (`origin/main` + this branch head `6e3b39ae`):
+
+- Conflicts were **exactly** the forecasted three docs files; every code path auto-merged.
+- Resolved the docs by keeping main's side (for the simulation only) and committed the merge.
+- **Fast suite on the merged tree: 944 passed, 4 skipped** — no code adjustment is needed after the base lands.
+- Temp worktree removed afterwards; the real resolution should **union** the docs (DONE entries from both sides,
+  ADR README rows, system-impact rows), not keep one side.
+
+Conclusion: once #642 lands and this PR is retargeted to `main`, only the three docs append conflicts need a union
+merge; the merged code is green.

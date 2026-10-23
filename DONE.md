@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 150 — merge simulated into main: code auto-merges, merged fast suite 944 passed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran a real merge of this branch head into `origin/main` in a temporary worktree: the only conflicts were the three forecasted docs files; all code auto-merged.
+- After resolving the docs (main's side, simulation only) the merged tree's **fast suite passed 944 tests** — so no code work will be needed once #642 lands and the PR is retargeted.
+- Recorded the real-resolution note (union the docs, do not keep one side) in `2026-10-23-premerge-verification.md`; temp worktree removed.
+
+---
+
 ## MIT quality loop, round 149 — merge-conflict forecast vs main: code clean, only 3 docs files (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
