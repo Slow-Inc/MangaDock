@@ -141,7 +141,7 @@ opt-in because the page context is believed to help quality).
 Measured on the corpus Tsuki page: one `foreign_script` glitch -> translation stage **11.0 s** vs 3-4 s unglitched,
 because attempts 2 and 3 each re-send every line (3x page traffic).
 
-Proposal worth its own loop: keep the whole-page retry for **attempt 2** (context matters when the model got one line
+wrong) but send only the flagged subset for **attempt 3** - at that point the whole page already failed twice with the same
 wrong) but send only the flagged subset for **attempt 3** - at that point the whole page already failed twice with the same
 context, so page-mates are not the variable. Needs the forced-glitch harness to compare final quality attempt-3
 subset vs whole-page before it can be a default; if that A/B is neutral, the default saves ~2-4 s on pages whose glitch

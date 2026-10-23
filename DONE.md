@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 266 — attempt-3 subset retry measured: identical quality, no latency win -> rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Forced persistent-glitch A/B (corrupt first two attempts; whole-page vs subset retries; 3 reps/arm): **final translations identical 3/3** (dst_diffs 0), but whole median 11.1 s vs subset 12.1 s (one 48 s outlier) - no measurable win because a retry is one gateway call either way on these page sizes.
+- Rejected the attempt-3 subset default; keep MIT_SEGMENT_RETRY opt-in. Recorded in the backlog. No code change.
+
+---
+
 ## MIT quality loop, round 265 — remaining latency cost is whole-page glitch retries; candidate queued (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
