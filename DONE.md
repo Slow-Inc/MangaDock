@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 220 — evidence images downscaled to 900px for a ~244 MB docs function (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 34 evidence images are downscaled again (max side 900px): total 17.4 -> **8.4 MB (-9 MB)**, putting the docs function around **~244 MB** with ~6 MB of headroom under the 250 MB limit, so the next Vercel retry should pass even if the earlier estimate was optimistic.
+- Vercel CLI is authenticated but the Frontend has no local project link, so no manual prebuilt deploy was attempted; the fix waits for the external rate-limit window.
+
+---
+
 ## MIT quality loop, round 219 — Vercel re-rate-limited; size shrank ahead of its next retry (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
