@@ -187,12 +187,12 @@ body::-webkit-scrollbar-track {
 }
 
 body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
   border-radius: 999px;
 }
 
 body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
 }
 
 body::-webkit-scrollbar-thumb:active {
@@ -378,10 +378,10 @@ body::-webkit-scrollbar-thumb:active {
   animation: account-page-panel-in-right 1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Custom scrollbar — thin, dark, fade on idle */
+/* Custom scrollbar — thin, faint, fade on idle; the thumb is a tint of ink, so it shows in both themes (#778) */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -393,13 +393,13 @@ body::-webkit-scrollbar-thumb:active {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
   border-radius: 999px;
   transition: background 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
@@ -416,6 +416,12 @@ body::-webkit-scrollbar-thumb:active {
   :root:not([data-theme="light"]) .md-logo-on-light { display: none; }
   :root:not([data-theme="light"]) .md-logo-on-dark { display: block; }
 }
+
+/* ThemeToggle draws all three icons; the painted theme picks one before hydration (#778). No data-theme = system. */
+.md-theme-icon { display: none; }
+:root[data-theme="dark"] .md-theme-icon[data-icon="dark"],
+:root[data-theme="light"] .md-theme-icon[data-icon="light"],
+:root:not([data-theme]) .md-theme-icon[data-icon="system"] { display: block; }
 
 /* Override focus ring to be invisible inside .no-focus-ring descendants */
 .no-focus-ring :focus-visible {
