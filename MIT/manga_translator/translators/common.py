@@ -191,6 +191,11 @@ class CommonTranslator(InfererModule):
                 # again re-translates clean lines (most of the page) for every glitch; this sends the flagged
                 # subset instead. The tradeoff is that the retried line loses its page-mates as context, so the
                 # whole-page retry stays the default.
+                # #1055 (opt-in): a retry only needs the segments that are still invalid. Sending the whole page
+                # again re-translates clean lines (most of the page) for every glitch; this sends the flagged
+                # subset instead. The tradeoff is that the retried line loses its page-mates as context, so the
+                # whole-page retry stays the default. (A neighbour-context note was tried and did not reproducibly
+                # restore quality — see 2026-10-23-1055-forced-retry.md — so the simple subset stays.)
                 _subset = [queries[j] for j in untranslated_indices]
                 _sub = await self._translate(*_langs, _subset)
                 if len(_sub) < len(untranslated_indices):

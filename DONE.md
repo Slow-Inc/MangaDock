@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 91 — neighbour-context hint for segment retry: tried, did not reproducibly help, reverted (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Round 90 showed the isolated retry sometimes garbles/truncates, so tried appending the already-translated **previous line** as context to each retried segment (same opt-in path).
+- Forced-harness runs (2 reps, real gateway): whole-page retry stayed clean; segment retry + context still produced a garbled answer in 1 of 2 reps (`60 นน. ...`) and a fine answer in the other. The hint adds prompt tokens without reproducibly restoring quality.
+- **Reverted** — no unproven prompt complexity in the retry path. The simple flagged-subset retry stays behind `MIT_SEGMENT_RETRY=1`; default whole-page retry unchanged. Glitch-retry tests 16 green; benchmark `2026-10-23-1055-forced-retry.md` updated.
+
 ## MIT quality loop, round 90 — forced-failure retry harness: segment retry saves 1.2-1.6 s/glitch but risks quality (#1055) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
