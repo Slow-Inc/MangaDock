@@ -27,3 +27,16 @@ only on long lines, one call per page.
   pipeline as an opt-in retry (`MIT_OMISSION_VERIFY=1`) needs: repeat-agreement between two verifier passes, a
   forced-injection proof, and a precision sweep across more pages.
 - The tool ships with pure-helper tests (long-line filter, prompt building, verdict parsing, flagged selection).
+## Two-pass agreement (added after the instability finding)
+
+The tool now supports `--passes N` and flags a pair only when **every pass** agrees (`combine_passes`). Full corpus
+with `--passes 2` (33 pages with long lines, 85 pairs, 66 verifier calls):
+
+| outcome | count | examples |
+|---|---|---|
+| **agreed** (both passes) | **2** | Akuyaku `this piqued my curiosity`; Komi `100 (IOO)` — both clear true positives |
+| **disagreed** (one pass only) | 2 | Horimiya `won't give my pen back` -> `ให้ปากกาคืนมา` (tense nuance, borderline); Osoraku `THE OTHER THREE` -> `คนอื่น` (the number `three` dropped, minor) |
+
+So two-pass agreement keeps the high-confidence omissions and drops the borderline ones — usable for an opt-in
+audit/retry path, at 2x verifier calls (66 calls / 39 pages). Still report-only in the pipeline; integration needs the
+forced-injection proof next.

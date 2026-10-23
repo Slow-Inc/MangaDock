@@ -74,6 +74,27 @@ def flagged(pairs, verdicts):
     return out
 
 
+def combine_passes(pass_verdicts, pairs):
+    """(agreed, disagreed) omission hits across multiple verifier passes.
+
+    pass_verdicts is a list of verdict lists (one per pass). A hit is agreed when every pass flags the same pair
+    index; an index flagged by some but not all passes is a disagreement (the measured instability).
+    """
+    per_pass = []
+    for verdicts in pass_verdicts:
+        per_pass.append({h[0] for h in flagged(pairs, verdicts)})
+    if not per_pass:
+        return [], []
+    agreed_idx = set.intersection(*per_pass)
+    any_idx = set.union(*per_pass)
+    missing_text = {}
+    for verdicts in pass_verdicts:
+        for i, _src, _dst, m in flagged(pairs, verdicts):
+            if m:
+                missing_text.setdefault(i, m)
+    agreed = [(i, pairs[i][0], pairs[i][1], missing_text.get(i, '')) for i in sorted(agreed_idx)]
+    return agreed, sorted(any_idx - agreed_idx)
+
 def verify_page(pairs, offset, base, key, model, timeout=180):
     import requests
     body = {'model': model, 'max_tokens': 2048, 'temperature': 0,
@@ -89,6 +110,7 @@ def main():
     ap.add_argument('--out')
     ap.add_argument('--min-words', type=int, default=8)
     ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--passes', type=int, default=1, help='verifier passes per page; flags need all passes to agree')
     args = ap.parse_args()
 
     from manga_translator import initialize as _initialize_env
@@ -107,15 +129,18 @@ def main():
         pairs = long_pairs(doctor, args.min_words)
         if not pairs:
             continue
-        verdicts = verify_page(pairs, 0, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL)
-        hits = flagged(pairs, verdicts)
+        verdicts_list = [verify_page(pairs, 0, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL)
+                         for _ in range(max(1, args.passes))]
+        hits, disagreements = combine_passes(verdicts_list, pairs)
         total_pairs += len(pairs)
         total_flags += len(hits)
         page = os.path.basename(path)
-        report[page] = {'long_pairs': len(pairs), 'parsed': verdicts is not None,
-                        'flagged': [{'i': i, 'src': s, 'dst': d, 'missing': m} for i, s, d, m in hits]}
-        print(f'{page[:52]:54s} long={len(pairs):2d} flagged={len(hits)} '
-              + ('PARSE-FAIL' if verdicts is None else ''), file=sys.stderr)
+        parsed = all(v is not None for v in verdicts_list)
+        report[page] = {'long_pairs': len(pairs), 'passes': max(1, args.passes), 'parsed': parsed,
+                        'agreed': [{'i': i, 'src': s, 'dst': d, 'missing': m} for i, s, d, m in hits],
+                        'disagreed': disagreements}
+        print(f'{page[:52]:54s} long={len(pairs):2d} agreed={len(hits)} disagreed={len(disagreements)} '
+              + ('' if parsed else 'PARSE-FAIL'), file=sys.stderr)
         for i, s, d, m in hits:
             print(f'  [{i}] {m[:70]}', file=sys.stderr)
     if args.out:

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 154 — omission verifier two-pass agreement keeps 2 clear TPs, drops 2 borderline (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--passes N` + `combine_passes` to `tools/omission_verify.py`: a pair is flagged only when every pass agrees; disagreements are reported separately. Unit test added (4 tests in the file).
+- Ran the full corpus with 2 passes (33 pages/85 long pairs/66 calls): **2 agreed** (Akuyaku curiosity clause, Komi `100 (IOO)`) and **2 disagreed** borderline cases (Horimiya tense nuance, Osoraku dropped `three`). Two-pass keeps the high-confidence omissions, at 2x calls; still report-only pending a forced-injection proof.
+
+---
+
 ## MIT quality loop, round 153 — omission verifier full-corpus sweep: 33 pages, 85 long pairs, 2 true-positive flags; run-to-run instability documented (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

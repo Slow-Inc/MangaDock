@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / 'tools'))
 
-from omission_verify import build_user, flagged, long_pairs, parse_verdicts
+from omission_verify import build_user, combine_passes, flagged, long_pairs, parse_verdicts
 
 
 def _doctor(regions):
@@ -39,3 +39,13 @@ def test_flagged_selects_only_omitted_entries():
     assert len(hits) == 1 and hits[0][0] == 0 and hits[0][3] == 'clause x'
     assert flagged(pairs, None) == []
 
+
+def test_combine_passes_keeps_only_agreed_hits():
+    pairs = [('SRC A', 'ก'), ('SRC B', 'ข'), ('SRC C', 'ค')]
+    pass1 = [{'i': 0, 'omitted': True, 'missing': 'x'}, {'i': 1, 'omitted': True, 'missing': 'y'}]
+    pass2 = [{'i': 0, 'omitted': True, 'missing': 'x'}]
+    agreed, disagreed = combine_passes([pass1, pass2], pairs)
+    assert [a[0] for a in agreed] == [0]
+    assert agreed[0][3] == 'x'
+    assert disagreed == [1]
+    assert combine_passes([], pairs) == ([], [])
