@@ -26,3 +26,12 @@ that the guard set absorbs model variance.
 The bad batch is an external model/gateway variance, not a code regression (no prompt/config change was deployed
 between the runs). It strengthens the case for the guards and for the single-retry budget being sufficient — but also
 shows why the exhausted-retry salvage must keep all script ranges (round 164/165 work).
+## Retry depth in the stress run
+
+Parsed the trigger log per source line: **15 unique triggered lines**, only **one** line (`NYA`) tripped twice, none
+tripped three times — so no segment exhausted the retry budget in this bad batch. The twice-retried line shipped as the
+correct Thai cat sound (`เมี้ยว`), and the other short interjections came out clean (`AH` -> `อ๊ะ`/`อ้อ`, `EH?` -> `เอ๊ะ?`).
+
+This validates the current `_INVALID_REPEAT_COUNT = 2` against natural model variance: two re-asks sufficed even when
+the model answered in Chinese. If a future run shows three triggers on the same line (budget exhausted), that is the
+signal to consider a higher budget or a blank-instead-of-garbage fallback.

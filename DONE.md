@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 169 — retry depth analysed in the stress run: no segment exhausted the budget (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Parsed the stress-run trigger log per source line: **15 unique triggered lines**, only `NYA` tripped twice, none three times — so `_INVALID_REPEAT_COUNT = 2` was sufficient even with whole-line Chinese answers. `NYA` shipped as `เมี้ยว`, `AH` as `อ๊ะ/อ้อ`, `EH?` as `เอ๊ะ?`.
+- Recorded the signal to watch (three triggers on one line = budget exhausted -> raise budget or blank-instead-of-garbage) in the stress-run benchmark. No code change.
+
+---
+
 ## MIT quality loop, round 168 — stress run: bad model batch (whole Chinese lines) left zero defects (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
