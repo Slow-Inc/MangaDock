@@ -259,7 +259,7 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetailOpen(false)} />
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
-            <button onClick={() => setDetailOpen(false)} className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
+            <button onClick={() => setDetailOpen(false)} aria-label="Close user details" className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
               <h2 className="text-base font-semibold text-ink">{detail.displayName || 'Unknown'}</h2>
               <p className="text-xs text-ink-3 mt-0.5">{detail.email}</p>
@@ -291,11 +291,13 @@ export default function AdminUsersPage() {
                     {adjustOpen && (
                       <div className="pb-3 space-y-2">
                         <input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)}
+                          aria-label="Coin adjustment amount"
                           placeholder="+100 or -50"
-                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 transition-colors" />
+                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-ink-3 transition-colors" />
                         <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)}
+                          aria-label="Reason for the adjustment" aria-required="true"
                           placeholder="Reason (required)…"
-                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 transition-colors" />
+                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-ink-3 transition-colors" />
                         <div className="flex justify-end">
                           <button onClick={submitAdjust}
                             disabled={adjusting || !adjustDelta || !adjustReason.trim() || parseInt(adjustDelta, 10) === 0 || isNaN(parseInt(adjustDelta, 10))}

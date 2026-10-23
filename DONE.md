@@ -77,6 +77,19 @@
 
 ---
 
+## #1068 Admin wallet-adjust inputs: real names and the focus ring (2026-10-23)
+
+**What:** #1040 / #1044 left the admin user drawer's coin-adjust amount and reason inputs alone while the wallet area
+was parked; the developer lifted that. Each now has an `aria-label` ("Coin adjustment amount", "Reason for the
+adjustment") and the `focus:outline-none` opt-out is gone, so the standard 2 px accent ring shows. The adjust logic is
+untouched.
+
+**Validated:** production build, signed in as admin via the local fake session with the admin users API answered by
+Playwright (no wallet write sent): before — no name, outline `none`; after — both named, `solid 2px` ring on focus.
+Real tsc clean; eslint equal to main.
+
+---
+
 ## #778 Light mode is on: a theme toggle in the nav (2026-10-23)
 
 **What:** with every user-facing route token-clean (#1048 light sweep, #776 auth screens), `ThemeToggle` goes into
