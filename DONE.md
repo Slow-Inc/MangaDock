@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 117 — production-path acceptance passes; hedging guard rejected on false-positive rate (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Production path (sequential single-page requests + `series_context`):** series name memory applied 2 fixes on page 2 and the chapter kept one spelling; gate shows only the expected `empty_translation` findings for Japanese regions deliberately kept as original artwork on an English page. No other violations.
+- **Hedging-lost guard (I think/maybe/probably) rejected before implementation:** 180 raw hits in stored segments but ~10 unique and mostly false positives (`what KIND OF thing`, `I THINK?` -> `ใช่ไหม?`, `or so it seems` -> `หรือว่าแค่ฉันเอง`); a deterministic guard would fire mostly on non-hedges. Documented, no code.
+- Benchmark `2026-10-23-prod-path-acceptance.md`. The deterministic lever list is now exhausted for the current corpus; remaining classes are model-ceiling sense/nuance + the data-limited JP evaluation.
+
 ## MIT quality loop, round 116 — judge-noise-adjusted quality: raw 1.44 -> **1.70/2**, 72 % perfect (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
