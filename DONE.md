@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 131 — batch/single payload parity verified (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the same page through `translate_patches` and `translate_batch_pipelined([page])` with one config on two real pages: **payload keys, image size, patch count, region count, rendered/dropped split and the full source-text set are identical**. Translation strings differ only by sampling, as expected.
+- With the earlier 1.46x latency measurement and the context/glossary quality wins, this closes the "can batch mode be enabled safely?" question from the payload consumer's side: it cannot break a consumer that relies on payload structure. Benchmark `2026-10-23-batch-single-payload-parity.md`.
+
+---
+
 ## MIT quality loop, round 130 — gate CLI verified with the new rules; module docs updated (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
