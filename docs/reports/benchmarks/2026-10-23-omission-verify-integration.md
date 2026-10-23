@@ -74,3 +74,40 @@ same Akuyaku page:
 So the second pass is doing real work: the verifier can miss the clause in a single sample, and the agreement rule is
 what keeps the signal stable. **Default stays 2**; single-pass exists only as an explicit cost trade for chapters where
 a missed omission is acceptable.
+---
+
+## CORRECTION (round 211): the earlier natural proof was not attributable; three bugs found and fixed
+
+The Akuyaku runs that showed a restored curiosity clause were **translation sampling variance**, not the pass: no
+`[omission-verify]` line ever appeared in those runs, and the pipeline verification actually returned nothing. Three
+real defects were found while chasing it:
+
+1. **Parser bug.** JSON mode returns a single JSON **object** (`{"i":0,...}`) for one pair; the parser only accepted
+   arrays, so every single-line verification silently became "no omissions". Fixed in the module and in
+   `tools/omission_verify.py` (accepts array, object, or a dict wrapping a list).
+2. **One request per page is unreliable.** With two pairs in one prompt the model returned a single, wrongly-indexed
+   item (`{i:1, omitted:false, missing:...}`), so the batched page could never agree. Verification now sends **one
+   candidate per request**, fanned out.
+3. **Gateway burst throttle.** 12 parallel verifier calls made most calls fail (non-200), so agreement was empty in the
+   pipeline while 2-candidate probes worked. Added `Semaphore(3)` plus one retry per call.
+
+### Proof after the fixes (deterministic replay, not sampling)
+
+`doctor_page --replay final121/Akuyaku-p0 --tag _omvreplay` with `MIT_OMISSION_VERIFY=1`:
+
+```
+[omission-verify] entered candidates=6
+[omission-verify] agreed=[5]
+[omission-verify] reasked=1 got=1 first="แล้ว... เรื่องนี้ทำให้ฉันทึ่งมากตอนที่อยู่ในห้องอาหาร"
+[omission-verify] "แล้ว... เมื่อตอนกลางวันในโรงอาหาร" -> "แล้ว... เรื่องนี้ทำให้ฉันทึ่งมากตอนที่อยู่ในห้องอาหาร" (missing="THIS PIQUED MY CURIOSITY")
+[omission-verify] candidates=6 flagged=1 applied=1
+```
+
+Replay pins the baseline translation (the omitted line from the earlier sweep), so the change is caused by the pass.
+An independent probe with the per-line verifier flagged the same pair **4/4 runs**.
+
+### Cost of the working version
+
+- The replay page took ~29.6 s wall (translation itself 5 ms because it is replayed): ~2 verifier round-trips (six
+  candidates, two passes each, throttled to 3 concurrent) plus one re-ask call.
+- Still opt-in, and only runs for the custom_openai gateway translator; other translators skip it.

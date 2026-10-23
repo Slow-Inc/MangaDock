@@ -78,3 +78,28 @@ def test_passes_option_parses_and_clamps():
     assert og.passes({'MIT_OMISSION_VERIFY_PASSES': '1'}) == 1
     assert og.passes({'MIT_OMISSION_VERIFY_PASSES': '9'}) == 3
     assert og.passes({'MIT_OMISSION_VERIFY_PASSES': 'x'}) == 2
+
+
+def test_parse_verdicts_accepts_a_single_object():
+    # JSON mode returns one object for one pair; the old parser only took arrays and silently dropped it
+    obj = chr(123) + '"i":0,"omitted":true,"missing":"x"' + chr(125)
+    assert og.parse_verdicts(obj) == [{'i': 0, 'omitted': True, 'missing': 'x'}]
+    wrapped = chr(123) + '"results":[' + chr(123) + '"i":1,"omitted":false' + chr(125) + ']' + chr(125)
+    assert og.parse_verdicts(wrapped) == [{'i': 1, 'omitted': False}]
+
+
+def test_verify_sends_one_candidate_per_request(monkeypatch):
+    cands = [{'idx': 0, 'src': 'SRC ONE', 'dst': 'TH ONE'}, {'idx': 1, 'src': 'SRC TWO', 'dst': 'TH TWO'}]
+    prompts = []
+
+    def fake_call(base, key, model, user, timeout=120):
+        prompts.append(user)
+        if 'SRC ONE' in user:
+            return [{'i': 0, 'omitted': True, 'missing': 'missing-one'}]
+        return [{'i': 0, 'omitted': False, 'missing': ''}]
+
+    monkeypatch.setattr(og, '_call', fake_call)
+    agreed = asyncio.run(og.verify_candidates(cands, 'http://x', 'k', 'm', passes=2))
+    assert len(prompts) == 4  # two candidates x two passes
+    assert all(p.count('<|') == 1 for p in prompts)  # each request carries exactly one pair
+    assert agreed == {0: 'missing-one'}

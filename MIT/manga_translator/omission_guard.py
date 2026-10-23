@@ -12,13 +12,8 @@ import re
 
 logger = logging.getLogger('manga_translator')
 
-_SYSTEM = (
-    "You are a strict bilingual editor for manga translations into Thai. For each numbered pair you get the "
-    "SOURCE segment and its THAI translation. Decide ONLY whether the Thai translation OMITS a whole clause or "
-    "piece of content that the source states. Ignore style, typos, wording preferences and slight nuance shifts. "
-    "Reply with ONLY a JSON array of objects with i (0-based) and omitted (true/false); include missing (the "
-    "omitted words) when omitted is true. No prose, no code fences."
-)
+_SYSTEM = 'You are a strict bilingual editor for manga translations into Thai. For each numbered pair you get the SOURCE segment and its THAI translation. Decide ONLY whether the Thai translation OMITS a whole clause or piece of content that the source states (e.g. a sentence part dropped, a listed item missing). Ignore style, typos, wording preferences and slight nuance shifts - those are not omissions. Reply with ONLY a JSON array [{"i":0,"omitted":true,"missing":"..."},{"i":1,"omitted":false}] with one entry per pair. No prose, no code fences.'
+
 _EN_WORD = re.compile(r"[A-Za-z][A-Za-z']+")
 
 
@@ -61,18 +56,27 @@ def build_prompt(candidates, offset=0):
 
 
 def parse_verdicts(content):
-    m = re.search(chr(92) + '[' + '.*' + chr(92) + ']', content or '', re.S)
-    if not m:
+    text = (content or "").strip()
+    if not text:
         return None
-    try:
-        data = json.loads(m.group(0))
-    except Exception:
-        return None
-    return data if isinstance(data, list) else None
-
+    for candidate in (text, text[text.find("{"): text.rfind("}") + 1], text[text.find("["): text.rfind("]") + 1]):
+        if not candidate:
+            continue
+        try:
+            data = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            if "i" in data or "omitted" in data:
+                return [data]
+            for value in data.values():
+                if isinstance(value, list):
+                    return value
+    return None
 
 def distribute(verdicts, candidates):
-    """{region_idx: missing_text} for verdicts that mark an omission."""
     out = {}
     for item in verdicts or []:
         if not isinstance(item, dict) or not item.get('omitted'):
@@ -127,18 +131,37 @@ def _call(base, key, model, user, timeout=120):
 
 
 async def verify_candidates(candidates, base, key, model, passes=2):
-    """{region_idx: missing} agreed by every pass; {} when the verification could not run."""
+    """{region_idx: missing} for candidates every pass agrees dropped a clause.
+
+    Each candidate is sent in its OWN request: the model returned a single-item, wrongly-indexed array when two
+    pairs shared a prompt (2026-10-23), so per-line verification trades token count for reliability. The requests
+    run concurrently, so the wall cost is still about one round-trip.
+    """
     if not candidates:
         return {}
-    user = build_prompt(candidates)
 
-    async def one_pass():
-        return await asyncio.to_thread(_call, base, key, model, user)
+    sem = asyncio.Semaphore(3)  # the gateway rejects a burst of parallel verifier calls
 
-    # Run the passes concurrently: they are independent requests, so two-pass agreement costs one round-trip.
-    results = await asyncio.gather(*[one_pass() for _ in range(max(1, passes))])
-    agreed = None
-    for verdicts in results:
-        page = distribute(verdicts, candidates)
-        agreed = page if agreed is None else {k: v for k, v in agreed.items() if k in page}
-    return agreed or {}
+    async def one(cand, pass_no):
+        verdicts = None
+        for _attempt in range(2):
+            async with sem:
+                verdicts = await asyncio.to_thread(_call, base, key, model, build_prompt([cand]))
+            if verdicts is not None:
+                break
+        return cand["idx"], distribute(verdicts, [cand])
+
+    jobs = [one(cand, n) for cand in candidates for n in range(max(1, passes))]
+    results = await asyncio.gather(*jobs)
+    per_candidate = {}
+    for idx, page in results:
+        per_candidate.setdefault(idx, []).append(page)
+    agreed = {}
+    for idx, pages in per_candidate.items():
+        if len(pages) != max(1, passes):
+            continue
+        if all(idx in page for page in pages):
+            agreed[idx] = next(page[idx] for page in pages if page.get(idx))
+    return agreed
+
+

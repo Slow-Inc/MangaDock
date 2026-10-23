@@ -1641,26 +1641,41 @@ class MangaTranslator:
         from .omission_guard import (apply_results, build_query, collect_candidates, passes as omission_passes,
                                      verify_candidates)
         candidates = collect_candidates(ctx.text_regions)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] entered candidates={len(candidates)}', flush=True)
         if not candidates:
             return
         from .translators import keys
         base = keys.CUSTOM_OPENAI_API_BASE.rstrip('/') + '/chat/completions'
         agreed = await verify_candidates(candidates, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL,
                                          passes=omission_passes())
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] agreed={sorted(agreed)}', flush=True)
         if not agreed:
             return
         src_lang = str(getattr(config.translator, 'source_lang', '') or '').strip()
         if not src_lang or src_lang.upper() == 'AUTO':
             return
         tgt_lang = str(getattr(config.translator, 'target_lang', '') or 'THA')
-        from .text_translation_dispatcher import build_chatgpt_translator
-        translator = build_chatgpt_translator(config.translator.translator)
+        # Only the gateway translator is supported here (the pass uses its credentials and retry machinery).
+        from .config import Translator as _Translator
+        if getattr(config.translator, 'translator', None) != _Translator.custom_openai:
+            return
+        from .translators.custom_openai import CustomOpenAiTranslator
+        translator = CustomOpenAiTranslator()
         translator.parse_args(config.translator)
         flagged = [c for c in candidates if c['idx'] in agreed]
         queries = [build_query(c['src'], agreed[c['idx']]) for c in flagged]
         translated = await translator.translate(src_lang, tgt_lang, queries)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] reasked={len(queries)} got={len(translated or [])} first={ (translated or [""])[0][:60]!r}', flush=True)
+        before = {c['idx']: ctx.text_regions[c['idx']].translation for c in flagged}
         applied = apply_results(ctx.text_regions, [c['idx'] for c in flagged], translated)
         if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            for c in flagged:
+                after = ctx.text_regions[c['idx']].translation
+                if after != before.get(c['idx']):
+                    print(f"[omission-verify] {before.get(c['idx'])!r} -> {after!r} (missing={agreed[c['idx']]!r})", flush=True)
             print(f'[omission-verify] candidates={len(candidates)} flagged={len(agreed)} applied={applied}', flush=True)
 
     async def _finish_patches(self, ctx, config, source_icc):

@@ -51,16 +51,25 @@ def build_user(pairs, offset=0):
 
 
 def parse_verdicts(content):
-    """Parse the verifier reply into a list of dicts, or None when it is not a JSON array."""
-    m = re.search(r'\[.*\]', content or '', re.S)
-    if not m:
+    text = (content or "").strip()
+    if not text:
         return None
-    try:
-        data = json.loads(m.group(0))
-    except Exception:
-        return None
-    return data if isinstance(data, list) else None
-
+    for candidate in (text, text[text.find("{"): text.rfind("}") + 1], text[text.find("["): text.rfind("]") + 1]):
+        if not candidate:
+            continue
+        try:
+            data = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            if "i" in data or "omitted" in data:
+                return [data]
+            for value in data.values():
+                if isinstance(value, list):
+                    return value
+    return None
 
 def flagged(pairs, verdicts):
     """[(index, src, dst, missing)] for verdicts that mark an omission."""

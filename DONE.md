@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 211 — omission pass: three real bugs fixed; deterministic replay proof (CORRECTION) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Correction:** the round-208/209 "natural proof" was not attributable — those runs showed translation sampling variance and the pipeline verification returned nothing (no log line). Chasing it exposed three real defects: (1) JSON mode returns a single **object** for one pair while the parser only accepted arrays; (2) a batched page prompt made the model return one wrongly-indexed item; (3) 12 parallel verifier calls were throttled by the gateway so agreement was empty at page scale.
+- Fixes: parser accepts array/object/wrapped list (module + `tools/omission_verify.py`); verification sends **one candidate per request** fanned out; `Semaphore(3)` + one retry per call; the retry now builds `CustomOpenAiTranslator` (the pass only supports the gateway translator); diagnostics under `MIT_LOG_OMISSION_VERIFY`.
+- **Deterministic replay proof** (`--replay` pins the omitted baseline): `agreed=[5]`, `reasked=1`, shipped `แล้ว... เรื่องนี้ทำให้ฉันทึ่งมากตอนที่อยู่ในห้องอาหาร` (was `แล้ว... เมื่อตอนกลางวันในโรงอาหาร`). Independent probe flags the pair 4/4 runs. Cost ~29.6 s on the replay page (~2 verifier round-trips + one re-ask). Still opt-in. Suite 977 passed.
+
+---
+
 ## MIT quality loop, round 210 — omission pass count configurable; default stays 2 because single-pass misses the case (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
