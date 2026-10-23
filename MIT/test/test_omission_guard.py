@@ -55,13 +55,19 @@ def test_apply_results_updates_only_accepted_regions():
 
 def test_verify_candidates_needs_every_pass_to_agree(monkeypatch):
     cands = [{'idx': 0, 'src': 'SRC', 'dst': 'TH'}]
-    replies = iter([
+    import threading
+    lock = threading.Lock()
+    replies = [
         '[{"i":0,"omitted":true,"missing":"x"}]',
         '[{"i":0,"omitted":false}]',
-    ])
+    ]
+    state = {'n': 0}
 
     def fake_call(base, key, model, user, timeout=120):
-        return og.parse_verdicts(next(replies))
+        with lock:
+            idx = state['n']
+            state['n'] += 1
+        return og.parse_verdicts(replies[idx % len(replies)])
 
     monkeypatch.setattr(og, '_call', fake_call)
     assert asyncio.run(og.verify_candidates(cands, 'http://x', 'k', 'm', passes=2)) == {}

@@ -48,3 +48,15 @@ as a default.
 Next tuning ideas before any default decision: a single verifier pass (halves the cost; two passes were a stability
 cushion), or verify only lines that the content-loss predicate already suspects. Both need a corpus sweep with the
 translation judge to prove they keep the win.
+## Tuning: the two verifier passes now run concurrently (round 209)
+
+The passes are independent HTTP requests, so they are issued with `asyncio.gather` instead of one after the other.
+Same agreement requirement, half the round-trips:
+
+| run | wall (Akuyaku p0) | result |
+|---|---|---|
+| sequential passes | 32.5 s | clause restored |
+| **concurrent passes** | **25.2 s** | clause restored (`แล้ว... เมื่อครู่ในโรงอาหารนี้ ก็ทำให้ฉันสงสัย`) |
+
+Still ~10 s over the default pipeline (one verifier round-trip plus the re-ask call), so it stays opt-in; the next
+lever would be a single-pass mode for chapters where the extra confidence is not worth a round-trip.

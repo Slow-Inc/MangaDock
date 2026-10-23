@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 209 — omission pass: concurrent verifier passes save 7.3 s/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The two verifier passes are independent requests; they now run with `asyncio.gather` (same agreement rule). Re-measured on Akuyaku p0: **25.2 s vs 32.5 s**, clause still restored (`แล้ว... เมื่อครู่ในโรงอาหารนี้ ก็ทำให้ฉันสงสัย`).
+- Still ~10 s over default (one verifier round-trip + the re-ask call), so opt-in stays; single-pass mode recorded as the next cost lever. Test updated for concurrent replies; suite green.
+
+---
+
 ## MIT quality loop, round 208 — omission pass natural proof: clause restored; cost ~3 gateway calls/page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

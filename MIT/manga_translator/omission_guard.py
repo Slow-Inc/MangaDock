@@ -121,9 +121,14 @@ async def verify_candidates(candidates, base, key, model, passes=2):
     if not candidates:
         return {}
     user = build_prompt(candidates)
+
+    async def one_pass():
+        return await asyncio.to_thread(_call, base, key, model, user)
+
+    # Run the passes concurrently: they are independent requests, so two-pass agreement costs one round-trip.
+    results = await asyncio.gather(*[one_pass() for _ in range(max(1, passes))])
     agreed = None
-    for _ in range(max(1, passes)):
-        verdicts = await asyncio.to_thread(_call, base, key, model, user)
+    for verdicts in results:
         page = distribute(verdicts, candidates)
         agreed = page if agreed is None else {k: v for k, v in agreed.items() if k in page}
     return agreed or {}
