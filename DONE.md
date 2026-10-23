@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 279 — hand-off index refreshed to the final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off now covers v7-v10 (gate/lleftover {}, guard 1-14 by window, wall 6.1-10.3 s), judge raw 1.38-1.44, tests 995, Vercel green heads, the new licences and the SFX prefetch change, plus the missing evidence files. No code change.
+
+---
+
 ## MIT quality loop, round 278 — temperature 0.2 does not reduce guard triggers; licence side-effect audit clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

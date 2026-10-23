@@ -8,21 +8,22 @@ names the state, the knobs and the things that were already tried and rejected (
 | item | value |
 |---|---|
 | branch / PR | `feat/mit-quality-loop`, PR #794 (draft, base `integrate/render-reconcile`, MERGEABLE) |
-| end-state sweep | **v7/v8**: 39 pages / 369 regions, page gate `{}`, leftover `{}` in both runs; guard triggers 3 then **1**; wall 6.07-7.83 s avg (run variance) |
-| judge | raw **1.42-1.44/2** across runs; strict-adjusted **1.53-1.60**; broken share **2.2 %** (best) |
-| tests | **989 passed**, 4 skipped (fast suite, torch-free stub) |
-| CI | logic gate / heavy ML / backend green; Vercel green on `16ff6e43`, later heads blocked by its external build-rate limit |
-| merge readiness | `merge-tree` diff vs main: only the three append-only docs conflict; merged tree fast suite 985 (pre-refactor) |
+| end-state sweep | latest full runs **v7-v10**: 39 pages / 369-371 regions, page gate `{}`, leftover `{}` in every run; guard triggers 1-14 depending on the model window; wall 6.1-10.3 s avg (retry-bound in bad windows) |
+| judge | raw **1.38-1.44/2** (window-dependent); strict-adjusted **1.53-1.60**; broken share **2.2-2.4 %** |
+| tests | **995 passed**, 4 skipped (fast suite, torch-free stub) |
+| CI | logic gate / heavy ML / backend green; Vercel green on several heads (`16ff6e43`, `3d1f6d94`, `bc773045`) when its build quota allows |
+| merge readiness | `merge-tree` diff vs main: only the three append-only docs conflict; merged tree fast suite 993 at the last re-verify (branch 995 after the round-274 licences) |
 
 ## Defaults that were turned ON in this loop (quality first)
 
-- `MIT_OCR_REREAD` (second OCR pass; low-confidence Latin lines + single-letter garbles + wider crop for those)
+- `MIT_OCR_REREAD` (second OCR pass; low-confidence Latin lines, single-letter garbles like `N`->`NOT` with a wider crop, never garbled-to-garbled)
 - `MIT_FILTER_AFTER_STRIP` (early filter before translation)
 - `normalize_common_typos` (Thai แล่ว/แลว, ไม/ให้ tokens, name whitelist for Mai)
 - guards: foreign-script (22 scripts) + leaked-script salvage, negation_lost, runaway, spurious_filler, lost_as_rare,
   dropped_question (with tag / retort licences), untranslated_word, content_loss, consider_as_please, numbered contract,
   series name memory (interjections excluded)
-- gate precision licences: retort question, Thai emphasis particle carrying `!`
+- gate/guard precision licences: retort questions, opinion tags (`SEE?`, `UNDERSTAND?`), Thai emphasis particles and question particles carrying `!`, reader-site URLs/credits, digit-suffixed kept names, strong Thai negation
+- latency: concurrent SFX vision prefetch (order-preserving, empty answers cached) + 768 px JPEG uploads
 
 ## Opt-ins (real tradeoffs, so not default)
 
@@ -41,6 +42,9 @@ names the state, the knobs and the things that were already tried and rejected (
 | `guard-precision-licences.md` | retort + Thai emphasis licences, retry-budget decision |
 | `prod-path-acceptance.md` | production single-page path + series memory verification |
 | `premerge-verification.md` | merge simulation, runbook, re-verification vs main |
+| `sfx-vlm-prefetch.md` | textline_merge 32-37 s -> 8.4 s via concurrent SFX vision calls + smaller uploads |
+| `new-manga-generalization.md` | 27 unseen pages across 5 series (26 gated clean) |
+| `guard-precision-licences.md` | every precision licence and the retry-budget decisions |
 | `next-loop-backlog.md` | **do-not-repeat list** (rejected experiments with evidence) |
 
 ## Open items
