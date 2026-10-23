@@ -27,3 +27,17 @@ Unseen-page QA surfaced `textline_merge` times of 25-37 s on SFX-heavy pages. Pr
 - Gate on the re-run: **0 violations**; the rescued onomatopoeia stayed plausible (`กร๊อบ`, `เฮ้อ`, ...; run-to-run wording
   varies by design).
 - Tests: `localize_candidates` (order + concurrency), data-URL could be JPEG; suite **991 passed**.
+## Quality A/B: full-resolution PNG upload vs 768 px JPEG (round 236)
+
+To make sure the upload change did not degrade the onomatopoeia readings, the same unseen page was run twice per arm with
+`_to_data_url` swapped between the old PNG and the new JPEG encoder (candidate selection unchanged: 9 candidates both
+arms):
+
+| arm | rescued Thai onomatopoeia (two runs) |
+|---|---|
+| PNG (old) | `เหมียว` / `ปัง`, `กลิ้งกลิ้ง`, `ฟึ่บ` |
+| 768 px JPEG (new) | `ฟึ่บ` / `ฟึ่บ`, `เฮ้อ` |
+
+Both arms return plausible short onomatopoeia with no garbage tokens; the run-to-run variation is the same sampling
+nondeterminism seen before (candidate crops can differ slightly between detection runs). The upload optimisation is
+quality-neutral, so it stays part of the default prefetch path.

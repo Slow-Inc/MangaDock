@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 281 — SFX upload A/B: 768 JPEG is quality-neutral (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Same unseen page, two runs per arm, `_to_data_url` swapped between full-res PNG and the new 768 px JPEG (9 candidates both arms): both arms produced plausible short onomatopoeia (`เหมียว`/`ปัง`/`ฟึ่บ` vs `ฟึ่บ`/`เฮ้อ`) with no garbage; variation is sampling/candidate nondeterminism. The upload change is quality-neutral and stays default. No code change.
+
+---
+
 ## MIT quality loop, round 280 — v11 sweep: one more emphasis carrier; gate {} again (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
