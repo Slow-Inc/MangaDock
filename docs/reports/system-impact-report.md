@@ -1,5 +1,21 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-24 — Physical Z Flip4 Phase 5 QA
+
+| Field | Record |
+|---|---|
+| What / where | Full Backend 4001, existing Phase 5 APK installed with data preserved, physical Chrome harness and Metro loopback helper; [device evidence](phase5-zflip4-2026-10-24/README.md) |
+| Why | User requested running the local Backend, real Z Flip4 feature testing, and a done/remaining inventory |
+| Before → After | No local services/device acceptance → Backend physically reachable, Native home/account restored and 8 Web QA groups passed on the actual phone |
+| Performance Δ | Not measured; no throughput/latency improvement percentage claimed |
+| Quality / validation | Android 16/Chrome 155, actual 360×744 viewport, 23 feature requests, real Nest + isolated PostgreSQL SQL with synthetic auth/catalog/controlled transport; no page errors. Source/provider/live-schema acceptance kept distinct |
+| Diagnosis | Metro IPv4 refused while IPv6 worked; a loopback-only TCP forward made the same phone request and native launch succeed. No application source or system setting changed |
+| Risk / rollback | Push disabled; no real user data mutation or remote migration. Stop QA/Metro-forward processes to revert local test networking. Original installed APK backed up, matching signing certificate verified before replacement |
+| Remaining | Live Phase 5 schema absent (PGRST205/PGRST202); EAS/Firebase and real Redis unavailable; Native Feed/Collections and physical push acceptance pending. Health/exception reporting gaps separately recorded |
+| Links | Source `b168975`, branch `feat/mobile-phase5-push-20261023`; no issue, PR or external publication action |
+
+ภาษาไทย: ตรวจบน Z Flip4 จริงตามคำสั่ง เปิด Backend และติดตั้ง APK โดยเก็บข้อมูลเดิม เว็บผ่าน 8 กลุ่มกับฐานข้อมูล QA แยก แก้เฉพาะปัญหา Metro IPv4/IPv6 ไม่มีเปอร์เซ็นต์ performance ที่วัด งานต่อและขอบเขตจำลอง/บริการจริงระบุครบในรายงาน ไม่อ้าง Push/Redis/production schema ผ่าน
+
 ## 2026-10-24 — Phase 5 retention and Backend push
 
 1. **What changed** — New `Backend/src/retention`, Web `/feed` and `/collections`, Push device/preferences service and worker, two transactional migrations. Existing Expo client is reused. / เพิ่ม Feed/คอลเลกชันเว็บและ Backend Push ใช้ client เดิม

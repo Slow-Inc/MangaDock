@@ -125,6 +125,8 @@ Status is based on code in the default branch, dated engineering reports, and ou
 
 **2026-10-24:** [Implementation, tests, screenshots and release gates](docs/reports/phase5-2026-10-24/README.md). Following and rule-ranked feeds, private/public collections and the durable server push contract/pipeline are implemented. Native/provider rollout remains disabled; this is not production acceptance.
 
+**Physical QA 2026-10-24:** [Z Flip4 evidence and current blockers](docs/reports/phase5-zflip4-2026-10-24/README.md): Web flows passed on the phone with isolated QA data; Native startup/account restoration passed. The configured live database still lacks the migrations, and real push/provider/Redis acceptance remains pending.
+
 **2026-10-23:** [Mobile push contract and verification](Mobile/docs/2026-10-23-phase5-push.md). Rollout is disabled. This does not complete the Phase 5 feed, custom collections or multi-node notification delivery pipeline.
 
 **Audit (2026-10-22):** Current user_follows APIs and the in-app notifications service are not the planned personalized Following/ranked feed or OS-level push delivery. Existing favorites, followed series and reading history are not custom public/shareable collections. No end-to-end delivery of the new Phase 5 scope is claimed.
@@ -281,6 +283,8 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **สถานะ:** WIP — ทำและตรวจ Feed/คอลเลกชันเว็บกับ source ท่อส่ง Backend Push บน branch Phase 5 แล้ว ยังรอ migration จริง ตั้งค่า provider และรับผลบนอุปกรณ์
 
 **2026-10-24:** [รายละเอียดการพัฒนา ผลทดสอบ ภาพหน้าจอ และเกณฑ์ก่อนเปิดใช้](docs/reports/phase5-2026-10-24/README.md) มี Following/Personalized Feed, คอลเลกชันส่วนตัว/สาธารณะ และสัญญา/ท่อส่ง Push แบบ durable แล้ว ยังปิด rollout และไม่อ้างตรวจรับ production
+
+**QA เครื่องจริง 2026-10-24:** [หลักฐาน Z Flip4 และงานค้างล่าสุด](docs/reports/phase5-zflip4-2026-10-24/README.md) เว็บผ่านบนโทรศัพท์ด้วยข้อมูล QA แยก Native เปิดและกู้ session บัญชีได้ ฐานข้อมูลใช้งานยังขาด migration และยังไม่รับผล Push/provider/Redis จริง
 
 **2026-10-23:** [สัญญาและผลตรวจ Mobile Push](Mobile/docs/2026-10-23-phase5-push.md) ยังปิด rollout ไม่ใช่ผลเสร็จของ Feed, Custom Collections หรือระบบส่งหลาย node ทั้ง Phase 5
 

@@ -1,0 +1,37 @@
+[
+  {
+    "table": "reader_collections",
+    "status": 404,
+    "errorCode": "PGRST205"
+  },
+  {
+    "table": "reader_collection_items",
+    "status": 404,
+    "errorCode": "PGRST205"
+  },
+  {
+    "table": "push_devices",
+    "status": 404,
+    "errorCode": "PGRST205"
+  },
+  {
+    "table": "push_preferences",
+    "status": 404,
+    "errorCode": "PGRST205"
+  },
+  {
+    "table": "push_outbox",
+    "status": 404,
+    "errorCode": "PGRST205"
+  },
+  {
+    "rpc": "phase5_feed",
+    "status": 404,
+    "errorCode": "PGRST202"
+  },
+  {
+    "rpc": "phase5_push_due",
+    "status": 404,
+    "errorCode": "PGRST202"
+  }
+]

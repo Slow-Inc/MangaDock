@@ -1,0 +1,33 @@
+{
+  "model": "SM-F721B",
+  "apk": {
+    "package": "com.mangadock.mobile",
+    "versionName": "0.1.0",
+    "versionCode": 1,
+    "sha256": "F8EB7AAE882A3E702CB600416E585B59A68D344C6B7987CE14183A972997CF2B",
+    "installMode": "adb install -r, signature matched; previous APK backed up; app data not cleared"
+  },
+  "checks": [
+    {
+      "check": "Native launch with current Phase 5 Metro source",
+      "result": "pass"
+    },
+    {
+      "check": "Native home and account with restored session",
+      "result": "pass"
+    },
+    {
+      "check": "Adjacent inbox and wallet account actions visible; gated OS push controls absent",
+      "result": "pass, rollout disabled"
+    },
+    {
+      "check": "Remote push opt-in/arrival/receipt/tap",
+      "result": "not run: EAS/Firebase configuration and live migrations missing"
+    },
+    {
+      "check": "Native feed and custom collections UI",
+      "result": "not implemented in this branch"
+    }
+  ],
+  "privacy": "Native account screenshots/XML kept outside Git because they contain personal profile information. No profile change, logout, notification-read mutation, payment, or remote push was performed."
+}

@@ -1,0 +1,162 @@
+{
+  "results": [
+    {
+      "feature": "Following Feed",
+      "result": "pass",
+      "device": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36",
+        "width": 360,
+        "height": 744,
+        "dpr": 3,
+        "touchPoints": 5
+      }
+    },
+    {
+      "feature": "Personalized Feed",
+      "result": "pass"
+    },
+    {
+      "feature": "Feed failure/retry",
+      "result": "pass"
+    },
+    {
+      "feature": "Private collection create + manga add",
+      "result": "pass"
+    },
+    {
+      "feature": "Collection edit/public/share clipboard",
+      "result": "pass"
+    },
+    {
+      "feature": "Guest public read / no edit controls",
+      "result": "pass"
+    },
+    {
+      "feature": "Privacy revocation / guest and other-account denial",
+      "result": "pass"
+    },
+    {
+      "feature": "Manga removal + collection deletion",
+      "result": "pass"
+    }
+  ],
+  "requests": [
+    {
+      "path": "feed",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "feed",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "feed",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "collections",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4/items",
+      "method": "PUT",
+      "status": 204
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/public/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/public/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4/items",
+      "method": "DELETE",
+      "status": 204
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "DELETE",
+      "status": 204
+    },
+    {
+      "path": "collections/64dfb7a5-f9a5-4879-bd60-43065383ecc4",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "collections",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "errors": [],
+  "boundary": "Physical Z Flip4 Chrome, no emulation; feature HTTP -> real Nest -> isolated PGlite; synthetic auth/catalog and controlled transport; live production-schema acceptance not claimed"
+}

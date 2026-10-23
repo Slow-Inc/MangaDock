@@ -1,5 +1,12 @@
 <!-- lang:en -->
 
+## Phase 5 physical Z Flip4 QA — 2026-10-24
+
+- Started the full branch Backend on 4001 with existing configuration, left it and Metro running, and verified physical phone connectivity through ADB reverse. Installed the Phase 5 debug APK without clearing app data; previous APK backed up and signature matched. Native home/account and session restoration observed.
+- Physical Z Flip4 / Android 16 / Chrome 155 at 360×744 passed eight Web feature groups with 23 feature HTTP requests against isolated PostgreSQL/Nest feature paths. Screenshots, sanitized Native result and read-only live-schema preflight are in the [device QA report](docs/reports/phase5-zflip4-2026-10-24/README.md). Synthetic auth/catalog/transport boundaries are explicit; no real user mutation or remote push was performed.
+- Diagnosed Metro's IPv6-only localhost listener versus ADB's IPv4 connection, proved the differential and fixed only local QA networking with a loopback forwarder. Real feature migrations, EAS/Firebase, Redis delivery and Native Feed/Collections remain pending. Existing health/exception reporting gives misleading Redis-up/database-offline signals; recorded without unrelated source changes.
+- ภาษาไทย: เปิด Backend 4001 และ Metro ค้างไว้ ติดตั้ง APK ทับโดยเก็บข้อมูลและ session เดิม ทดสอบเว็บบน Z Flip4 จริงผ่าน 8 กลุ่ม โดยใช้ SQL/Nest กับบัญชีและข้อมูล QA แยก มีภาพ/ผล Native/หลักฐาน schema จริงที่ยังขาดในรายงาน แก้การเชื่อม Metro IPv4/IPv6 เฉพาะเครื่องทดสอบ ไม่แก้ข้อมูลบัญชีจริง ไม่ส่ง Push ไม่ migrate/deploy/merge/push งานต่อคือ migration, EAS/Firebase, Redis และหน้าจอ Native ของ Feed/คอลเลกชัน
+
 ## Phase 5 retention and Backend push — 2026-10-24
 
 - Continued `feat/mobile-phase5-push-20261023` in `C:/Users/woral/md-phase5-mobile`. Added chronological Following Feed, database-ranked Personalized Feed, owner/private/public collections with Web URL sharing, and Backend device/preferences/outbox/Redis-worker/receipt integration matching the existing Expo client.
