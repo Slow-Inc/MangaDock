@@ -54,6 +54,7 @@ def test_apply_results_updates_only_accepted_regions():
 
 
 def test_verify_candidates_needs_every_pass_to_agree(monkeypatch):
+    monkeypatch.setattr(og, "_call_batch", lambda *a, **k: None)
     cands = [{'idx': 0, 'src': 'SRC', 'dst': 'TH'}]
     import threading
     lock = threading.Lock()
@@ -89,6 +90,7 @@ def test_parse_verdicts_accepts_a_single_object():
 
 
 def test_verify_sends_one_candidate_per_request(monkeypatch):
+    monkeypatch.setattr(og, "_call_batch", lambda *a, **k: None)
     cands = [{'idx': 0, 'src': 'SRC ONE', 'dst': 'TH ONE'}, {'idx': 1, 'src': 'SRC TWO', 'dst': 'TH TWO'}]
     prompts = []
 
@@ -103,3 +105,17 @@ def test_verify_sends_one_candidate_per_request(monkeypatch):
     assert len(prompts) == 4  # two candidates x two passes
     assert all(p.count('<|') == 1 for p in prompts)  # each request carries exactly one pair
     assert agreed == {0: 'missing-one'}
+
+
+def test_verify_uses_the_batched_schema_when_the_item_count_matches(monkeypatch):
+    cands = [{"idx": 0, "src": "SRC ONE", "dst": "TH ONE"}, {"idx": 1, "src": "SRC TWO", "dst": "TH TWO"}]
+    calls = []
+
+    def fake_batch(base, key, model, user, timeout=120):
+        calls.append(user)
+        return [{"i": 0, "omitted": True, "missing": "gone"}, {"i": 1, "omitted": False}]
+
+    monkeypatch.setattr(og, "_call_batch", fake_batch)
+    agreed = asyncio.run(og.verify_candidates(cands, "http://x", "k", "m", passes=2))
+    assert len(calls) == 2  # two schema-enforced passes, no per-line fallback
+    assert agreed == {0: "gone"}

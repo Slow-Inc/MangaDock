@@ -136,3 +136,17 @@ true-positive proven deterministically, false-positive rate on clean pages 0/9 i
 
 Cost per page stayed in the 14-23 s wall range (verifier adds ~4-8 s when candidates exist; a page with 0 candidates
 adds nothing). The pass stays opt-in until a full-corpus sweep and a translation-judge comparison are run.
+## Cost cut: schema-enforced batched verification (round 214)
+
+Per-line verification fixed the reliability but cost 12 requests per page. The gateway accepts `response_format:
+json_schema`, so the verifier now asks for a single object `{"items":[{i,omitted,missing}, ...]}` in **one request per
+pass**; the model must enumerate every pair, and the fast path is taken only when the returned item count matches the
+candidate count. If it does not, the pass falls back to the proven per-line path.
+
+| run (Akuyaku replay, deterministic) | wall | outcome |
+|---|---|---|
+| per-line (round 211) | 29.6 s | clause restored |
+| **schema batch (round 214)** | **24.8 s** | clause restored (`...ฉันก็เกิดสงสัยขึ้นมาด้วย`) |
+
+Direct verifier probe with six candidates still flags only the omitted line (`agreed={5: THIS PIQUED MY CURIOSITY}`),
+and the unit suite (11 omission tests) covers the fast path, the item-count fallback and the object/array parser.

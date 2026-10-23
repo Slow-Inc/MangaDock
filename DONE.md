@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 214 — omission pass: schema-enforced batch verification cuts cost to 24.8 s on the replay page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The gateway supports `response_format: json_schema`; the verifier now requests one `{items:[{i,omitted,missing}]}` object per pass (one request), taking the fast path only when the item count matches and falling back to the proven per-line path otherwise.
+- Akuyaku replay: **24.8 s vs 29.6 s**, clause still restored (`...ฉันก็เกิดสงสัยขึ้นมาด้วย`); direct six-candidate probe flags only the omitted line. 11 omission tests (fast path, count fallback, object/array parser); full suite green.
+
+---
+
 ## MIT quality loop, round 213 — omission pass: 0 false positives across 6 clean pages (9 candidates) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -130,7 +130,41 @@ def _call(base, key, model, user, timeout=120):
     return parse_verdicts(resp.json()['choices'][0]['message']['content'])
 
 
+_SCHEMA = {
+    "type": "object",
+    "properties": {"items": {"type": "array", "items": {"type": "object",
+        "properties": {"i": {"type": "integer"}, "omitted": {"type": "boolean"}, "missing": {"type": "string"}},
+        "required": ["i", "omitted"]}}},
+    "required": ["items"],
+}
+
+
+def _call_batch(base, key, model, user, timeout=120):
+    """One schema-enforced request for the whole page; returns the items list or None."""
+    import requests
+    body = {"model": model, "max_tokens": 2048, "temperature": 0,
+            "response_format": {"type": "json_schema", "json_schema": {"name": "omissions", "schema": _SCHEMA}},
+            "messages": [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}]}
+    resp = requests.post(base, headers={"Authorization": "Bearer " + key}, json=body, timeout=timeout)
+    if resp.status_code != 200:
+        return None
+    return parse_verdicts(resp.json()["choices"][0]["message"]["content"])
+
 async def verify_candidates(candidates, base, key, model, passes=2):
+    """Fast path: one schema-enforced batched request per pass; per-line fallback if the item count is wrong."""
+    if not candidates:
+        return {}
+    user = build_prompt(candidates)
+    batch = await asyncio.gather(*[asyncio.to_thread(_call_batch, base, key, model, user) for _ in range(max(1, passes))])
+    if all(r is not None and len(r) == len(candidates) for r in batch):
+        agreed = None
+        for verdicts in batch:
+            page = distribute(verdicts, candidates)
+            agreed = page if agreed is None else {k: v for k, v in agreed.items() if k in page}
+        return agreed or {}
+    return await _verify_per_line(candidates, base, key, model, passes)
+
+async def _verify_per_line(candidates, base, key, model, passes=2):
     """{region_idx: missing} for candidates every pass agrees dropped a clause.
 
     Each candidate is sent in its OWN request: the model returned a single-item, wrongly-indexed array when two
