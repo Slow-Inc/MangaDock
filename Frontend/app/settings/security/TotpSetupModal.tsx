@@ -75,7 +75,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl backdrop-blur-2xl">
+      <div className="w-full max-w-md rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm font-semibold text-ink">เปิดใช้งาน 2FA</p>
@@ -199,7 +199,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
                 onSuccess();
                 onClose();
               }}
-              className="w-full rounded-xl bg-ok py-2.5 text-sm font-semibold text-bg transition hover:bg-ok/85"
+              className="w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))]"
             >
               เสร็จสิ้น
             </button>

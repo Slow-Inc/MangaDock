@@ -39,7 +39,7 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/90 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-8 text-center shadow-2xl backdrop-blur-2xl">
+      <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-8 text-center shadow-2xl">
         {/* Icon */}
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/20">
           <svg

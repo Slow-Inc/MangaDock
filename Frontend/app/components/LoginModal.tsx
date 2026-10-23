@@ -213,11 +213,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </svg>
             ) : null}
           </div>
-          <Loader context="section" className="mb-4 text-ink-2" />
-          <p className="text-sm font-semibold text-ink">
+          {/* on the scrim (black in both themes): fixed light text */}
+          <Loader context="section" className="mb-4 text-white/70" />
+          <p className="text-sm font-semibold text-white">
             {socialLoading === "google" ? "กำลังรอการยืนยันจาก Google" : "กำลังรอการยืนยันจาก Facebook"}
           </p>
-          <p className="mt-1.5 text-xs text-ink-3">โปรดดำเนินการในหน้าต่างที่เปิดขึ้น</p>
+          <p className="mt-1.5 text-xs text-white/60">โปรดดำเนินการในหน้าต่างที่เปิดขึ้น</p>
         </div>
 
         {/* ── Close button ── */}
@@ -241,7 +242,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         >
           {/* Drag handle — mobile only, sticky so it stays visible while scrolling */}
           <div className="md:hidden flex justify-center pt-3 pb-1 sticky top-0 z-10 bg-surface">
-            <div className="w-10 h-1 rounded-full bg-raised" />
+            <div className="w-10 h-1 rounded-full bg-ink-3" />
           </div>
 
           {/* ════════════════
@@ -304,9 +305,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             {/* OR divider — mobile only (between social top and form bottom) */}
             <div className="md:hidden flex items-center gap-3 pt-1">
-              <div className="flex-1 h-px bg-raised" />
+              <div className="flex-1 h-px bg-line" />
               <span className="text-[10px] font-bold text-ink-3 tracking-widest uppercase">หรือใช้อีเมล</span>
-              <div className="flex-1 h-px bg-raised" />
+              <div className="flex-1 h-px bg-line" />
             </div>
 
             {/* Terms — desktop only (mobile Terms is in form panel bottom) */}
@@ -327,7 +328,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             {/* Tab switcher — sliding pill indicator */}
             <div className="relative mb-5 flex rounded-xl border border-line bg-fill p-1 md:mb-8 shrink-0">
               <div
-                className={`absolute top-1 bottom-1 rounded-lg bg-raised shadow transition-all duration-300 ease-in-out ${
+                className={`absolute top-1 bottom-1 rounded-lg bg-surface shadow transition-all duration-300 ease-in-out ${
                   mode === "register" ? "left-[calc(50%+2px)] right-1" : "left-1 right-[calc(50%+2px)]"
                 }`}
               />

@@ -88,6 +88,10 @@ Strata tokens — ~130 class edits, styling only (`git diff` has no non-class li
 window is open), and the callback shows a `Loader page` while it completes. The login and link modals' panels were
 translucent glass over the dark scrim — black in light mode — and are now an opaque `bg-surface` (blur dropped). Brand
 colours (Google, Facebook) and the TOTP QR's white backing stay. The callback test's import allow-list gained the Loader.
+From review: the OAuth-wait overlay sits on the scrim (black in both themes), so its text stays fixed white; hairlines
+and the drag handle mapped to `raised` were near-invisible — now `line` / `ink-3`, and the tab pill is `surface`; the
+TOTP done button uses the ink primary (green was 4.0:1); blur dropped from the three now-solid panels. Light-theme
+`--ok` / `--danger` on their own tints sit just under AA app-wide — a token decision, filed separately.
 
 **Validated:** production build, both themes: the light sweep's white-on-light texts on `/settings/security` gone; a
 contrast check of the login modal and the security / accounts pages finds 0 low-contrast texts in light and dark;

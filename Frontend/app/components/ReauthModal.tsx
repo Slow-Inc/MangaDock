@@ -76,7 +76,7 @@ export default function ReauthModal({
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl backdrop-blur-2xl">
+      <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl">
         <p className="text-sm font-semibold text-ink">ยืนยันตัวตน</p>
         <p className="mt-1 text-xs text-ink-2">
           เพื่อความปลอดภัยก่อน{actionLabel} กรุณายืนยันว่าเป็นคุณ
@@ -115,9 +115,9 @@ export default function ReauthModal({
 
           {hasPassword && (hasGoogle || hasFacebook) && (
             <div className="flex items-center gap-2">
-              <span className="h-px flex-1 bg-raised" />
+              <span className="h-px flex-1 bg-line" />
               <span className="text-[10px] text-ink-3">หรือ</span>
-              <span className="h-px flex-1 bg-raised" />
+              <span className="h-px flex-1 bg-line" />
             </div>
           )}
 
