@@ -367,7 +367,10 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     """
     if to_lang and str(to_lang).upper() not in ('THA', 'TH'):
         return False
-    if '?' not in src and '？' not in src:
+    # A '?' embedded between letters/digits is an OCR artefact (titles like `Episode?3`) or an interrobang
+    # style, never a question; only a standalone '?' counts (gate has the same licence).
+    standalone = re.sub(r'(?<=[A-Za-z0-9])\?+(?=[A-Za-z0-9])', '', src or '')
+    if '?' not in standalone and '？' not in standalone:
         return False
     return _THAI_Q_MARKERS.search(dst or '') is None
 
@@ -418,3 +421,19 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
         return True
     return False
 
+#: #1058: a Thai answer far shorter than the source line means content loss/truncation.
+_ASCII_LETTER = re.compile(r'[A-Za-z]')
+
+
+def content_loss(src: str, dst: str, to_lang: str = '') -> bool:
+    """True when the Thai answer is far too short for the source line (#1058).
+
+    Measured over 8,423 real segments: median dst/src length ratio 0.86, p10 0.66; the 0.6 % below 0.45 are real
+    losses (a truncated Thai phrase, a completely different short line), not terse styling.
+    """
+    if to_lang and str(to_lang).upper() not in ('THA', 'TH'):
+        return False
+    src, dst = src or '', dst or ''
+    if len(src) < 24 or not dst or not _ASCII_LETTER.search(src):
+        return False
+    return len(dst) / len(src) < 0.45

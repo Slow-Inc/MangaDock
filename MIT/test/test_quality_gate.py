@@ -75,3 +75,10 @@ def test_question_words_near_the_end_also_cover_a_dropped_mark_990i():
     assert check_page([_r("DO YOU KNOW WHAT A DEMON LORD IS?", "รู้ไหมว่าจอมมารคืออะไร")]) == []
     assert check_page([_r("ARENT THEY THE STRONGEST WIZARDS?", "พวกเขาไม่ใช่จอมเวทที่เก่งกาจที่สุดหรือไง")]) == []
     assert check_page([_r("WHAT SHOULD I DO?", "ฉันควรทำอะไรสักอย่าง")]) == []  # อะไร mid-sentence is accepted as a question marker
+
+def test_a_question_marker_early_in_a_long_answer_counts_1056c():
+    """#1056: the question particle can sit anywhere in a long sentence, not only the last 16 chars."""
+    from manga_translator.quality_gate import check_page
+    v = check_page([{"src": "IS THAT REALLY TRUE? I CANT BELIEVE IT AT ALL",
+                    "dst": "หรือว่ามันจะเป็นเรื่องจริง ฉันไม่อยากจะเชื่อเลยสักนิด"}])
+    assert not any(x["kind"] == "dropped_?" for x in v), v

@@ -69,7 +69,7 @@ def check_page(regions, page='?'):
                     continue  # one interrobang covers both marks
                 if mark == '!' and '?' in dst:
                     continue  # a Thai rhetorical question keeps only the ?
-                if mark == '?' and _THAI_QUESTION.search(dst[-16:]):
+                if mark == '?' and _THAI_QUESTION.search(dst):
                     continue  # final Thai question particle carries the question
                 if mark == '…' and '...' in dst:
                     continue

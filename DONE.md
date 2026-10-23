@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 109 — baseline sweep: 2 guard false positives fixed; content-loss class measured and guarded (opt-in) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 8-page baseline sweep with all defaults: 7 triggers, all true positives (CJK/Arabic/Cyrillic foreign-script leaks, two `lost_as_rare`); judge **1.48/2** over 92 segments (baseline 1.44-1.48).
+- **FP fix 1 (#1056):** `Episode?3` fired `dropped_question`; a `?` embedded between alphanumerics is OCR/title noise — stripped before the decision, tested.
+- **FP fix 2 (#990):** the gate's `dropped_?` look only at the last 16 chars, so a question particle earlier in a long answer was missed (false violation). It now searches the whole answer; the same 8 pages re-check to **0 violations** (was 1).
+- **New class measured (#1058):** over 8,423 segments, dst/src length ratio median 0.86 / p10 0.66, and 54 segments (0.6 %) below 0.45 are real content loss (truncated Thai, different short line). Added `content_loss` predicate + **opt-in** `MIT_CONTENT_LOSS_GUARD=1` retry (note asks for the whole line), with tests; forced-injection proof is the next step before any default.
+- Full suite **928 passed**; benchmark `2026-10-23-guard-fps-and-content-loss.md`.
+
 ## MIT quality loop, round 108 — untranslated-word guard promoted to default after forced proof + 16-page FP sweep (#1057) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

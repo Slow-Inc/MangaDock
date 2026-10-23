@@ -306,3 +306,18 @@ def test_an_english_word_left_inside_thai_is_an_untranslated_leak_1057():
     assert not u("RTSD IS THE PUBLISHER", "RTSD คือสำนักพิมพ์")
     assert not u("SHE SAID HELLO", "เธอทักทาย")
     assert not u("DID ANYONE BRING THE MATERIALS?", "Materials อยู่ไหน")
+
+
+def test_an_ocr_embedded_question_mark_is_not_a_question_1056b():
+    from manga_translator.translation_quality import dropped_question
+    assert not dropped_question("Episode?3", "ตอนที่ 3")
+    assert not dropped_question("IF?YOU CAN", "ถ้าเธอทำได้")
+    assert dropped_question("IS THAT SO?", "อย่างนั้นสินะ")
+
+
+def test_a_far_too_short_answer_is_content_loss_1058():
+    from manga_translator.translation_quality import content_loss
+    assert content_loss("MAY THE BLESSINGS OF THE GREAT", "ขอพรจากมหา")
+    assert not content_loss("MAY THE BLESSINGS OF THE GREAT", "ขอให้พรจากมหาเทพผู้ยิ่งใหญ่จงสถิตอยู่กับท่าน")
+    assert not content_loss("SHORT", "สั้น")
+    assert not content_loss("MAY THE BLESSINGS OF THE GREAT", "blessings", "ENG")
