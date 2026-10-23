@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 234 — CORRECTION: v6 leftovers are `{untranslated_word: 1}` (the rare leak), not {} (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Validated the final-report reproduce command (`quality_dashboard.py --doctor-dir result/doctor/final166`): it reports gate `{untranslated_word: 1, added_latin: 1}` and leftover **`{untranslated_word: 1}`** — the same rare `ATERIAL` leak. The earlier v6 "leftover 0" came from a custom scan that did not include the untranslated-word predicate.
+- Corrected the v6 table and the final report dict wording; the leak is the already-analysed guard-failure case, not a new defect. No code change.
+
+---
+
 ## MIT quality loop, round 233 — merge-day runbook written; status re-checked (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

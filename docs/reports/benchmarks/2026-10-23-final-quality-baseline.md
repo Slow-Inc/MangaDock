@@ -139,7 +139,7 @@ The 4 glitch triggers are the lowest of any sweep; every gate finding has a know
 |---|---|---|
 | pages / regions | 39 / 369 | 39 / 370 |
 | page gate violations | {} (after re-scan) | **2 on one line** (+1 name variance): `untranslated_word` + `added_latin` on the same Horimiya line |
-| leftovers (five scans) | {} | **{}** |
+| leftovers | {} | **{`untranslated_word`: 1}** — the same rare `ATERIAL` line; foreign/content/typo/filler/rare are all 0 (the earlier `{}` claim came from a scan that omitted the untranslated-word predicate; the official dashboard counts it) |
 | guard triggers | 4 | 4 |
 | wall avg / median | 7.80 / 6.62 s | 7.80 / 6.62 s |
 | retort retries | 2 per Horimiya run | **gone** (licensed) |
