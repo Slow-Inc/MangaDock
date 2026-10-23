@@ -3,6 +3,12 @@
 
 ---
 
+## MIT quality loop, round 97 — consolidated status report of the whole loop (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-quality-loop-status.md`: full-corpus judge baseline (39/39 pages, 403 segments, 1.44/2, 2.7 % broken, noise caveat), the shipped default fixes with their evidence, the opt-in list with the tradeoff that blocked each default, the 8-page latency profile, open items and the reusable tooling.
+- This is the hand-off view of the loop: what changed by default, what stays behind a flag and why, and where the remaining work is (#1050/#1051 blocked, #897 data-limited, #1052/#1039 intermittent confirmation).
+
 ## MIT quality loop, round 96 — #899 second attempt (background-aware contrast): verified inert, visual check clean, issue closeable (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
