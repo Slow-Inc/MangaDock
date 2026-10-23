@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 232 — retry budget re-evaluated (keep 2) and final report bumped to v6/982 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Evaluated raising `_INVALID_REPEAT_COUNT` to 3 for the rare `ATERIAL` case: the leak is 1/370, guard hits are rare, and direct sampling shows the first retry normally fixes leaks (0/9) — the third attempt would mostly add latency on bad batches. **Kept at 2**, with the revisit condition recorded (name the leaked token in the note only if leaks survive two retries).
+- Final report updated with the v6 gate wording and the current suite count (982). No code change.
+
+---
+
 ## MIT quality loop, round 231 — v6 sweep: v5 gate findings stay fixed; one rare guard-failure leak analysed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -38,3 +38,15 @@ with `MIT_LOG_GLITCH` and `--gate`:
 - Gate: **pages=2 violations=0**.
 - The only glitches were two `foreign_script` Chinese leaks (model variance) which the existing guard retried/salvaged —
   gate stayed clean, so the retries did their job.
+## Retry budget re-evaluation (2026-10-23, round 232): keep 2
+
+The v6 sweep's one real leftover was an `untranslated_word` case where **both** retries leaked an English variant
+(`material` -> `ATERIAL`) and the budget was spent. We evaluated raising `_INVALID_REPEAT_COUNT` (custom_openai = 2, i.e.
+3 attempts) for this:
+
+- Frequency: 1 shipped leak in 370 regions; the guard fires rarely (2 lines across the corpus in v6) and direct sampling
+  showed the model normally returns fully Thai on the first retry (0 Latin leaks in 9/9 A/B samples).
+- Cost: every guard hit (and a bad model batch can hit many lines) would buy one more gateway call; the stress run showed
+  glitches are transient and usually fixed on the first retry, so the third attempt mostly adds latency.
+- Decision: **keep 2**. Revisit only if future sweeps show repeated leaks surviving two retries (then the fix should name
+  the leaked token in the retry note rather than just raising the budget).

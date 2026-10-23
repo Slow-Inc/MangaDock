@@ -8,7 +8,7 @@ benchmarks linked below.
 | metric | value |
 |---|---|
 | corpus | 39 real pages, 365 regions (EN→TH) |
-| gate | **0 violations** |
+| gate (page-level) | **0 on v5 outputs; v6 live: one rare `untranslated_word` leak (model variance) + name variance** |
 | leftovers (foreign script / content loss / typo / filler / lost-as-rare) | **0 / 0 / 0 / 0 / 0** |
 | judge | raw **1.44/2**, strict-adjusted **1.58** (band 1.55-1.60), 3.6 % broken / 34.4 % partial / 62.0 % perfect |
 | guard triggers in the sweep | 5 |
@@ -65,5 +65,5 @@ cd MIT && .venv/Scripts/python.exe tools/doctor_page.py <pages> --target THA --s
 
 PR: #794 (draft, mergeable). CI: logic gate / heavy ML / backend green; Vercel is an external rate limit.
 
-Latest test count: **978 passed** (omit the torch-contract test). All end-state numbers above are from the v4 sweep;
+Latest test count: **982 passed** (omit the torch-contract test). All end-state numbers above are from the v4 sweep;
 the omission pass is opt-in and not part of those numbers.
