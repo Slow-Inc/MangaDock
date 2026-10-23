@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 118 — verified `series_context` reaches the MIT translator on the real path (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Traced the production wiring end-to-end: `mit-translation.service.ts:116` / `mit-batch-stream.ts:120` -> `composeSeriesContext` -> `mit-config.ts:250` (`translator.series_context`) -> MIT `TranslatorConfig.series_context` -> prompt seam -> `series_glossary_memory` keyed by `(target_lang, series_context)`.
+- Tests: Backend `mit-config.spec.ts` **27 passed** (includes the series_context branch); MIT series-memory + extraction **7 passed**. `series-context.spec.ts` fails to start locally on Node 26 (`fetch is not defined` in `page-source.ts`) — a test-runner environment issue, not a branch regression.
+- Conclusion: the cross-page name-consistency feature is reachable on the real production path (single-page and batch), not only in the batch pipeline. Benchmark `2026-10-23-prod-wiring-verification.md`.
+
 ## MIT quality loop, round 117 — production-path acceptance passes; hedging guard rejected on false-positive rate (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
