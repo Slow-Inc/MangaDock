@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 152 — semantic omission verifier prototyped: 2/2 true positives on long lines (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The ratio guard cannot see dropped clauses, so prototyped `tools/omission_verify.py`: one gateway verification call per page on **long source lines only** (>= 8 English words), JSON verdicts, report-only.
+- Probe over 10 final-sweep pages: 23 long pairs, **2 flagged and both true positives** — the known `this piqued my curiosity` omission and a second `PAIZ` (paid) modifier loss that the gate never saw. 21 unflagged lines spot-check clean.
+- Ships with pure-helper tests. Next step (backlog P1): wider sweep, then a forced-injection proof before wiring as opt-in `MIT_OMISSION_VERIFY=1`.
+
+---
+
 ## MIT quality loop, round 151 — next-loop backlog written for the hand-off (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
