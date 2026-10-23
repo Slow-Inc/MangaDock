@@ -298,14 +298,14 @@ export default function PostDetailPage() {
   );
 
   return (
-    <div className="relative [overflow-x:clip]">
+    <div className="relative">
       {/* 
         Sticky Secondary Header (Bar) 
         - Always present back button
         - Dynamic background and title on scroll
       */}
       <div
-        className={`sticky top-16 z-50 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
+        className={`sticky top-16 z-40 -mx-4 px-4 lg:mx-0 lg:px-0 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
           headerScrolled
             ? "bg-surface/80 backdrop-blur-md border-line shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
             : "bg-transparent border-transparent"
