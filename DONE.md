@@ -77,6 +77,20 @@
 
 ---
 
+## #1088 Book popup buttons show one spinner while chapters load (2026-10-24)
+
+**What:** the developer reported "( ( กำลังโหลด". The buttons already swap their icon for a spinner while loading,
+and fc90239c had added a second spinner inside the label. The label is now plain text. The secondary "อ่านตอนที่ …"
+button now swaps its book icon for the spinner, like the others.
+
+**Validated:** production build with the chapter request held.
+- **Before:** 2 spinners on "ดูตอนทั้งหมด" (1280 px) and on the phone read button (390 px); 1 spinner next to a book
+  icon on the desktop read button.
+- **After:** one spinner each and no other icon. A screenshot was sent to the developer.
+- The book popup probe still passes, and unit tests are 496/496. Real tsc is clean, and eslint matches main.
+
+---
+
 ## #1085 One keyboard-ownership rule for dialogs; book popup on useModalDialog (2026-10-23)
 
 **What:** a `/simplify` pass on #1073 found the question "is this keyboard event this dialog's?" answered four ways.
