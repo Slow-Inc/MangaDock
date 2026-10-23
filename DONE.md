@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 256 — batched notes: v8 in hand-off, intra-page name unify measured as unnecessary (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off end-state row now covers v7/v8 (gate {} both runs, 1-3 guard triggers, 6.07-7.83 s).
+- Negative result recorded: intra-page name spelling variance is 0/39 pages, so no page-level normaliser is warranted; cross-page variance is the production series-memory case (#1065). No code change.
+
+---
+
 ## MIT quality loop, round 255 — v8 reproducibility sweep: gate {} again, 1 guard trigger, 6.07 s avg (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

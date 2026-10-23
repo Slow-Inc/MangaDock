@@ -117,3 +117,9 @@ Names are already covered by the series name memory; **common terms** (`DEMON LO
 name-focused lines (single Latin name + short Thai run). A term memory would need: recurring-titlecase extraction, a
 target registered in the series key, and a licence so ordinary words are never enforced. This is a new feature with real
 FP risk - do it as its own loop with a judge A/B, not as a tail-end patch.
+### Evaluated 2026-10-23 (round 204): intra-page name unify - **not needed**
+
+Scanned all v8 pages for a name that appears on multiple lines with different Thai spellings inside the SAME page:
+**0 of 39 pages**. The model is already consistent within a page; the observed variance (TSUKUYOMI) is cross-page and is
+covered by the production series memory plus the token-level fix (#1065). Adding a page-level normaliser would be
+complexity without a defect to fix.
