@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 182 — global OCR box padding rejected and experiment removed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested padding every detected textline box 15 % before the first OCR pass (the re-read pass's mechanism, at zero extra calls). Sweep: **159/348 (45.7 %) source strings changed, 24/39 page layouts changed**, text-level A/B 25 padded-better vs **13 baseline-better** — chapter-wide churn with a coin-flip on aligned lines.
+- **Rejected**: keep padding only on the low-confidence line via the re-read pass. Removed the experimental knob/helpers/tests so nothing unproven ships; documented in `2026-10-23-ocr-box-pad-rejected.md`. Suite 961 passed.
+
+---
+
 ## MIT quality loop, round 181 — production acceptance with the OCR pass default ON (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
