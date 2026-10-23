@@ -291,11 +291,13 @@ export default function AdminUsersPage() {
                     {adjustOpen && (
                       <div className="pb-3 space-y-2">
                         <input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)}
+                          aria-label="Coin adjustment amount"
                           placeholder="+100 or -50"
-                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 transition-colors" />
+                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-ink-3 transition-colors" />
                         <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)}
+                          aria-label="Reason for the adjustment"
                           placeholder="Reason (required)…"
-                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 transition-colors" />
+                          className="w-full bg-fill border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-3 focus:border-ink-3 transition-colors" />
                         <div className="flex justify-end">
                           <button onClick={submitAdjust}
                             disabled={adjusting || !adjustDelta || !adjustReason.trim() || parseInt(adjustDelta, 10) === 0 || isNaN(parseInt(adjustDelta, 10))}
