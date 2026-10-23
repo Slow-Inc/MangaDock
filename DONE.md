@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 90 — forced-failure retry harness: segment retry saves 1.2-1.6 s/glitch but risks quality (#1055) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Committed a reproducible harness `tools/forced_glitch_retry_bench.py`: it corrupts the first translation so a guard fires deterministically, then alternates the whole-page retry vs `MIT_SEGMENT_RETRY=1` on the same real page through the real gateway.
+- **Latency:** warm glitched page **6.8 s -> 5.2 s** (and 5.6 s in the second rep) — **~1.2-1.6 s (20-25 %)** off a glitched page; with the measured ~1-in-6 guard rate that is ~0.2-0.3 s of average per-page latency.
+- **Quality risk observed:** with the line retried in isolation, one harness run produced a garbled retried line (`60 นน.`) and an earlier one a **truncated** line (`...เพราะฉันอายุ`) — the predicted page-context loss; the whole-page retry kept the page for the model and stayed clean in the same runs.
+- **Decision: opt-in stays.** The gain is real but only on glitched pages and the quality risk is observable in a tiny sample, so it is not free enough to default. Benchmark `2026-10-23-1055-forced-retry.md`; #1055 updated.
+
 ## MIT quality loop, round 89 — opt-in segment-only retry for guard re-asks (#1055) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
