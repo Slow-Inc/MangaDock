@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 104 — post-default regression audit: quality stays at baseline (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran 7 real pages with the two new defaults active (#1051 filter-after-strip, series name memory): **gate 0 violations, 0 glitch triggers, judge 91 segments mean 1.45/2 with zero 0-score segments** — exactly the full-corpus baseline (1.44/2 over 403 segments).
+- Series-glossary fixes: 0, as expected — `doctor_page` sends no `series_context`, confirming the memory is a strict no-op without one (no behavior change for context-less work).
+- Conclusion: the filter move is a pure latency win (earlier A/B: translation 3.62 -> 2.12 s on a mixed page) and the name memory only acts with a series key; neither regressed quality. Benchmark `2026-10-23-post-default-regression.md`.
+
 ## MIT quality loop, round 103 — series name memory promoted to default ON (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
