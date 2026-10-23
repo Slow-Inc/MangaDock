@@ -205,7 +205,8 @@ export class VersionsService {
   }
 
   async listVersionsByTitle(titleId: string): Promise<ChapterVersion[]> {
-    const { data, error } = await this.db
+    // the title page's main data: a slow upstream gives up and errors (retryable) instead of hanging (#863)
+    const { data, error } = await this.supabase.reads
       .from('chapter_versions')
       .select('*')
       .eq('title_id', titleId)

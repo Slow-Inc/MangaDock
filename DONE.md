@@ -90,6 +90,26 @@ is untouched.
 - **Light, before:** the worst case was 3.88 (ok) and 3.96 (danger).
 - **Light, after:** 20 cases, minimum 4.63.
 - **Dark:** minimum 6.57, unchanged.
+## #863 Supabase reads give up after 8 s; auth and writes keep their client (2026-10-24)
+
+**Decision (the developer asked the agent to make it): option (b).**
+- `SupabaseService.reads` is a second client with `db: { timeout: 8000 }`, so PostgREST requests are aborted after
+  8 s.
+- `listVersionsByTitle`, the title page's main data that hung for 25 s, now uses it. A slow upstream gives a
+  retryable error instead of a hang.
+- `client` keeps no timeout:
+  - `db.timeout` never touched `AuthGuard`'s JWT checks, which go through GoTrue anyway;
+  - an aborted request can still commit on the server, so wallet/unlock writes stay where a failure can't be
+    reported for a write that happened.
+- The search alt-name read kept its own 3 s cap from #1046.
+
+**Validated:**
+- Jest: 3 new tests red first, then green. They check that `reads` is a separate client with the timeout, that
+  `client` has none, and that `listVersionsByTitle` goes through `reads`. Backend 1183/1183, and the build passes.
+  eslint is below main (supabase.service 2 → 1).
+- Against the real project, supabase-js 2.99.1 with a 1 ms `db.timeout` aborted (`AbortError`) in 23 ms, so the
+  option really cuts requests.
+- Live, through the frontend proxy: `/versions/title/<id>` returned 200 in 0.37 s.
 ## #1094 Forum post image viewer: large view, arrows on hover, swipe on phones (2026-10-24)
 
 **What:** the developer asked for a large view of post images, because clicking one opened the raw file in a new tab,
