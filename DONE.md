@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 116 — judge-noise-adjusted quality: raw 1.44 -> **1.70/2**, 72 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/audit_summary.py`: it classifies the judge's typo-noise notes (identical strings around `→`, 'typos' with no other complaint) and reports raw vs noise-adjusted distributions.
+- On the 480 post-default segments: **raw mean 1.44/2 with 146 (30 %) noise flags**, **adjusted mean 1.70/2**, distribution **10/125/345 (2.1 % broken, 26 % partial, 72 % perfect)**.
+- Remaining real classes are model-ceiling nuance/sense (exclamations as greetings, dropped hedging, calques) and fragments/name variants — not the corruption classes the loop already guards. Future audits should quote the adjusted number; benchmark `2026-10-23-judge-noise-adjusted-profile.md`.
+
 ## MIT quality loop, round 115 — detection_size 2048 rejected: changes detections for ~0.1-0.3 s (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
