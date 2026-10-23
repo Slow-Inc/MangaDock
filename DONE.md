@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 192 — PR body round-4 section; CI green on the tuned head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Appended the round-4 section to the PR body (OCR threshold tune 0.75/cap 8 with the A/B, tag-question licence and gate alignment, stronger spurious-filler note with the 3/3 result, mapping robustness test, v3 row) plus a Thai mirror.
+- CI on head `aeff9208` (run 39947222701): **logic gate, heavy ML and backend all pass**; Vercel remains the external 24 h rate limit.
+
+---
+
 ## MIT quality loop, round 191 — spurious_filler note strengthened: natural `ทน` misses fixed 3/3 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
