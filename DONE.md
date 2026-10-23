@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 138 — temperature 0.5 vs 0.2 A/B launched; pilot favours 0.2 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran paired translations of **all 39 corpus pages** at temp 0.5 (current default) and 0.2 (patched `ConfigGPT.temperature` in a separate process per arm).
+- **Guard hits:** 0.5 -> **10** triggers (pilot 4 + rest 6); 0.2 -> **6** (pilot 1 + rest 5) — ~40 % fewer, but the pilot's strong 4:1 shrank to 6:5 on the rest.
+- **Judge (pilot 11 pages, 118 segments each):** 0.5 **1.52** raw with 6 zeros vs 0.2 **1.62** with 4 zeros; the remaining 28-page judge is running. The default decision waits for the paired full-corpus numbers (the loop's own rule: <40 pages = noise). Benchmark `2026-10-23-temperature-ab.md` (status: judge pending).
+
+---
+
 ## MIT quality loop, round 137 — dashboard positive-control fixture (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
