@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 129 — gate no longer flags dropped (never-rendered) regions as empty translations (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Payloads carry **dropped regions** for attribution (`rendered: False`, `drop_reason`) alongside rendered ones (#535); the gate treated their empty translations as `empty_translation` violations (hit on the batch sanity run: JP credits/`月` kept as original artwork).
+- `check_page` now skips `rendered is False` regions; a rendered region with an empty translation is still flagged. Test added; gate suite 16 passed; full suite green.
+
+---
+
 ## MIT quality loop, round 128 — production log hygiene: debug prints are env-gated (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

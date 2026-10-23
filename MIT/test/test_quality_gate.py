@@ -94,3 +94,10 @@ def test_the_gate_flags_a_word_kept_in_english_1057():
     from manga_translator.quality_gate import check_page
     v = check_page([{"src": "DID ANYONE BRING THE RESOURCE MATERIALS?", "dst": "มีใครเอามATERIALS มาบ้างไหม?"}])
     assert any(x["kind"] == "untranslated_word" for x in v), v
+
+def test_a_dropped_region_with_no_translation_is_not_a_violation_535():
+    from manga_translator.quality_gate import check_page
+    v = check_page([{'src': '、題', 'dst': '', 'rendered': False, 'drop_reason': 'source language filter'}])
+    assert not v, v
+    v2 = check_page([{'src': 'REAL LINE', 'dst': ''}])
+    assert any(x['kind'] == 'empty_translation' for x in v2), v2

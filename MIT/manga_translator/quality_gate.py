@@ -39,6 +39,10 @@ def check_page(regions, page='?'):
     """Return a list of violation dicts for one page's ``{src, dst}`` regions."""
     out = []
     for i, region in enumerate(regions or []):
+        if region.get('rendered') is False:
+            # #535: the payload also carries dropped regions for attribution (rendered=False); they
+            # were never drawn, so an empty translation there is expected - not a missing translation.
+            continue
         src = (region.get('src') or '').strip()
         dst = (region.get('dst') or '').strip()
         if not src or not dst:
