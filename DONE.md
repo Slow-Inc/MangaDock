@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 244 — v7 judge: raw 1.42, adjusted 1.56, broken share 2.2 % (lowest) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v7 outputs: 369 segments, raw **1.42**, 66 noise flags, strict-adjusted **1.56**, distribution 8/145/216 -> **broken 2.2 % (lowest of any sweep)**, partial 39.3 %, perfect 58.5 %.
+- Raw reads 1.42-1.44 across the loop's judge runs; adjusted stays in the 1.53-1.60 band. Baseline doc, final report and vault updated together. No code change.
+
+---
+
 ## MIT quality loop, round 243 — v7 sweep: page gate `{}`, leftover `{}`, 3 guard triggers (lowest) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

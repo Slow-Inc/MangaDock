@@ -189,3 +189,12 @@ band and the raw value; do not treat the adjusted movement as a pipeline change.
 
 This is the cleanest end state so far: the page gate and leftover sets are empty, and the remaining OCR oddities are
 real stammers/truncations that must stay as-is.
+### v7 official judge run
+
+```
+segments 369 | raw mean 1.42/2 | noise flags 66 | strict-adjusted 1.56/2
+distribution 0/1/2 = 8 / 145 / 216  (broken 2.2 % — best of any sweep / partial 39.3 % / perfect 58.5 %)
+```
+
+Raw now reads **1.42-1.44** across the v1-v7 runs (run-to-run judge noise); the strict-adjusted stays inside
+**1.53-1.60**, and the broken share is the lowest measured (8 segments, 2.2 %).

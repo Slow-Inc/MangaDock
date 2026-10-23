@@ -92,7 +92,7 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - leak-script salvage ครอบ **22 scripts** (Arabic ฯลฯ) + `_TARGET_OWN_SCRIPTS` กันตัดสคริปต์ target; fast path ทำให้ guard cost 0.40ms/หน้า
 
 ### ตัวเลข v3 (ต้อง quote เป็นช่วง)
-- raw **1.44/2**; strict-adjusted **1.53–1.60** (v2 dashboard 1.60; movement มาจาก noise-flag count 77 vs 138 ไม่ใช่หลักฐาน OCR gain)
+- raw **1.42–1.44/2**; strict-adjusted **1.53–1.60** (v7: broken 2.2% ต่ำสุด) (v2 dashboard 1.60; movement มาจาก noise-flag count 77 vs 138 ไม่ใช่หลักฐาน OCR gain)
 - 39 หน้า / 369 region, leftover {}, gate 1 (`dropped_!`), wall 8.03s (run เดียว)
 - defect คงเหลือ: model-ceiling sense/nuance ในบรรทัดที่ลื่น + ชื่อที่ `series_context` แก้ใน production
 
