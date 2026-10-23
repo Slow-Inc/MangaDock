@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 148 — quality-loop env knobs documented in the env examples (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a consolidated **quality-loop knobs** section to `MIT/.env.example`: default-on guards with their disable flags (`MIT_FILTER_AFTER_STRIP`, `MIT_NAME_GLOSSARY`, `MIT_SERIES_GLOSSARY`, `MIT_LEAK_LATIN_GUARD`, `MIT_CONTENT_LOSS_GUARD`), opt-in levers (`MIT_SEGMENT_RETRY`, `MIT_PRELOAD`, `MIT_BATCH_PIPELINE`) and the debug loggers.
+- Added the two documented-but-missing Backend knobs to `Backend/.env.example` (`MIT_DETECTION_SIZE`, `MIT_WIDEN_VERTICAL_COLUMNS`) next to `MIT_TEMPERATURE`.
+- Docs-only; operators can now discover every knob from the env example instead of grepping the code.
+
+---
+
 ## MIT quality loop, round 147 — clause-omission guard measured and rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
