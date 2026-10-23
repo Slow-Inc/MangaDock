@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 194 — panel-detection downscale rejected: it reorders 12/33 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured Kumiko across all 39 pages: **509 ms/page (19.9 s total)**, ~35 % of the `textline_merge` stage. Downscaling its input to 0.5x halves the cost (257 ms/page) but **12 of 33 compared pages end up with a different region order** — reading order is part of quality, so no downscale.
+- Recorded in the do-not-repeat list; no code change. Full-resolution panel detection stays.
+
+---
+
 ## MIT quality loop, round 193 — laughter normalisation measured and rejected (1 real case of 4) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

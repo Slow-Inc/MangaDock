@@ -49,6 +49,8 @@ with the acceptance rule for each.
 - laughter normalisation (2026-10-23): mined strict laughter lines across the corpus — 4 lines, 3 without a Thai laugh
   marker, but only 1 is a real defect (`HEHE.` -> `เข่าเข่า.`; `NYA` -> `เนีย` is a sound transliteration). One case
   does not justify a normaliser; leave it to the model,
+- panel-detection downscale (2026-10-23): Kumiko is 509 ms/page (35 % of `textline_merge`); at 0.5x it halves to 257 ms
+  but **12 of 33 compared pages reorder the regions** — reading order is quality, so the page stays full-resolution,
 - segment-only retry as default (quality risk), neighbour-context retry hint (no reproducible recovery).
 ## New evidence (2026-10-23): OCR errors are resolution-bound — a targeted second-pass lever
 
