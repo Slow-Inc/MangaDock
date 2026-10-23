@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * Where Tab should land when it would leave the dialog (#837): the last control wraps to the first, Shift+Tab on
@@ -8,10 +8,10 @@ import { useEffect, type RefObject } from "react";
  * layer opened from the dialog (the reader, a lightbox — portals outside it) is left alone. null = let the browser
  * move focus normally.
  */
-export function focusWrapTarget({ index, count, backwards, focusInOtherLayer = false }: {
-  index: number; count: number; backwards: boolean; focusInOtherLayer?: boolean;
+export function focusWrapTarget({ index, count, backwards }: {
+  index: number; count: number; backwards: boolean;
 }): number | null {
-  if (count === 0 || focusInOtherLayer) return null;
+  if (count === 0) return null;
   if (index === -1) return backwards ? count - 1 : 0;
   if (!backwards && index === count - 1) return 0;
   if (backwards && index === 0) return count - 1;
@@ -89,7 +89,7 @@ export function keepTabStops<T>(items: T[], group: (el: T) => string | null, che
     const g = group(el);
     if (g === null) continue;
     const current = stop.get(g);
-    if (current === undefined || (checked(el) && !checked(current))) stop.set(g, el);
+    if (current === undefined || checked(el)) stop.set(g, el);
   }
   return items.filter((el) => {
     const g = group(el);
@@ -120,8 +120,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !isTop() || !ref.current) return;
-      // a dialog opened inside this one (a report form in the reader) runs its own Tab cycle (#1073)
-      if (focusInNestedDialog(ref.current)) return;
+      // focus in another layer — a dialog inside this one (a report form in the reader) or over it — is that layer's
+      if (!ownsKeyboardNow(ref.current)) return;
       // visible (offsetParent is null for fixed elements) and not inside an inert part (a collapsed group, a closed menu):
       // the browser skips those, and the toast cycle below moves focus itself, so it must skip them too
       const own = keepTabStops(
@@ -135,17 +135,16 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
       const items = [...own, ...toast];
       const active = document.activeElement;
       const index = items.indexOf(active as HTMLElement);
-      const focusInOtherLayer = !!active && active !== document.body && index === -1 && !ref.current.contains(active);
       if (toast.length > 0) {
         // A toast is up: the dialog stays sealed, and its controls join the cycle right after the dialog's own —
         // only for the dialog nothing else is layered above (a popup under the reader or a lightbox must not act)
         const layer = ref.current.closest("body > *");
-        if (focusInOtherLayer || items.length === 0 || (layer && hasLayerAbove(layer))) return;
+        if (items.length === 0 || (layer && hasLayerAbove(layer))) return;
         e.preventDefault();
         items[cycleTarget({ index, count: items.length, backwards: e.shiftKey })].focus();
         return;
       }
-      const target = focusWrapTarget({ index, count: items.length, backwards: e.shiftKey, focusInOtherLayer });
+      const target = focusWrapTarget({ index, count: items.length, backwards: e.shiftKey });
       if (target === null) return;
       e.preventDefault();
       items[target].focus();
@@ -170,39 +169,38 @@ export function ownsKeyboard<T>(dialog: T, active: T | null, body: T, innermost:
 }
 
 /**
- * `ownsKeyboard` for an aria-modal `root` on the live page: is this Escape its to act on (#1073)? Focus on a toast's
- * button counts as no layer's — the toast joins the open dialog's Tab cycle (#956), so Escape still closes the dialog.
+ * `ownsKeyboard` for an aria-modal `root` on the live page (#1073): is this Tab or Escape its to act on? Focus on a
+ * toast's button counts as no layer's — the toast joins the open dialog's Tab cycle (#956).
  */
-export function ownsEscapeNow(root: Element | null): boolean {
+export function ownsKeyboardNow(root: Element | null): boolean {
   const el = document.activeElement?.closest("[data-toast-card]") ? document.body : document.activeElement;
   return !!root && ownsKeyboard<Element>(root, el, document.body, innermostModal(el));
-}
-
-/**
- * Whether focus is in a dialog opened inside `root` (a report form in the reader, a top-up in the book popup): that
- * dialog owns Tab and Escape, and `root` stands aside (#1073).
- */
-export function focusInNestedDialog(root: Element | null): boolean {
-  const inner = innermostModal(document.activeElement);
-  return !!root && !!inner && inner !== root && root.contains(inner);
 }
 
 /**
  * An aria-modal dialog's keyboard (#1073): `useDialogFocus` plus Escape calling `onClose` while the dialog owns the
  * keyboard. Listened in the bubble phase: a popover inside it (a search dropdown) closes first and consumes the key
  * (`preventDefault`), so one Escape closes one layer. `active` = the dialog is open (one that animates out stays
- * mounted after it closes).
+ * mounted after it closes); `isTop` = it is the top of its own stack (stacked book popups).
  */
-export function useModalDialog(ref: RefObject<HTMLElement | null>, onClose: () => void, active = true) {
-  useDialogFocus(ref, () => true, active);
+export function useModalDialog(
+  ref: RefObject<HTMLElement | null>,
+  onClose: () => void,
+  active = true,
+  isTop: () => boolean = () => true,
+) {
+  useDialogFocus(ref, isTop, active);
+  // read at key time, so a caller's inline close (a new function each render) does not re-subscribe
+  const latest = useRef({ onClose, isTop });
+  useEffect(() => { latest.current = { onClose, isTop }; });
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || !ownsEscapeNow(ref.current)) return;
+      if (e.key !== "Escape" || e.defaultPrevented || !latest.current.isTop() || !ownsKeyboardNow(ref.current)) return;
       e.preventDefault();
-      onClose();
+      latest.current.onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ref, onClose, active]);
+  }, [ref, active]);
 }
