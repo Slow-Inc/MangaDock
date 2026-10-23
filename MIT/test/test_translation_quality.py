@@ -286,3 +286,12 @@ def test_leaked_script_salvage_removes_foreign_glyphs_but_keeps_thai_903b():
     assert strip_leaked_script("สึกุโยมิ!", "TSUKUYOMI!") == "สึกุโยมิ!"
     assert strip_leaked_script("ドン! ลาก่อน", "ドン! さようなら") == "ドン! ลาก่อน"   # source uses kana
     assert strip_leaked_script("Привет!", "HELLO") == "!"
+
+
+def test_a_dropped_source_question_is_flagged_1060():
+    from manga_translator.translation_quality import dropped_question
+    assert dropped_question("FOR NO REASON? I WONT LEND.", "ไม่มีเหตุผลเลย! ฉันจะไม่ยืม")
+    assert not dropped_question("WHY?", "ทำไมล่ะ")
+    assert not dropped_question("WHY?", "ทำไม?")
+    assert not dropped_question("NO REASON", "ไม่มีเหตุผล")
+    assert not dropped_question("WHY?", "Why", "ENG")

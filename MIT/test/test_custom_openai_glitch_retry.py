@@ -205,3 +205,10 @@ def test_the_default_retry_still_resends_the_whole_page_1065(monkeypatch):
     calls = t.client.chat.completions.create.call_args_list
     assert _prompt_line_count(calls[0]) == 2
     assert _prompt_line_count(calls[1]) == 2
+
+
+def test_a_dropped_source_question_counts_as_glitched_1056():
+    """#1056: FOR NO REASON? -> a flat statement must trigger a re-ask, not ship."""
+    t = CustomOpenAiTranslator()
+    assert t._is_glitched("FOR NO REASON? I WONT LEND.", "ไม่มีเหตุผลเลย! ฉันจะไม่ยืม", "THA")
+    assert not t._is_glitched("FOR NO REASON? I WONT LEND.", "ไม่มีเหตุผลเลยหรือ ฉันจะไม่ยืม", "THA")

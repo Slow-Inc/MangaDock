@@ -6,7 +6,8 @@ from typing import List, Tuple
 from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
-                                   runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script)
+                                   runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
+                          dropped_question)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -292,6 +293,8 @@ class CommonTranslator(InfererModule):
             reasons.append('spurious_filler')
         if lost_as_rare(trans, query):
             reasons.append('lost_as_rare')
+        if dropped_question(query, trans, to_lang):
+            reasons.append('dropped_question')
         if reasons and os.environ.get('MIT_LOG_GLITCH'):
             print(f'[glitch] {",".join(reasons)} | src={query[:44]!r} -> dst={trans[:44]!r}', flush=True)
         return bool(reasons)
@@ -301,6 +304,9 @@ class CommonTranslator(InfererModule):
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #1056: a source question whose answer lost every question marker.
+        if dropped_question(query, trans):
+            return query + ("\n\n[note: the source line asks a question ('?'); keep the question in the translation, e.g. end it with a Thai question particle such as ไหม or หรือเปล่า.]")
         # #1052: LOST rendered as หายาก ("rare") — a meaning-changing near-homophone.
         if lost_as_rare(trans, query):
             return query + ('\n\n[note: LOST means หาย/สูญหาย. หายาก means RARE — do not use it here.]')

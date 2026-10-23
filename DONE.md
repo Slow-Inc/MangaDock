@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 106 — sweep 43 (full 39-page coverage) + dropped-question retry guard (#1056) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Swept the last 13 pages with the current defaults: `spurious_filler` fired 3x (2 garbage variants, 1 legitimate `ทน` the guard cannot distinguish — shipped text reads naturally), and the gate caught two real issues.
+- **New guard `dropped_question` (#1056):** a source retort (`FOR NO REASON?`) shipped as a flat statement. `translation_quality.dropped_question` is true only when the source has `?` and the Thai target contains no question marker at all (particle/word list), wired as a real retry trigger + note — same predicate->trigger->note discipline as #1039/#1052, with predicate and trigger tests (55 tests in the two files).
+- **Tracked, not rushed (#1057):** a mangled untranslated English word glued to Thai (`เอามATERIALS`) — the `added_latin` gate caught the mangled token, but a retry class for intact untranslated words needs a licensed-copy design to avoid credit/name false positives.
+- Benchmark `2026-10-23-sweep43-dropped-question.md`.
+
 ## MIT quality loop, round 105 — fresh 20-page sweep: guards caught CJK and Arabic leaks live; gate clause false positive fixed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

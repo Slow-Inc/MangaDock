@@ -352,3 +352,21 @@ def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
         return trans
     cleaned = re.sub(r'[ 	]{2,}', ' ', out).strip()
     return cleaned or trans
+
+
+#: Thai question markers: explicit '?' or a question particle/word.
+_THAI_Q_MARKERS = re.compile(
+    r'\?|หรือ(?:เปล่า|ไม่|ไง)|ไหม|มั้ย|เหรอ|หรอ|หรือ|อะไร|ทำไม|ยังไง|อย่างไร|เท่าไหร่|แค่ไหน|ที่ไหน|ใคร|เมื่อไหร่')
+
+
+def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
+    """True when the source asks a question but the target has no question marker at all.
+
+    A source '?' on a retort (`FOR NO REASON?`) is a meaning-bearing nuance; Thai may realise it with a particle
+    rather than '?', so only a total absence of any marker counts. Only applied to Thai targets.
+    """
+    if to_lang and str(to_lang).upper() not in ('THA', 'TH'):
+        return False
+    if '?' not in src and '？' not in src:
+        return False
+    return _THAI_Q_MARKERS.search(dst or '') is None
