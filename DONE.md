@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 273 — merge re-verified against main 1a7ed2e6: 3 docs conflicts, merged suite 993 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- main advanced (#1091 image-proxy allowlist); `merge-tree` still conflicts only on the three append-only docs, and the extracted merged tree passes **993/4** - identical to the branch. Runbook unchanged; #642 still an old open draft. No code change.
+
+---
+
 ## MIT quality loop, round 272 — Kaiju pages 8-11: gate 0, licence holds; unseen aggregate 23 pages (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

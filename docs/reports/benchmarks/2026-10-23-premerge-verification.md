@@ -70,3 +70,11 @@ auto-merges with `main` and the merged fast suite passes (944 at the time, 982 n
   (`DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md`) and nothing else auto-merge fails.
 - The merged tree was extracted and its fast suite run in place: **985 passed, 4 skipped** — identical to the branch,
   so the runbook below remains valid even though main advanced (e.g. #1077 icon-button fixes).
+## Re-verification against main `1a7ed2e6` (2026-10-23, round 225)
+
+- Conflicts remain exactly the three append-only docs (`DONE.md`, `docs/adr/README.md`,
+  `docs/reports/system-impact-report.md`); everything else auto-merges (`merge-tree` tree hash produced).
+- The merged tree's fast suite: **993 passed, 4 skipped** - identical to the branch, after main advanced with #1091
+  (image-proxy allowlist).
+- #642 itself is still an open draft with an old head; once its owner resolves the same three-doc union conflict and
+  merges, the runbook applies unchanged.
