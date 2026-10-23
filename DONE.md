@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 94 — traceability pass over the open render issues: most are fixed and only waiting for merge (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the still-open render issues against HEAD: **#791/#792/#793 are covered by tests** (13 pass, `compact_special_symbols` no longer deletes the space after punctuation); **#873 verified fixed on the real Otome page** (page-bounds clamp, crop checked); **#876 pinned by `clamp_box_to_neighbors` tests**; **#897 updated** with the JP audit (one real page uploaded twice, gate clean, judge 1.57/2, opt-in widen fix for the squeeze).
+- **#899 (outlined JP lettering -> grey contrast) is the one genuinely open item** — not re-measured here; recorded as the next real render-quality target.
+- Wrote `2026-10-23-render-issues-traceability.md` (issue -> test/evidence table) and posted status comments on #791/#873/#897.
+
 ## MIT quality loop, round 93 — numbers are never broken across lines; นาทีละ segmenter tie verified fixed (#842/#844) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
