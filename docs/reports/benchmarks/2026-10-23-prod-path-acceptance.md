@@ -24,3 +24,22 @@ was added; the class stays with the model (documented in the adjusted profile).
 Production path (single-page + series context + all default guards) behaves as designed; the deterministic lever list
 is now exhausted for the current corpus. Remaining defects are model-ceiling sense/nuance plus the data-limited JP
 evaluation.
+---
+
+## Re-verification after the round-3 fixes (2026-10-23, round 226)
+
+Two-page production-style run (sequential `translate_patches` with a stable `series_context`, gateway translator,
+default series memory):
+
+```
+page1 Tsuki c2_p0 -> ... สึกุโยมิ ...        (first spelling, learned)
+[series-glossary] applied 2 name fix(es)
+page2 Tsuki c2_p1 -> สึกุโยมิ!              (consistent with page1)
+```
+
+- The series memory applied **2 name fixes** on page 2 and the shipped spelling matches page 1.
+- Two tooling traps found while re-running this (not pipeline bugs): the check script must import
+  `bench_render_tuned`/`initialize()` **before** `manga_translator` (the keys module caches the gateway URL at import),
+  and `TUNED` carries no `translator` key, so a custom script must set `translator='custom_openai'` explicitly.
+- This run also exercised the #1065 token-level glossary fix: the page-2 variant (`ทสึคุโยมิ`-style) is now corrected
+  instead of skipped.

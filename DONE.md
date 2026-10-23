@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 226 — production series-memory re-verified end-to-end: 2 name fixes, consistent spelling (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two-page production-style run with a stable `series_context`: page 2 logged `[series-glossary] applied 2 name fix(es)` and shipped the same `สึกุโยมิ` spelling as page 1 — the default production path is consistent again after the #1065 token-level fix.
+- Root cause of the earlier `APIConnectionError` in the recheck script was **import order** (keys caches the gateway URL at import; `.env` must load first) plus `TUNED` having no translator key — both tooling, not pipeline. Recorded in the prod-path acceptance benchmark.
+
+---
+
 ## MIT quality loop, round 225 — series-memory bug fixed: token-level glossary presence (#1065) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
