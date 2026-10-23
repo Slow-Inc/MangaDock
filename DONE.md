@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 130 — gate CLI verified with the new rules; module docs updated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the standalone `tools/quality_gate.py` CLI on an old payload that contains a known defect: it reports `content_loss: index=5 detail=114->46` — the new rule works outside the pytest path too.
+- Updated the module docstring to list the newer classes (untranslated English word #1057, content loss #1058, question particle anywhere in the answer) and the `rendered: False` dropped-region rule (#535). Gate tests 16 passed.
+
+---
+
 ## MIT quality loop, round 129 — gate no longer flags dropped (never-rendered) regions as empty translations (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

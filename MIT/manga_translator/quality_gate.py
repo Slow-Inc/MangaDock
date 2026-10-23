@@ -5,10 +5,13 @@ gated without a judge model:
 
 - foreign-script leaks and runaway repetition (#903 / #901),
 - Thai orthography: doubled combining marks and a leading combining mark,
-- control/zero-width characters and unexpected Latin words,
-- dropped `!` / `?` / `…` punctuation (an interrobang covers both marks, `...` covers `…`, and a final Thai
-  question particle such as เหรอ/ไหม carries a question without the mark),
+- control/zero-width characters, unexpected Latin words, English source words kept untranslated (#1057) and
+  far-too-short answers / content loss (#1058),
+- dropped `!` / `?` / `…` punctuation (an interrobang covers both marks, `...` covers `…`, and a Thai question
+  particle anywhere in the answer carries a question without the mark),
 - cross-page character-name spellings (`name_glossary`).
+
+Regions the payload marks `rendered: False` were dropped for attribution (#535) and are never checked.
 
 Pure logic, so it unit-tests without the ML stack.
 """
