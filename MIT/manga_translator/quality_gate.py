@@ -15,7 +15,8 @@ Pure logic, so it unit-tests without the ML stack.
 import re
 
 from .name_glossary import extract_glossary
-from .translation_quality import foreign_script, runaway_translation
+from .translation_quality import (content_loss, foreign_script, runaway_translation,
+                                  untranslated_source_word)
 
 _COMBINING = set('\u0E31\u0E34\u0E35\u0E36\u0E37\u0E38\u0E39\u0E3A\u0E47\u0E48\u0E49\u0E4A\u0E4B\u0E4C\u0E4D\u0E4E')
 _DOUBLED = re.compile(r'([\u0E31\u0E34-\u0E3A\u0E47-\u0E4E])\1')
@@ -49,6 +50,10 @@ def check_page(regions, page='?'):
             out.append({'page': page, 'index': i, 'kind': 'foreign_script', 'detail': dst[:60]})
         if thai and runaway_translation(src, dst):
             out.append({'page': page, 'index': i, 'kind': 'runaway', 'detail': f'{len(src)}->{len(dst)}'})
+        if thai and content_loss(src, dst, 'THA'):
+            out.append({'page': page, 'index': i, 'kind': 'content_loss', 'detail': f'{len(src)}->{len(dst)}'})
+        if thai and untranslated_source_word(src, dst, 'THA'):
+            out.append({'page': page, 'index': i, 'kind': 'untranslated_word', 'detail': dst[:60]})
         if thai and _DOUBLED.search(dst):
             out.append({'page': page, 'index': i, 'kind': 'doubled_mark', 'detail': dst[:60]})
         if thai and dst[0] in _COMBINING:

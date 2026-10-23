@@ -3,6 +3,12 @@
 
 ---
 
+## MIT quality loop, round 123 — deterministic gate now covers content-loss and untranslated-word (#1057/#1058) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Extended `quality_gate.check_page` with the two newer classes: `content_loss` and `untranslated_word` (same predicates as the live retry triggers), with tests, so a chapter replay reports them without the judge.
+- Dashboard over the latest stored output of 44 page payloads: **2 violations** — one `content_loss` on an old audit payload (`114 -> 46` chars, correctly the class the predicate targets) and the known `dropped_!` nuance on Iruma p1. No `untranslated_word` remains; every other gate class stays clean. Benchmark `2026-10-23-gate-classes-extension.md`.
+
 ## MIT quality loop, round 122 — final-sweep latency outliers triaged: transient contention, not code (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

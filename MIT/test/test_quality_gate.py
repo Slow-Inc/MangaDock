@@ -82,3 +82,15 @@ def test_a_question_marker_early_in_a_long_answer_counts_1056c():
     v = check_page([{"src": "IS THAT REALLY TRUE? I CANT BELIEVE IT AT ALL",
                     "dst": "หรือว่ามันจะเป็นเรื่องจริง ฉันไม่อยากจะเชื่อเลยสักนิด"}])
     assert not any(x["kind"] == "dropped_?" for x in v), v
+
+
+def test_the_gate_flags_content_loss_1058():
+    from manga_translator.quality_gate import check_page
+    v = check_page([{"src": "MAY THE BLESSINGS OF THE GREAT", "dst": "ขอพรจากมหา"}])
+    assert any(x["kind"] == "content_loss" for x in v), v
+
+
+def test_the_gate_flags_a_word_kept_in_english_1057():
+    from manga_translator.quality_gate import check_page
+    v = check_page([{"src": "DID ANYONE BRING THE RESOURCE MATERIALS?", "dst": "มีใครเอามATERIALS มาบ้างไหม?"}])
+    assert any(x["kind"] == "untranslated_word" for x in v), v
