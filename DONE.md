@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 119 — final full-corpus sweep: 39/39 pages, 9 guard saves, 0 leftovers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran **all 39 corpus pages** with the final defaults (`MIT_LOG_GLITCH=1` + gate, real gateway): **9 guard triggers** — 3 foreign_script, 3 content_loss, 2 untranslated_word, 1 dropped_question — and a post-run predicate scan of the final payloads found **0 leftovers**: every triggered segment was re-asked and fixed in place.
+- Gate: **2 violations** — one minor `dropped_!` nuance (Iruma p1) and one name inconsistency that is expected in doctor runs (no `series_context` -> memory is a no-op; production path has it, verified).
+- Latency across 39 pages: **avg 7.65 s, median 6.96 s** (warm, GPU1). Benchmark `2026-10-23-final-corpus-sweep.md`.
+
 ## MIT quality loop, round 118 — verified `series_context` reaches the MIT translator on the real path (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
