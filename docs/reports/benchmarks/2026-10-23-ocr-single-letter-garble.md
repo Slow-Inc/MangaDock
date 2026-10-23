@@ -25,3 +25,9 @@ shipped Thai: อ๋อ- เธอไม่ชอบขนมพวกนี้�
 
 Before the change the same page shipped `อ- เธอชอบขนมพวกนี้มั้ย?` (positive). Tests added in
 `test_ocr_reread.py`; no new flag (still part of `MIT_OCR_REREAD=0`-controllable pass).
+## Follow-up: never swap one garble for another (round 241)
+
+Re-running the five pages that had suspicious singles showed the expected Iruma fix (`YOU N` -> `YOU NOT`) and one
+worthless churn: `TREASURE DOWN HERE S` (0.29) was re-read as `TREASURE DOWN HERE F` (0.54) and accepted through the
+**confidence margin** path, i.e. garbled to garbled. `better_read` now returns early for a suspicious old line: the only
+acceptable outcome is a read with **no** suspicious single left. Test added; suite 984 passed.

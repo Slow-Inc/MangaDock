@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 241 — garble-to-garble churn blocked in the OCR re-read (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the five pages that had suspicious singles: the Iruma `N`->`NOT` fix reproduced and all five pages passed the gate, but one line churned `TREASURE DOWN HERE S` -> `... F` through the confidence-margin path (garbled to garbled).
+- `better_read` now refuses any replacement while the new read still carries a suspicious single letter; only a clean read may replace a suspicious one. Test added; suite 984 passed. Benchmark updated.
+
+---
+
 ## MIT quality loop, round 240 — OCR single-letter garbles (N=NOT) re-read: negation loss fixed 3/3 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -106,3 +106,9 @@ def test_single_letter_ocr_garbles_are_reread_even_at_high_confidence():
     assert needs_reread("AH-DO YOU N LIKE THESE SNACKS?", 0.95)
     assert better_read("AH-DO YOU N LIKE THESE SNACKS?", 0.78, "AH- DO YOU NOT LIKE THESE SNACKS?", 0.68)
     assert not better_read("AH-DO YOU N LIKE THESE SNACKS?", 0.78, "AH-DO YOU N LIKE THESE SNACKS?", 0.99)
+
+
+def test_a_suspicious_line_never_swaps_one_garble_for_another():
+    # measured: `DOWN HERE S` re-read as `DOWN HERE F`; both are garbles, so no change may be applied
+    assert not better_read("TREASURE DOWN HERE S", 0.29, "TREASURE DOWN HERE F", 0.54)
+    assert better_read("TREASURE DOWN HERE S", 0.29, "TREASURE DOWN HERE.", 0.54)

@@ -86,8 +86,8 @@ def better_read(old_text, old_prob, new_text, new_prob, margin=PROB_MARGIN):
     if new_text == (old_text or '').strip():
         return False
     # Correcting a mangled single-letter word is a meaning fix even without a confidence jump.
-    if has_suspicious_single(old_text) and not has_suspicious_single(new_text):
-        return True
+    if has_suspicious_single(old_text):
+        return not has_suspicious_single(new_text)  # never swap one garble for another (`S` -> `F`)
     return float(new_prob) >= float(old_prob) + margin
 
 
