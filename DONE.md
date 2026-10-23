@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 287 — team vault synced to the v6-v11 final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vault `project-translation-eval-set.md` gained the v6-v11 section: sweep results, judge band, the SFX batching latency win, OCR garble fix, new precision licences, series-memory fix, unseen 31-page validation, 997 tests, CI/merge status and the do-not-repeat list. No code change.
+
+---
+
 ## MIT quality loop, round 286 — loop-by-numbers summary added to the hand-off index (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

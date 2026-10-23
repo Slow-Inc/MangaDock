@@ -112,3 +112,15 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - **Vercel deploy (#1064)**: docs function trace รูปใน `docs/` รวม 253MB → เกิน limit; เพิ่ม `outputFileTracingExcludes` ให้ `/docs` แล้ว deploy ผ่าน (คืนรูปต้นฉบับ)
 - **omission pass (opt-in)**: schema 2 passes, replay proof clause กลับมา, clean-page FP 0/19, cost ~2 verifier requests + re-ask
 - suite **989 passed**; PR #794: CI เขียว (Vercel ติด external quota เป็นช่วง)
+
+### v6–v11 end state + latency/perf (2026-10-23 late)
+
+- **sweeps v7–v11**: 39 หน้า / 369–371 region, dashboard **gate `{}` + leftover `{}` ทุกครั้ง** (หลัง re-scan ด้วย licence ล่าสุด); guard triggers 1–14 ตาม model window; wall 6.1–10.3s (retry-bound ใน window แย่)
+- **judge**: raw **1.38–1.44/2** (window-dependent), strict-adjusted **1.53–1.60**, broken **2.2–2.4%** — ควร quote เป็นช่วง + โครงสร้าง (gate/lleftover) ไม่ใช่ run เดียว
+- **latency win หลัก**: SFX vision calls batch concurrent + อัปโหลด 768px JPEG → `textline_merge` **32–37s → 8.4s**, หน้า SFX-heavy **54–68s → 26s** (quality-neutral จาก A/B); knob `MIT_RETRY_SUBSET_LAST` เป็น opt-in (A/B หน้า dense: คำตอบต่าง 4/9 → ไม่ promote)
+- **OCR single-letter garble**: `N`→`NOT` (negation หาย) แก้ด้วย re-read + wider crop, 3/3 รัน; กัน garbled→garbled
+- **precision licences ใหม่**: opinion tags (SEE/UNDERSTAND), URL/credit, digit-suffixed names (ZER0), strong negation, `นั่น`/`งั้นเหรอ` — ทำให้ gate/guard FP หมด
+- **series memory** token-level (#1065) + production path re-verified (gate 0, applied 2 name fixes, spelling ตรงข้ามหน้า)
+- **unseen validation**: 6 ซีรีส์ / 31 หน้า — 30/31 gated clean (ข้อยกเว้น = ชื่อ Latin ถูกต้อง); render spills 2 เคสบันทึกใน #642
+- tests **997 passed**; CI (logic/heavy/backend) + Vercel เขียวหลาย head; merge vs main เหลือ conflict 3 docs; blocker เดียว **#642** (open draft, CONFLICTING)
+- do-not-repeat: number guard, EN negation guard, temperature 0.2, attempt-3 subset default, panel downscale/micro-opt, OCR box pad, laughter normaliser
