@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 100 — forced-guard harness proves the filler and LOST->หายาก guards fix live output (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New dev tool `tools/forced_guard_bench.py`: on the first translation response it replaces one prompt line's answer with a known-bad translation, then runs the real pipeline and checks requests + final payload.
+- **lost (#1052):** injected `ของหายาก` for a `LOST` line -> **2 requests** (guard re-ask), **no `ของหายาก` left**, final lines `ไอเทมที่สูญหาย` / `เทคโนโลยีที่สูญหาย`.
+- **filler (#1039):** injected `ฉันทันทำแบบนั้น` -> **2 requests**, **no `ฉันทัน` left** in the payload.
+- This is the reproducible live proof the issues' acceptance lists were missing (natural guard triggers are intermittent); benchmark `2026-10-23-forced-guard-verification.md`; comments on #1039/#1052.
+
 ## MIT quality loop, round 99 — #1050 decided: the overlap already exists at page granularity (#905); in-page threading rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
