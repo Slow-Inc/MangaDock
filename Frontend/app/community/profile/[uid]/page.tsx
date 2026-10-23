@@ -366,7 +366,7 @@ export default function PublicProfilePage() {
                     {uploadingBanner ? (
                       <Loader context="section" />
                     ) : (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-5">
+                      <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex items-center gap-5">
                         <button
                           onClick={() => bannerInputRef.current?.click()}
                           className="flex flex-col items-center gap-1.5"
