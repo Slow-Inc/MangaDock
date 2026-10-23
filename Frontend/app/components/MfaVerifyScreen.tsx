@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface MfaVerifyScreenProps {
   factorId: string;
@@ -20,6 +21,9 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // aria-modal (#1073): Tab stays inside. No Escape — the only way out is "cancel and sign out", not a key to hit by chance
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, () => true);
 
   const handleVerify = async () => {
     if (code.length !== 6) return;
@@ -38,7 +42,8 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
   };
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/90 backdrop-blur-sm">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="การยืนยันสองขั้นตอน"
+      className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/90 backdrop-blur-sm outline-none">
       <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-8 text-center shadow-2xl">
         {/* Icon */}
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/20">

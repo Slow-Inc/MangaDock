@@ -26,7 +26,7 @@ import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
 import Mascot from "./mascot/Mascot";
-import { hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
+import { focusInNestedDialog, hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
 import { prefersReducedMotion, scrollBehavior } from "../hooks/reducedMotion";
 
 const MIT_OFFLINE_LABEL = "ระบบแปลออฟไลน์";
@@ -534,6 +534,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       // Focus in a layer over the reader (e.g. the login prompt) — that layer owns Escape.
       const active = document.activeElement;
       if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
+      // Focus in a dialog opened inside the reader (the report form) — that dialog owns Escape (#1073).
+      if (focusInNestedDialog(readerRef.current)) return;
       e.stopPropagation();
       if (commentOpenRef.current) { setCommentOpen(false); return; }
       if (translateMenuOpenRef.current) { setTranslateMenuOpen(false); translateMenuRef.current?.querySelector("button")?.focus(); return; }

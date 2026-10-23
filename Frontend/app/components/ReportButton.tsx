@@ -1,8 +1,9 @@
 "use client";
 
-import { useContext, useRef, useState } from "react";
+import { useCallback, useContext, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 type Props = {
   contentType: "post" | "manga" | "translation";
@@ -32,6 +33,8 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useModalDialog(dialogRef, close, open);
 
   function handleOpen() {
     if (!user) { showLoginPrompt(); return; }
@@ -94,8 +97,9 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim/70 p-4">
-          <div ref={dialogRef} className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-2xl">
+        <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="รายงานเนื้อหา"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim/70 p-4 outline-none">
+          <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             {done ? (
               <div className="text-center">
                 <div className="mb-3 text-3xl">✅</div>
@@ -112,7 +116,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
               <form onSubmit={handleSubmit}>
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold text-ink">รายงานเนื้อหา</p>
-                  <button type="button" onClick={() => setOpen(false)} className="text-ink-2 transition hover:text-ink">
+                  <button type="button" onClick={close} aria-label="ปิด" className="text-ink-2 transition hover:text-ink">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
                     </svg>

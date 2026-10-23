@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useRef, type ReactNode } from 'react';
-import { useDialogFocus } from '../../hooks/useDialogFocus';
+import { useRef, type ReactNode } from 'react';
+import { useModalDialog } from '../../hooks/useDialogFocus';
 
 /**
  * An admin overlay — a detail slide-over (`side`) or a centred confirm — as an aria-modal dialog (#1069): focus moves
@@ -10,12 +10,7 @@ export default function AdminDialog({ label, onClose, side = false, children }: 
   label: string; onClose: () => void; side?: boolean; children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useDialogFocus(ref, () => true);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useModalDialog(ref, onClose);
 
   return (
     <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={label}

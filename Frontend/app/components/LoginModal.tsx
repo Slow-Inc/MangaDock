@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getDisposableEmailError, normalizeEmail } from "../lib/emailValidation";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import Loader from "./ui/Loader";
 
 type Mode = "login" | "register" | "forgot-password";
@@ -62,11 +63,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    if (isOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, close]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes, focus goes back to the opener
+  useModalDialog(overlayRef, close, mounted);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -183,8 +181,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   return createPortal(
     <div
       ref={overlayRef}
+      tabIndex={-1} role="dialog" aria-modal="true" aria-label={mode === "register" ? "สมัครสมาชิก" : mode === "forgot-password" ? "ลืมรหัสผ่าน" : "เข้าสู่ระบบ"}
       onClick={(e) => { if (e.target === overlayRef.current) close(); }}
-      className={`fixed inset-0 z-[300] flex items-end md:items-center justify-center md:p-4 bg-scrim/70 md:bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[300] outline-none flex items-end md:items-center justify-center md:p-4 bg-scrim/70 md:bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >

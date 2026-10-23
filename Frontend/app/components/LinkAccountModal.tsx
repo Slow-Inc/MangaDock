@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import Loader from "./ui/Loader";
 
 export interface LinkAccountModalProps {
@@ -75,13 +76,8 @@ export default function LinkAccountModal({
     }
   }, [visible, isPasswordMode]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    if (isOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, close]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes, focus goes back to the opener
+  useModalDialog(overlayRef, close, mounted);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -152,10 +148,11 @@ export default function LinkAccountModal({
   return createPortal(
     <div
       ref={overlayRef}
+      tabIndex={-1} role="dialog" aria-modal="true" aria-label="เชื่อมบัญชี"
       onClick={(e) => {
         if (e.target === overlayRef.current) close();
       }}
-      className={`fixed inset-0 z-400 flex items-center justify-center bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-400 outline-none flex items-center justify-center bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >

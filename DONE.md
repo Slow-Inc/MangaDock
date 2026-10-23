@@ -77,6 +77,34 @@
 
 ---
 
+## #1073 App modals are real dialogs; one Escape closes one layer (2026-10-23)
+
+**What:** thirteen app modals blocked the page without being dialogs. They had no role or name, no Tab trap and no
+focus return. `useModalDialog` (in `hooks/useDialogFocus.ts`) combines `useDialogFocus` (#837) with Escape. Escape
+belongs to the innermost aria-modal dialog that holds focus (`ownsEscapeNow`). It is listened in the bubble phase and
+skipped when an inner popover already consumed it (`usePopoverDismiss` now calls `preventDefault`). The reader and the
+book popup stand aside while focus is in a dialog inside or over them. The Tab trap treats a radio group as one stop
+(`keepTabStops`), and gives focus back to the real opener when an `autoFocus` field took focus first (`pickOpener`).
+
+Per-modal decisions:
+- `DailyCheckin`: Escape works only after the claim, because before it there is no close.
+- `MfaVerifyScreen`: no Escape, because its only exit signs the user out.
+- `Topup`: Escape works as the scrim click does, and a pending payment stays pending.
+- `Reauth`: Escape cancels.
+- The docs drawer is left out: the developer's WIP is in that file.
+
+**Validated:**
+- Production build, fake session, `/api/proxy` answered by Playwright. 9 modals pass: named dialog, focus in, Tab
+  stays inside, Escape closes, focus back on the opener. The check-in stays open on Escape before the claim.
+- Popover inside the post form: before the fix, the first Escape closed the whole form. After it, Escape #1 closes
+  the dropdown and #2 closes the form.
+- No regressions: the admin overlay probe still passes 5/5, and the book popup still closes on Escape.
+- CI unit set 493/493 and `test:auth` 12/12. Real tsc is clean, and eslint matches main per file.
+- Not covered end-to-end: the comment action sheet (phone long-press), Reauth, MFA and LinkAccount. They use the
+  same hook path.
+
+---
+
 ## #1069 Admin overlays are real dialogs (2026-10-23)
 
 **What:** five admin overlays behaved as modals without being dialogs: the user drawer, the role and ban confirms,

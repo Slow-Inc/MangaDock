@@ -1,6 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useModalDialog } from "../../hooks/useDialogFocus";
 
 type Step = "loading" | "scan" | "verify" | "done";
 
@@ -71,10 +72,15 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
     }
   };
 
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes as the ✕ does, focus goes back to the opener
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, isOpen);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="เปิดใช้งาน 2FA"
+      className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm outline-none">
       <div className="w-full max-w-md rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">

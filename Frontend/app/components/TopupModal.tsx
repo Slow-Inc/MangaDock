@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTopupCreate, TIERS } from "../hooks/useTopupCreate";
@@ -10,6 +10,7 @@ import { errMessage } from "@/lib/errMessage";
 import { PRIMARY_FILL } from "./ui/Button";
 import Mascot from "./mascot/Mascot";
 import Coin from "./ui/Coin";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 function formatCountdown(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -141,6 +142,11 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
     if (!isOpen) setQrData(null);
   }, [isOpen]);
 
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes as the scrim does (a pending payment stays
+  // pending, as it does on a scrim click), focus goes back to the opener
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, isOpen);
+
   if (!isOpen) return null;
 
   const onProceed = async () => {
@@ -152,7 +158,8 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 p-4"
+      ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={qrData ? "สแกน QR เพื่อชำระเงิน" : "เติมเหรียญ"}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 p-4 outline-none"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-xs rounded-2xl border border-line bg-surface shadow-2xl">

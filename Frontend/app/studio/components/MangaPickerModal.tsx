@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
 import { useModalTransition } from "../../hooks/useModalTransition";
+import { useModalDialog } from "../../hooks/useDialogFocus";
 import { searchBooks, StudioBook } from "../../lib/studioApi";
 import Loader from "../../components/ui/Loader";
 import { PickerCover } from "./PickerCover";
@@ -118,6 +119,10 @@ export function MangaPickerModal({
       window.scrollTo(0, scrollY);
     };
   }, [mounted, asPage]);
+
+  // The desktop overlay is a dialog (#1073); the phone page is a normal page
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, mounted && !asPage);
 
   if (!mounted) return null;
 
@@ -267,7 +272,8 @@ export function MangaPickerModal({
   // Desktop modal mode
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-scrim/70 p-4 pt-12 sm:pt-16 transition-opacity duration-300 ${
+      ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="ค้นหามังงะ"
+      className={`fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-scrim/70 p-4 pt-12 sm:pt-16 outline-none transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
       onClick={onClose}
