@@ -133,3 +133,19 @@ noise-flag count moves with which lines the judge happens to note (65-138 across
 | HEHE laughter inconsistency | 1 gate finding | **gone** (interjections are no longer names) |
 
 The 4 glitch triggers are the lowest of any sweep; every gate finding has a known cause and none is a pipeline defect.
+## v6 end state (2026-10-23 final, every licence live)
+
+| metric | v5 | **v6** |
+|---|---|---|
+| pages / regions | 39 / 369 | 39 / 370 |
+| page gate violations | {} (after re-scan) | **2 on one line** (+1 name variance): `untranslated_word` + `added_latin` on the same Horimiya line |
+| leftovers (five scans) | {} | **{}** |
+| guard triggers | 4 | 4 |
+| wall avg / median | 7.80 / 6.62 s | 7.80 / 6.62 s |
+| retort retries | 2 per Horimiya run | **gone** (licensed) |
+
+The one real gate line is a **rare guard failure**: the source `DID ANYONE BRING THE RESOURCE MATERIALS?` shipped
+`มีใครเอามATERIALมาบ้างไหม?` — the `untranslated_word` guard fired, but both retries leaked an English variant
+(`material` -> `ATERIAL`), exhausting the budget. A direct A/B of three retry notes (none / current / stronger) on that
+line produced **0 Latin leaks in 9/9 samples**, so the leak is model variance rather than a weak note; no note change is
+justified. Every other gate item is the expected chapter-level name variance that `series_context` fixes in production.

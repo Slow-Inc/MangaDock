@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 231 — v6 sweep: v5 gate findings stay fixed; one rare guard-failure leak analysed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full default sweep with every licence live: leftover **0** across all five scans, 4 guard triggers, wall 7.80/6.62 s; retort retries stayed gone.
+- Page gate: 2 findings on ONE line (`untranslated_word` + `added_latin`: `...เอามATERIALมา...`) plus the expected name variance. The `untranslated_word` guard fired but both retries leaked an English variant, exhausting the budget.
+- Direct A/B of three retry notes (none/current/stronger) on that exact line: **0 Latin leaks in 9/9 samples** -> model variance, not a weak note; no change. Final baseline doc gained the v6 row.
+
+---
+
 ## MIT quality loop, round 230 — licences validated live: retort retries gone, gate 0 on the two pages (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
