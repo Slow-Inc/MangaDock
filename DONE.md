@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 270 — fifth unseen series (Kaiju No. 8): gate 0, no guard triggers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Kaiju No. 8 (4 unseen pages, optimized pipeline): gate 0 everywhere, render telemetry clean, **no guard triggers**; merge 0.2-0.5 s on plain pages and 5.3-7.9 s on the two SFX-heavy ones (batching keeps the worst case at ~8 s instead of 25-37 s).
+- Unseen-data aggregate: 5 series / 20 pages, 19/20 gated clean (the exceptions are legitimate Latin names on Bocchi). No code change.
+
+---
+
 ## MIT quality loop, round 269 — remaining merge outliers profiled: panel/bubble layout + SFX vision wait (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
