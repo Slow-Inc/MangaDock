@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 105 — fresh 20-page sweep: guards caught CJK and Arabic leaks live; gate clause false positive fixed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh sweep of 20 pages with the current defaults (`MIT_LOG_GLITCH=1` + gate): **4 foreign_script triggers, all true positives** — CJK (`融入`, `总有`), an **Arabic** leak inside a character name (`ชิอينا`) and a retry of the same page; every one was re-asked and the final payloads contain **0 foreign-script regions** (verified by re-scanning the outputs).
+- **Gate false positive fixed (#990):** `inconsistent_name: TSUKUYOMI` came from a 17-char **clause** being stored as the name's spelling because `extract_glossary` took the longest Thai run of any region that merely mentioned the name. Extraction now requires a name-focused line (spelling run 3-12 chars, translation no longer than spelling + 6), matching the series-memory rule. With the fix the sweep reports the *true* inconsistency (`สึกุโยมิ` vs `ทสึคุโยมิ`) instead of a fabricated one, and clauses can no longer poison the batch/series glossary.
+- Tests: name-glossary extraction, series memory and gate suites green; benchmark `2026-10-23-sweep42-and-gate-fp.md`.
+
 ## MIT quality loop, round 104 — post-default regression audit: quality stays at baseline (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

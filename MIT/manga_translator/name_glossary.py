@@ -109,8 +109,14 @@ def extract_glossary(regions, existing=None) -> dict:
             continue
         spelling = max(runs, key=len)
         # a transliterated name is short; a whole Thai clause means the region was not name-focused
-        if 3 <= len(spelling) <= 18:
-            glossary[name] = spelling
+        if not (3 <= len(spelling) <= 12):
+            continue
+        # Name-focused only: if the translation is much longer than the spelling, the region merely MENTIONS
+        # the name inside dialogue and the 'longest run' is a clause, not a spelling (gate FP: TSUKUYOMI ->
+        # 'ฉันอยากเห็นเธออีก'). Such a line must not define the series glossary.
+        if len(dst) > len(spelling) + 6:
+            continue
+        glossary[name] = spelling
     return glossary
 
 
