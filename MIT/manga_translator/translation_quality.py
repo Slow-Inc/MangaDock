@@ -516,6 +516,18 @@ _COMMON_THAI_TYPOS = (('แล่ว', 'แล้ว'), ('แลว', 'แล้
 #: ไม x100, ให x75, ไมใช x36 — every sampled context was the misspelling.
 _SIMPLE_TOKEN_FIXES = {'ไม': 'ไม่', 'ให': 'ให้', 'ไมใช': 'ไม่ใช่'}
 
+#: 'ไม' is also a plausible name (Mai); fix it only when the next significant token continues a negation.
+#: All 100 corpus occurrences start with one of these; 'ให'/'ไมใช' are not names and stay unconditional.
+_NEG_CONTINUATIONS = ('ทำ', 'ไป', 'ใช่', 'ได้', 'ถ้วน', 'มี', 'ต้อง', 'อยาก', 'หรอก', 'จริง', 'ค่อย', 'รู้', 'เป็น',
+                      'ว่า', 'ชอบ', 'สน', 'ไว้', 'ถึง', 'เห็น', 'เข้า', 'กล้า', 'ควร', '-')
+
+
+def _next_significant(parts, start):
+    for idx in range(start, len(parts)):
+        if parts[idx].strip():
+            return parts[idx]
+    return ''
+
 
 def _fix_simple_tokens(trans: str) -> str:
     """Token-level fix for missing-mark typos; skipped when pythainlp is unavailable (string fixes still run)."""
@@ -531,8 +543,12 @@ def _fix_simple_tokens(trans: str) -> str:
         return trans
     out = []
     changed = False
-    for part in parts:
-        fixed = _SIMPLE_TOKEN_FIXES.get(part, part)
+    for idx, part in enumerate(parts):
+        if part == 'ไม':
+            nxt = _next_significant(parts, idx + 1)
+            fixed = 'ไม่' if nxt.startswith(_NEG_CONTINUATIONS) else part
+        else:
+            fixed = _SIMPLE_TOKEN_FIXES.get(part, part)
         if fixed != part:
             changed = True
         out.append(fixed)

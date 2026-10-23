@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 199 — typo normalizer name-safety guard for `ไม` (Mai) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Self-review risk: `ไม -> ไม่` could rewrite a character named Mai. The replacement is now gated on the next significant token continuing a negation (whitelist mined from all 100 corpus occurrences: ทำ/ไป/ใช่/ได้/ถ้วน/.../-); `ให`/`ไมใช` stay unconditional.
+- `ไม นี่คือเพื่อนของฉัน` is untouched; the genuine negations still fix. Validation on the final outputs: 0 further changes; suite 966 passed; benchmark updated.
+
+---
+
 ## MIT quality loop, round 198 — OCR pass made fail-open (dispatch errors cannot fail the page) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

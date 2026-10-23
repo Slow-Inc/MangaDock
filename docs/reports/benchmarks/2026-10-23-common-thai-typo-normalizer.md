@@ -80,3 +80,12 @@ dictionary word with the same base. 11 candidates, all but none safe to auto-cor
 | `เบ` | 39 | SFX | intentional |
 
 No missing/wrong-mark typo beyond the already-normalised `แล่ว/ไม/ให/ไมใช` surfaced, so no further mapping is added.
+## Name-safety guard for `ไม` (round 199)
+
+`ไม` is also a plausible Thai nickname (Mai). The token-level replacement `ไม -> ไม่` is therefore gated on the next
+significant token continuing a negation: `ทำ, ไป, ใช่, ได้, ถ้วน, มี, ต้อง, อยาก, หรอก, จริง, ค่อย, รู้, เป็น, ว่า,
+ชอบ, สน, ไว้, ถึง, เห็น, เข้า, กล้า, ควร, -`.
+
+- All 100 corpus occurrences start with one of these; `ให`/`ไมใช` stay unconditional (not names).
+- `ไม นี่คือเพื่อนของฉัน` (Mai is my friend) is now left untouched; `มันไมใช่!`, `ไมทำให...`, `ไม-` still fixed.
+- Validation on the final sweep outputs: 0 further changes (typos already normalised in those runs). Suite 966 passed.

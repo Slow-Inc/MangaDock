@@ -362,3 +362,12 @@ def test_tag_questions_are_licensed_1024():
     assert not dropped_question('YOU DID IT, EH?', 'เธอทำได้แล้ว')
     # real questions still fire
     assert dropped_question('IS THAT SO?', 'มันเป็นอย่างนั้นจริงๆ')
+
+
+def test_mai_as_a_name_is_not_rewritten_1030():
+    from manga_translator.translation_quality import normalize_common_typos
+    # 'ไม' is a plausible Thai name (Mai); only negation continuations are fixed
+    assert normalize_common_typos("ไม นี่คือเพื่อนของฉัน") == "ไม นี่คือเพื่อนของฉัน"
+    assert normalize_common_typos("มันไมใช่!") == "มันไม่ใช่!"
+    assert normalize_common_typos("ไมทำใหฉันทนตายนะ?!") == "ไม่ทำให้ฉันทนตายนะ?!"
+    assert normalize_common_typos("ไม-") == "ไม่-"
