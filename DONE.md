@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 190 — OCR pass mapping robustness test (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a test that runs two candidates through the batched canvas and makes the fake model return the reads in **reverse order**: the pass maps them back to the right textlines by slot y-span and accepts both (`TO DEEEND` -> `TO DEFEND`, `SLAND` -> `ISLAND`). This pins the production mapping logic that the single-candidate test never exercised.
+- Suite 964 passed.
+
+---
+
 ## MIT quality loop, round 189 — team memory updated with round-3 (OCR pass, rejects, v3 numbers) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

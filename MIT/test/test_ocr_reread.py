@@ -61,3 +61,26 @@ def test_reread_replaces_only_improved_lines_and_respects_the_cap():
     assert len(calls) == 1
     assert calls[0][2] == 1
 
+
+def test_reread_maps_multiple_candidates_by_slot_even_when_the_model_returns_them_out_of_order():
+    image = np.zeros((120, 200, 3), dtype=np.uint8)
+    first = types.SimpleNamespace(text='TO DEEEND', prob=0.40,
+                                  pts=np.array([[10, 10], [180, 10], [180, 30], [10, 30]], dtype=np.float32))
+    second = types.SimpleNamespace(text='SLAND AND', prob=0.47,
+                                   pts=np.array([[10, 50], [180, 50], [180, 70], [10, 70]], dtype=np.float32))
+
+    async def fake_dispatch(ocr_key, canvas, quads, cfg, device, verbose):
+        assert len(quads) == 2
+        out = []
+        # deliberately reversed order: map back by the y span of each pasted crop
+        for q, text in ((quads[1], 'ISLAND AND'), (quads[0], 'TO DEFEND')):
+            ys = q.pts[:, 1]
+            out.append(types.SimpleNamespace(text=text, prob=0.90,
+                                             pts=np.array([[0, ys.min()], [50, ys.min()], [50, ys.max()], [0, ys.max()]],
+                                                          dtype=np.float32)))
+        return out
+
+    changed = asyncio.run(reread_textlines(image, [first, second], '48px', None, 'cpu', fake_dispatch))
+    assert changed == 2
+    assert first.text == 'TO DEFEND'
+    assert second.text == 'ISLAND AND'
