@@ -233,3 +233,18 @@ Inspected the two rendered PNGs by eye (Akuyaku p0, Tsuki p0) in addition to the
 
 Quote the visual check alongside the telemetry when claiming render quality; the stylised-heading gap needs detection
 work (title/logo class), not a translation fix.
+## v9 sweep after the SFX batching (2026-10-23 evening)
+
+| metric | v8 | **v9** |
+|---|---|---|
+| pages / regions | 39 / 369 | 39 / **370** |
+| dashboard page gate | `{}` | **`{}`** |
+| dashboard leftover | `{}` | **`{}`** |
+| guard triggers | 1 | **11** (model-variance burst: foreign-script Chinese leaks, `ทน` spurious filler, content-loss) |
+| wall avg | 6.07 s | **10.3 s** |
+| translation total | 97.9 s | **165.7 s** |
+
+Every one of the 11 triggers was caught by a guard (gate and leftover stayed empty), so quality held; the extra wall time
+is exactly the whole-page retry cost measured in round 265-266 (each glitch re-sends the page twice). This run also
+confirms the retry-cost analysis with natural data rather than a forced harness: the model's variance in this window, not
+the SFX change, drove the latency.

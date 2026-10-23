@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 267 — v9 sweep after SFX batching: gate/lleftover empty, 11 glitches cost retries (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 39-page sweep on the optimized pipeline: dashboard page gate **{}** and leftover **{}** again, but the window's model variance produced **11** guard triggers (foreign-script Chinese leaks, spurious `ทน`, content-loss), and the wall rose to 10.3 s avg with translation 165.7 s total.
+- Every trigger was caught (nothing shipped), so quality held; the extra time is the whole-page retry cost measured in rounds 265-266 - natural-data confirmation that retries, not the SFX change, dominate latency in a bad model window. v9 row recorded.
+
+---
+
 ## MIT quality loop, round 266 — attempt-3 subset retry measured: identical quality, no latency win -> rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
