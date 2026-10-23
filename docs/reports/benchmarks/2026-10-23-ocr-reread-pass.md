@@ -80,3 +80,14 @@ Rather than relying on the translation judge (noise-dominated), the 34 changed s
 Combined with the sweep (10 % of source strings improved, 2/39 layout changes, +0.33 s/page), this is the strongest
 evidence so far that the OCR second pass improves quality rather than churning it. The tool is committed with tests
 (`test_ocr_text_ab.py`) and can A/B any two doctor dirs, so future OCR levers get the same objective check.
+## Decision (round 179): default ON
+
+The quality-first rule wins here: the pass is a **deterministic source repair** (text-level A/B: 30/34 changed lines
+better, 88 %), never moves a box (2/39 layout changes, both from merge rounding), and after batching costs only
+**+0.33 s/page (~+4 % wall)** — not a behaviour/UX tradeoff like the batch pipeline, but a small fixed cost.
+
+- **Default ON**, `MIT_OCR_REREAD=0` restores the pre-pass byte-identical behaviour.
+- Verified live on Otome p1: default run reads `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.`; with
+  `MIT_OCR_REREAD=0` it reads the old `DEEEND`/`/SLAND` line. Suite 961 passed.
+- If a deployment cares about the last 4 % of wall time, the escape is one env var; the default follows the
+  "quality first, latency after" objective.

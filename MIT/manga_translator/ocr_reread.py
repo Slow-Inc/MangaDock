@@ -1,4 +1,4 @@
-"""Second-pass OCR for low-confidence lines (opt-in `MIT_OCR_REREAD=1`).
+"""Second-pass OCR for low-confidence lines (default ON since 2026-10-23; `MIT_OCR_REREAD=0` disables).
 
 Measured (2026-10-23): the 48px OCR read `TO DEEEND` (prob 0.51) because the detector's textline box clipped the F
 edge; re-reading the SAME pixels with the box padded by 30 % gives `TO DEFEND` (prob 0.90), and the translation stops
@@ -27,9 +27,10 @@ _THAI_CJK = set()  # filled lazily below
 
 
 def reread_enabled(env=None):
-    """MIT_OCR_REREAD=1/true/on enables the second pass; unset stays byte-identical."""
+    """Default ON since 2026-10-23 (text-level A/B: 30/34 changed lines better, +0.33 s/page);
+    MIT_OCR_REREAD=0/false/no/off disables it and restores the byte-identical pre-pass behaviour."""
     value = str((env or os.environ).get('MIT_OCR_REREAD', '')).strip().lower()
-    return value in ('1', 'true', 'yes', 'on')
+    return value not in ('0', 'false', 'no', 'off')
 
 
 def _is_latin_line(text):

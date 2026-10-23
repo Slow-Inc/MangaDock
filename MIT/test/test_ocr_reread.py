@@ -12,7 +12,8 @@ def test_reread_enabled_flag():
     assert reread_enabled({'MIT_OCR_REREAD': '1'}) is True
     assert reread_enabled({'MIT_OCR_REREAD': 'true'}) is True
     assert reread_enabled({'MIT_OCR_REREAD': '0'}) is False
-    assert reread_enabled({}) is False
+    assert reread_enabled({'MIT_OCR_REREAD': 'false'}) is False
+    assert reread_enabled({}) is True  # default ON since 2026-10-23
 
 
 def test_needs_reread_only_for_low_confidence_latin_lines():

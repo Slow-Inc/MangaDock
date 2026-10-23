@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 179 — OCR second pass flipped to DEFAULT ON (+4 % wall, escape env) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Decision: default ON. The pass is a deterministic source repair (text-level A/B 30/34 = 88 % better), never moves a box, and with the batched dispatch costs only **+0.33 s/page (~+4 % wall)** — a small fixed cost, not a UX/behaviour tradeoff.
+- `MIT_OCR_REREAD=0` restores the old byte-identical behaviour; verified live on Otome p1 (default reads `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.`, escape reads `DEEEND`/`/SLAND`). Tests and `MIT/.env.example` updated; suite 961 passed.
+
+---
+
 ## MIT quality loop, round 178 — OCR re-read wins the text-level A/B: 30/34 lines better (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
