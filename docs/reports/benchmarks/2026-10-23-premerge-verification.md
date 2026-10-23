@@ -12,7 +12,7 @@
 
 PR #794 is **MERGEABLE** against `integrate/render-reconcile`.
 
-Quality/perf/rendering state carried by this branch: noise-adjusted **1.68/2** (367 segments, 70.6 % perfect), gate
+Quality/perf/rendering state carried by this branch: noise-adjusted **1.55/2 strict** (range 1.55-1.68; 367 segments, 58.9 % perfect strict), gate
 covering every class with 0 violations on the corpus dashboard, 9 natural guard saves with **0 leftovers** on the 39-page
 sweep, render telemetry all-zero across 39 pages, serial default filter-before-translation (+1.5 s/page on mixed pages),
 and the measured opt-in levers (batch 1.46x with payload parity, preload, widen columns, segment retry).

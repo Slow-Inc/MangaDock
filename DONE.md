@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 158 — documentation numbers made consistent everywhere (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Grepped all 2026-10-23 benchmarks for stale quality numbers; fixed the two remaining misleading spots: the judge-noise profile title (`1.70/2` -> `1.55 strict, 1.68-1.70 lenient`) and its summary line (`72 % perfect / 2.1 % broken` -> `58.9-72 % / 2.1-3.5 %` classifier-dependent), plus the pre-merge verification line (`1.68/2, 70.6 %` -> `1.55 strict, relative range`).
+- Every doc, the PR body and the vault now quote the same strict-adjusted number with the 1.55-1.68 range.
+
+---
+
 ## MIT quality loop, round 157 — omission verifier JSON mode: parse-fail 0/11, agreement more honest (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
