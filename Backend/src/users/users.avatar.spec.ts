@@ -13,7 +13,11 @@ function setup() {
     put: jest.fn().mockResolvedValue(undefined),
     delete: jest.fn(),
   };
-  const ctrl = new UsersController({} as UsersService, storage as never);
+  const ctrl = new UsersController(
+    {} as UsersService,
+    storage as never,
+    {} as never,
+  );
   const req = { supabaseUser: { uid: 'u1' } } as never;
   const file = (originalname: string, mimetype: string) =>
     ({

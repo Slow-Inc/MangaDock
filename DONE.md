@@ -99,6 +99,30 @@ covered by the backend.
 - On search: the request carries the token, the 18+ badge shows, and "เฉพาะ 18+" sends `adult=only`.
 - Signed out: no token and no rating filter.
 - Unit 507/507 and test:auth 12/12. The earlier dialog and popup probes still pass. eslint is no worse than main.
+## #1101 Backend: opt-in 18+ content levels (PRD #1100) (2026-10-24)
+
+**What:** the developer asked for an 18+ filter: every rating may be enabled, `pornographic` behind accepting a
+Terms notice, and only for a signed-in user who confirmed being 18+.
+- **Database:** `profiles.content_level` (`off`/`erotica`/`all`, default `off`), `adult_confirmed_at` and
+  `adult_tos_accepted_at`. Applied through the Supabase MCP; all 18 existing profiles are `off`.
+- **Gate:** `ContentLevelService` (a global module) applies `applyLevelChange`: `erotica` needs the age confirmed,
+  and `all` also needs the Terms; the server stamps the times. It serves the level from a 60 s per-user cache that a
+  save replaces, and fails closed to `off`.
+- **Endpoints:** `GET`/`PUT /users/me/content-settings`.
+- **Catalog routes** (search, genre, new releases, chapter list, preview): they use `OptionalAuthGuard`, and
+  `ratingScope(level)` is threaded down to every MangaDex request. Cache keys get `:r=<level>` (plus `:adult` for
+  search's `adult=only`) except at `off`, which keeps today's keys.
+- **Search leak closed:** the alt-name extras no longer add `erotica` for everyone.
+- **`contentRating`** is now on `LandingBook` and `MangaDetail`.
+- **RLS checked:** `profiles` has only a SELECT-own policy, so users can't write the level through PostgREST and
+  bypass the gate.
+
+**Validated:**
+- Jest: backend 1215/1215. New suites cover the gate and ratings (11), the service (5), the controller scope (3),
+  and the MangaDex URLs and cache keys (4).
+- Live (local backend): anonymous search, search with `adult=only`, search with a bogus token, the genre page and
+  new releases all return only safe/suggestive. The settings endpoint returns 401 without a session.
+- **Not live:** the signed-in path, which needs a real account; it is unit-tested instead.
 
 ---
 
