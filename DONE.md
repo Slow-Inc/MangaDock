@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 122 — final-sweep latency outliers triaged: transient contention, not code (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Broke down the 39-page sweep: translation 39 % of wall, textline_merge 18 %, OCR 16 %, detection 10 % (rest mask/inpaint/render); avg 7.65 s.
+- Outliers analysed: cold detection 5.7 s on the first page (opt-in preload covers it), gateway translation 10.9 s (external), and a textline_merge spike of 8.8 s.
+- **The merge spikes are transient, not content-specific:** the same page ran 315-367 ms in other runs, spikes move between pages/runs, size does not correlate (1.8 MP -> 8.8 s vs 5.3 MP -> 1.1 s), and models are not reaped (`models_ttl = 0`). No code change; recorded so future sessions do not chase it (`2026-10-23-latency-outlier-triage.md`).
+
 ## MIT quality loop, round 121 — durable memory consolidated; exclamation-loss guard rejected by measurement (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
