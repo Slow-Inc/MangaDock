@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 96 — #899 second attempt (background-aware contrast): verified inert, visual check clean, issue closeable (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the issue's alternative proposal as opt-in `render.background_aware_fill`: sample the background ring around a region, score current fill/outline vs two neutral pairs by worst-case `max(|bg-fill|, |bg-outline|)`, switch only on a clear improvement.
+- **Replay A/B (only colour can change): byte-identical renders on all five pages (JP + 4 EN), 0 regions picked** — current sampled pairs already pass the worst-case threshold; nothing to fix at HEAD.
+- **Visual check of the issue's region #5 at HEAD**: renders black fill + white halo over the grey/black background and is readable in the crop (`2026-10-23-899-head-region5.png`) — the washed-out grey fill does not reproduce.
+- Reverted the experimental flag/helper (no code shipped). Verdict: the defect is obsolete at HEAD; a fix is not needed. Benchmark updated; #899 to be closed with this evidence.
+
 ## MIT quality loop, round 95 — #899 investigated: grey-fill symptom gone at HEAD; the fix needs the erased background (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

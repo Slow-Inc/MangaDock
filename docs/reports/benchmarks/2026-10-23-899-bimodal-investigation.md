@@ -37,3 +37,25 @@ dark half the worst-case contrast is still poor — the readable answer is white
 that needs the **background behind the lettering** (the erased/inpainted patch), not the lettering histogram: pick
 the fill that maximises the minimum contrast over the patch (the issue's alternative proposal), then gate on the
 39-page replay (no changed renders outside these regions). That is the next concrete step for #899.
+## Round-2 attempt: background-aware pair contrast (implemented, verified inert, reverted)
+
+Tried the issue's alternative proposal as an opt-in `render.background_aware_fill`: for each region, sample the
+**background ring** outside its lettering, score the current (fill, outline) pair and two neutral pairs by their
+worst-case `max(|bg-fill|, |bg-outline|)` over that ring, and switch only when the current pair is weak and the
+candidate clears a margin.
+
+Result on real pages (replay, so only colour could change): **byte-identical renders on all five pages** (JP + four
+EN) and **0 regions picked** — the current sampled pairs already pass the worst-case threshold, i.e. the heuristic
+has nothing to fix at HEAD. Reverted (no code shipped).
+
+## Visual check of the issue region at HEAD
+
+![source region #5 rendered at HEAD](./2026-10-23-899-head-region5.png)
+
+Region #5 `(632,787)-(719,1082)` now renders as **black fill with a white halo**, which reads on the grey/black
+background in this crop — the washed-out grey-fill described in the issue is not what HEAD produces.
+
+## Verdict
+
+The reported defect no longer reproduces at HEAD (and a safety-net heuristic has nothing to change), so no fix is
+shipped and the issue can close as obsolete; reopen with a fresh crop if a washed-out fill is ever seen again.
