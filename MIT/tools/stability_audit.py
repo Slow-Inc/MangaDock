@@ -9,7 +9,6 @@ Needs the ML stack + the custom_openai gateway. Pages are the three real corpus 
 import argparse
 import asyncio
 import copy
-import difflib
 import json
 import os
 import sys
@@ -24,6 +23,7 @@ from manga_translator import initialize as _initialize_env  # noqa: E402
 _initialize_env()
 
 from bench_render_tuned import TUNED  # noqa: E402
+from stability_report import compare_runs  # noqa: E402
 from manga_translator import Config, MangaTranslator  # noqa: E402
 from PIL import Image  # noqa: E402
 
@@ -57,17 +57,7 @@ async def main():
             payload = await tr.translate_patches(image, _config())
             runs.append({(x.get("src") or "").strip(): (x.get("dst") or "").strip()
                          for x in payload.get("regions") or []})
-        common = set.intersection(*(set(r) for r in runs)) if runs else set()
-        buckets = {"stable": [], "moderate": [], "unstable": []}
-        for src in common:
-            values = [r[src] for r in runs]
-            worst = min(difflib.SequenceMatcher(None, values[i], values[j]).ratio()
-                        for i in range(len(values)) for j in range(i + 1, len(values)))
-            row = {"src": src, "dst": values, "min_ratio": round(worst, 2)}
-            buckets["stable" if worst >= 0.85 else "moderate" if worst >= 0.5 else "unstable"].append(row)
-        report[name] = {"segments": len(common),
-                        **{k: len(v) for k, v in buckets.items()},
-                        "unstable_examples": buckets["unstable"][:8]}
+        report[name] = compare_runs(runs)
         print(f"{name}: segs={len(common)} stable={len(buckets['stable'])} "
               f"moderate={len(buckets['moderate'])} unstable={len(buckets['unstable'])}", flush=True)
     with open(args.out, "w", encoding="utf-8") as fh:

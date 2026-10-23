@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 252 — stability-audit logic extracted and unit-tested (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `stability_audit.py` imports the ML stack, so its bucketing logic was untestable. Extracted the pure part into `tools/stability_report.compare_runs` (worst pairwise similarity per common segment, stable >=0.85 / moderate >=0.5) and made the audit call it.
+- Added `test/test_stability_report.py` (4 tests: bucket boundaries, segments missing from a run not scored, thresholds as parameters, empty input). Suite **989 passed**. No behaviour change to the audit.
+
+---
+
 ## MIT quality loop, round 251 — stability audit finds term/register variance, queued as a future-loop candidate (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
