@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 225 — series-memory bug fixed: token-level glossary presence (#1065) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checking the production series memory via its public API exposed a real bug: `apply_glossary` used a **substring** test for "spelling already present", so a variant that contains the remembered spelling (`ทสึคุโยมิ` contains `สึคุโยมิ`) was never fixed — exactly the shape that survives across pages in production.
+- Fixed to token-level presence check (#1065); measured before/after via the public API: page2 `ทสึคุโยมิ?` -> `สึคุโยมิ?` (fixed=1). Regression test added; suite **979 passed**.
+- The full gateway pipeline recheck still fails in this window with an SDK `APIConnectionError` while `GET /models` returns 200; module-level verification is the evidence and the pipeline re-run stays on the list.
+
+---
+
 ## MIT quality loop, round 224 — production series-memory recheck attempt hit a transient SDK connection error (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

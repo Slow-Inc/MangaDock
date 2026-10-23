@@ -169,7 +169,9 @@ def apply_glossary(regions, glossary) -> int:
         new_dst = dst
         for name in present:
             target = glossary[name]
-            if target in new_dst:
+            # Token-level presence: a substring test misses variants that merely CONTAIN the spelling
+            # (`ทสึคุโยมิ` contains `สึคุโยมิ`), so the series memory would never fix exactly that shape (#1065).
+            if any(tok == target for tok in _THAI_RUN.findall(new_dst)):
                 continue
             best = None
             best_ratio = 0.0

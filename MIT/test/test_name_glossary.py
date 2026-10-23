@@ -153,3 +153,19 @@ def test_laughter_and_sfx_are_not_name_candidates_1031():
     assert extract_glossary([{'src': 'HEHE.', 'dst': 'เข่า'}]) == {}
     assert extract_glossary([{'src': 'TSUKUYOMI!', 'dst': 'สึคุโยมิ!'}]) == {'TSUKUYOMI': 'สึคุโยมิ'}
 
+
+def test_apply_glossary_fixes_a_variant_that_contains_the_spelling_1065():
+    from manga_translator.name_glossary import apply_glossary
+
+    class R:
+        text = 'TSUKUYOMI?'
+        translation = 'ทสึคุโยมิ?'
+
+    regions = [R()]
+    fixed = apply_glossary(regions, {'TSUKUYOMI': 'สึคุโยมิ'})
+    assert fixed == 1
+    assert regions[0].translation == 'สึคุโยมิ?'
+
+    exact = R()
+    exact.translation = 'สึคุโยมิ?'
+    assert apply_glossary([exact], {'TSUKUYOMI': 'สึคุโยมิ'}) == 0  # already exact: untouched
