@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 163 — formatting probes: 3+ repetitions zero, edge whitespace now stripped (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Probes: **0** occurrences of 3+ consecutive identical Thai tokens outside known laughter/SFX; **0** double spaces, space-before-punctuation, unbalanced brackets or odd quotes in stored outputs.
+- Only **42 regions had trailing edge whitespace** (`'ฮ่า ฮ่า ฮ่า '`); the final cleanup now returns `trans.strip()` (never meaningful in a bubble) with a mocked-translator test. Heavy glitch suite 20 passed.
+
+---
+
 ## MIT quality loop, round 162 — live validation: typo normalizer active, 0 typo tokens, gate clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

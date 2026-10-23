@@ -230,3 +230,11 @@ def test_the_content_loss_guard_is_opt_in_1058(monkeypatch):
     assert t._is_glitched(src, dst, 'THA')
     monkeypatch.setenv('MIT_CONTENT_LOSS_GUARD', '0')
     assert not t._is_glitched(src, dst, 'THA')
+
+
+def test_edge_whitespace_is_stripped_from_the_answer():
+    """Measured 42 stored regions with trailing space; the cleanup strips edges (never meaningful in a bubble)."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(return_value=_reply('<|1|>  สวัสดีครับ  '))
+    out = asyncio.run(t.translate('ENG', 'THA', ['HELLO THERE']))
+    assert out[0] == "สวัสดีครับ", repr(out[0])

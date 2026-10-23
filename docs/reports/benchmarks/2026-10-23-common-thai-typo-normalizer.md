@@ -61,3 +61,10 @@ Ran six real pages through the normal pipeline with the new normalizer active:
 - One guard trigger (a `dropped_question` true positive) — unrelated to this fix.
 
 So the typo normalizer is wired into the live cleanup path, not just the unit tests.
+## Formatting probes (round 3): edge whitespace stripped, nothing else
+
+- **3+ consecutive identical Thai tokens** (repetition-loop check outside known laughter/SFX): **0 occurrences** —
+  the runaway guard and the model's own behaviour leave nothing to clean.
+- **Double spaces / space before punctuation / unbalanced brackets / odd quotes**: **0** in stored outputs.
+- **Edge whitespace**: 42 stored regions ended with a trailing space (`'ฮ่า ฮ่า ฮ่า '`). It is never meaningful in a
+  bubble line, so the final cleanup now returns `trans.strip()` (test added in the glitch-retry suite).

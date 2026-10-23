@@ -394,7 +394,8 @@ class CommonTranslator(InfererModule):
         #         el = re.escape(el)
         #         text = re.sub(r'(?: ' + el + r'){4} (' + el + r' )+', ' ', text)
 
-        return trans
+        # 42 stored regions carried edge whitespace ('ฮ่า ฮ่า ฮ่า '); it is never meaningful in a bubble line.
+        return trans.strip()
 
 class OfflineTranslator(CommonTranslator, ModelWrapper):
     _MODEL_SUB_DIR = 'translators'
