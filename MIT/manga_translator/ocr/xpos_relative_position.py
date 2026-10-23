@@ -36,7 +36,6 @@ def apply_rotary_pos_emb(x, sin, cos, scale=1):
     return (x * cos) + (rotate_every_two(x) * sin)
 
 def apply_rotary_pos_emb2d(x, sin, cos, scale=1):
-    breakpoint()
     sin, cos = map(lambda t: duplicate_interleave(t * scale), (sin, cos))
     # einsum notation for lambda t: repeat(t[offset:x.shape[1]+offset,:], "n d -> () n () (d j)", j=2)
     return (x * cos) + (rotate_every_two(x) * sin)

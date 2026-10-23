@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 145 — removed a pre-existing breakpoint() landmine from OCR code (#1059) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scan of the branch diff for debug leftovers found `breakpoint()` inside `apply_rotary_pos_emb2d` in `ocr/xpos_relative_position.py` (pre-existing since 2026-03-08, **never called** — grep finds only the definition). If it ever got called, a production worker would freeze in pdb.
+- Opened #1059 and removed the one-line hook (dead helper kept for upstream parity); import check passes and the fast suite stays green (944 passed).
+
+---
+
 ## MIT quality loop, round 144 — MIT_TEMPERATURE documented in Backend env example (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
