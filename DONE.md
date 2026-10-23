@@ -8,7 +8,7 @@
 Branch `feat/mit-quality-loop` (PR #794).
 - PR #794 is **mergeable**; CI: logic gate (torch-free) pass, backend jest pass, frontend/mobile skip, Vercel rate-limited (external), heavy ML report-only **failed** on `test_stages.py::test_run_rendering_default_dispatch_forwards_all_kwargs`.
 - Root cause is ours: commit `54ba1fb4` (#1006) started forwarding `fit_below_floor` and `widen_vertical_columns` through the rendering stage, but the test's `_render_config` SimpleNamespace and expected-kwargs assertion were not updated — the local fast gate skips heavy tests, so only CI caught it.
-- Updated the helper + expected kwargs; `test/test_stages.py` **9 passed** locally. CI re-runs on the push.
+- Updated the helper + expected kwargs; `test/test_stages.py` **9 passed** locally. After the push, CI is **green**: logic gate pass, heavy ML pass (4m39s), backend jest pass; only Vercel fails on an external deployment rate-limit (retry in 24 h) — the PR is mergeable and otherwise ready.
 
 ## MIT quality loop, round 125 — render/layout telemetry is clean on all 39 pages (2026-10-23)
 
