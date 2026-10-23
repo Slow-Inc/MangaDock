@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 247 — env example now documents the two new debug logs (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited `MIT/.env.example` against the knobs the code reads: the two debug logs added in this loop (`MIT_LOG_OCR_REREAD`, `MIT_LOG_OMISSION_VERIFY`) were missing; both are now listed next to the other log switches. No behaviour change.
+
+---
+
 ## MIT quality loop, round 246 — one-page branch hand-off index written (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
