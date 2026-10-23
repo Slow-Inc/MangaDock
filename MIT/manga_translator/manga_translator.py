@@ -933,7 +933,8 @@ class MangaTranslator:
                 and bool(getattr(ctx, 'patch_mode', False))):
             ctx.text_regions = self._apply_source_lang_filter(ctx, config)
             ctx.source_lang_filtered = True
-            print(f'[filter-after-strip] kept={len(ctx.text_regions or [])}', flush=True)
+            if os.environ.get('MIT_LOG_REGION_FILTER'):
+                print(f'[filter-after-strip] kept={len(ctx.text_regions or [])}', flush=True)
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  
@@ -1616,7 +1617,7 @@ class MangaTranslator:
             if series_memory_enabled():
                 _fixed = remember_and_apply(ctx.text_regions, getattr(config.translator, 'series_context', None),
                                             getattr(config.translator, 'target_lang', '') or '')
-                if _fixed:
+                if _fixed and os.environ.get('MIT_SERIES_GLOSSARY_LOG'):
                     print(f'[series-glossary] applied {_fixed} name fix(es)', flush=True)
         except Exception:
             logger.warning(f'[series-glossary] skipped:\n{traceback.format_exc()}')

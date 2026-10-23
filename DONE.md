@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 128 — production log hygiene: debug prints are env-gated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Found two unconditional `print`s this loop added: `[filter-after-strip]` fired on **every production page** (the filter is default ON) and `[series-glossary]` on every applied fix. Both are now gated behind existing/added debug envs (`MIT_LOG_REGION_FILTER`, `MIT_SERIES_GLOSSARY_LOG`).
+- Verified: a default doctor run on a real page now logs **zero** debug lines and the gate stays clean; the fast suite is green. No behaviour change — only log noise removed.
+
+---
+
 ## MIT quality loop, round 127 — pre-merge hygiene + PR body refreshed with round 2 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
