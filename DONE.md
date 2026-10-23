@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 134 — quality classifier tightened + numbers corrected everywhere (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added tests for `tools/audit_summary` and they exposed a **too-lenient noise classifier**: a note containing a real typo pair (`บ่าน→บ้าน`) was still counted as noise because it also contained an identical pair. The classifier now treats **any real pair (left != right) or complaint keyword as a real finding**; only all-identical pairs / typo-only claims are noise.
+- Recomputed honestly: end-state 367 segments **raw 1.44, strict-adjusted 1.55** (13/138/216 = 3.5 % broken / 37.6 % partial / **58.9 % perfect**), lenient-adjusted 1.68; 480-subset also 1.55 strict. The earlier 1.68 was the lenient cut.
+- Corrected `2026-10-23-final-quality-baseline.md`, `2026-10-23-judge-noise-adjusted-profile.md`, the vault note, and the PR body + a PR comment explaining the correction. 4 new tool tests.
+
+---
+
 ## MIT quality loop, round 133 — series-memory edge cases covered (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -10,22 +10,30 @@ import argparse
 import json
 import re
 
-_IDENTICAL_PAIR = re.compile(r'([\u0E00-\u0E7F]+)\s*(?:→|->)\s*\1')
+_PAIR = re.compile(r'([^\s,;:()\[\]→\-]+)\s*(?:→|->)\s*([^\s,;:()\[\]→\-]+)')
 _NOISE_HINTS = ('typo', 'misspelling', 'spelling error', 'not a valid thai word')
+_COMPLAINTS = ('literal', 'wrong', 'mistranslat', 'omiss', 'dropped', 'missing', 'inverted', 'opposite', 'adds ', 'added ')
 
 
 def _is_noise(note: str) -> bool:
-    """True when the only complaints look like the judge's tokenizer artefact."""
+    """True when the only complaints look like the judge's tokenizer artefact.
+
+    A note that carries any REAL pair (left != right) or a complaint keyword is a real finding; a note whose only
+    pairs are identical strings is the tokenizer artefact.
+    """
     note = note or ''
-    if _IDENTICAL_PAIR.search(note):
-        return True
+    pairs = _PAIR.findall(note)
+    if any(a.strip() and b.strip() and a.strip() != b.strip() for a, b in pairs):
+        return False
     low = note.lower()
+    if any(k in low for k in _COMPLAINTS):
+        return False
+    if pairs:
+        return True  # only identical strings were claimed as typos
     if any(h in low for h in _NOISE_HINTS) and 'meaning' in low and 'preserved' in low:
         return True
-    if 'typos' in low and '→' in note:
-        # 'Multiple typos (X→X, Y→Y)' with no other complaint
-        cleaned = _IDENTICAL_PAIR.sub('', note)
-        return '→' not in cleaned and '->' not in cleaned
+    if 'typos' in low:
+        return True
     return False
 
 
