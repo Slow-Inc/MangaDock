@@ -23,3 +23,15 @@ deterministic (no legitimate use of the wrong form), applies to every translated
 - Gate: new `common_typo` rule flags any remaining occurrence (defence in depth for future regressions); old stored
   payloads now report it, as expected.
 - Tests: normalizer cases + gate rule (translation-quality + gate suites 60 passed).
+## Extension: missing-mark tokens (ไม -> ไม่, ให -> ให้, ไมใช -> ไม่ใช่)
+
+Dictionary-based mining (pythainlp, 15.6k stored regions) surfaced three recurring invalid tokens: **ไม x100**,
+**ให x75**, **ไมใช x36** — all missing a tone/ending mark. All sampled contexts were the misspelling, and because
+the fix runs at **token level** (with `keep_whitespace=True`), real words that contain the same letters are untouched:
+`ไหน`, `ไม้`, `ให้` stay as-is.
+
+- Corpus validation: **219 of 15,590 regions (1.4 %)** are corrected by the normalizer (the earlier `แล่ว` 44 plus
+  these tokens); sampled diffs are all clear fixes (`มันไมใช่!` -> `มันไม่ใช่!`, `ทำให` -> `ทำให้`, `ขอให` -> `ขอให้`).
+- Cost: **0.04 ms/segment** (tokenizer is already loaded for Thai wrapping).
+- Tests cover the new mappings and the untouched real words; the gate's `common_typo` rule uses the same normalizer,
+  so a regression is reported deterministically.

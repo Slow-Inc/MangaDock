@@ -446,10 +446,39 @@ def content_loss(src: str, dst: str, to_lang: str = '') -> bool:
 _COMMON_THAI_TYPOS = (('แล่ว', 'แล้ว'), ('แลว', 'แล้ว'))
 
 
+
+
+#: Missing tone/ending marks that make a token invalid Thai; safe to fix at token level (tokenizer separates real
+#: words such as ไหน/ไม้/ให้, so these exact tokens only appear when the mark is missing). Measured in the corpus:
+#: ไม x100, ให x75, ไมใช x36 — every sampled context was the misspelling.
+_SIMPLE_TOKEN_FIXES = {'ไม': 'ไม่', 'ให': 'ให้', 'ไมใช': 'ไม่ใช่'}
+
+
+def _fix_simple_tokens(trans: str) -> str:
+    """Token-level fix for missing-mark typos; skipped when pythainlp is unavailable (string fixes still run)."""
+    if not trans:
+        return trans
+    try:
+        from pythainlp import word_tokenize
+    except Exception:
+        return trans
+    try:
+        parts = word_tokenize(trans, keep_whitespace=True)
+    except Exception:
+        return trans
+    out = []
+    changed = False
+    for part in parts:
+        fixed = _SIMPLE_TOKEN_FIXES.get(part, part)
+        if fixed != part:
+            changed = True
+        out.append(fixed)
+    return ''.join(out) if changed else trans
+
 def normalize_common_typos(trans: str) -> str:
     """Fix the few Thai misspellings that have exactly one correct form (deterministic, no ambiguity)."""
     if not trans:
         return trans
     for wrong, right in _COMMON_THAI_TYPOS:
         trans = trans.replace(wrong, right)
-    return trans
+    return _fix_simple_tokens(trans)

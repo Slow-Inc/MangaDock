@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 160 — missing-mark tokens fixed too: 219 stored regions corrected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Dictionary-based OOV mining over 15.6k stored regions found three recurring invalid tokens: **ไม x100, ให x75, ไมใช x36** (missing tone/ending marks). Added token-level fixes (`ไม->ไม่`, `ให->ให้`, `ไมใช->ไม่ใช่`) inside `normalize_common_typos`; because it tokenizes with `keep_whitespace=True`, real words (ไหน, ไม้, ให้) are untouched.
+- Corpus validation: **219 of 15,590 regions (1.4 %)** are corrected (แล่ว 44 + these 175); sampled diffs are all clear fixes; cost **0.04 ms/segment**.
+- Tests extended (new mappings + preserved words); gate `common_typo` uses the same normalizer. Suite green.
+
+---
+
 ## MIT quality loop, round 159 — แล่ว -> แล้ว normalizer (44 stored regions fixed) + fragment guard rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
