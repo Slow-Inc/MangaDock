@@ -91,3 +91,16 @@ better, 88 %), never moves a box (2/39 layout changes, both from merge rounding)
   `MIT_OCR_REREAD=0` it reads the old `DEEEND`/`/SLAND` line. Suite 961 passed.
 - If a deployment cares about the last 4 % of wall time, the escape is one env var; the default follows the
   "quality first, latency after" objective.
+## Threshold tuning 0.65 -> 0.75 (round 186)
+
+At threshold 0.65 the cap-6 candidate list rarely filled, so a higher bar mostly adds a few candidates to the same
+single batched canvas. Swept 39 pages at 0.75 with the cap raised to 8 and A/B-judged the 20 lines whose source differs:
+
+| outcome | run 1 | run 2 |
+|---|---|---|
+| 0.75 better | 10 | **11** |
+| 0.65 better | 4 | 3 |
+| tie | 6 | 6 |
+
+- Changed sources 20/369 (5.4 %), layout change 1 page, **OCR stage +69 ms/page only** (one canvas per page either way).
+- Both runs agree on the direction, so the new default is **threshold 0.75 / cap 8**.

@@ -15,13 +15,13 @@ import numpy as np
 logger = logging.getLogger('manga_translator')
 
 #: Re-read a line below this OCR confidence (normal reads sit around 0.85-0.99; the measured misread was 0.51).
-PROB_THRESHOLD = 0.65  # tuned: 0.65-0.78 was mostly punctuation churn (round 176 measurements)
+PROB_THRESHOLD = 0.75  # tuned: text A/B of 0.75 vs 0.65 = 11 better / 3 worse / 6 tie, +69 ms/page
 #: How much of the line width/height to pad on each side (the measured fix needed ~0.2-0.3).
 PAD_RATIO = 0.3
 #: The new read must beat the old confidence by this margin before it replaces the text.
 PROB_MARGIN = 0.12
 #: Never re-read more than this many lines per page (bounds the stage cost).
-MAX_REREADS = 6  # tuned with the batched dispatch (one model call per page, so a larger cap is cheap)
+MAX_REREADS = 8  # batched: one model call per page, the canvas is nearly free
 #: Latin-ish lines only: letters must dominate and no Thai/CJK may be present (a JP/SFX line is not our target).
 _THAI_CJK = set()  # filled lazily below
 

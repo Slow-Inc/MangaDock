@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 186 — OCR pass threshold tuned to 0.75: +8 net better lines for +69 ms/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Raised the OCR second-pass threshold 0.65 -> 0.75 and the cap 6 -> 8 (one batched canvas either way). Sweep: 20/369 sources change, 1 layout change, OCR **+69 ms/page**. Text A/B of those 20 lines: **11 better / 3 worse / 6 tie** (a second run: 10/4/6) — both runs agree on the direction.
+- Adopted as the new default; constants documented with the numbers. Benchmark updated.
+
+---
+
 ## MIT quality loop, round 185 — PR body numbers refreshed to the v2 range (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
