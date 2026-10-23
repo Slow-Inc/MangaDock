@@ -260,3 +260,13 @@ the SFX change, drove the latency.
 
 Quality held again in a degraded window (every trigger caught; the two gate items turned out to be licence gaps and are
 fixed). The wall time is retry-bound as analysed in rounds 265-267.
+### v10 official judge run (bad model window)
+
+```
+segments 371 | raw mean 1.38/2 | noise flags 77 | strict-adjusted 1.53/2
+distribution 0/1/2 = 9 / 155 / 207  (broken 2.4 % / partial 41.8 % / perfect 55.8 %)
+```
+
+The raw mean is window-dependent: **1.38-1.44** across the loop's runs (the v10 window also produced 14 guard triggers, all
+caught). The strict-adjusted value stays in **1.53-1.60** because the judge's noise-flag count moves with it. Quote the
+range plus the fixed structural numbers (gate {}, leftover {}) rather than one run's raw value.

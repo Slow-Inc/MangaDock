@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 276 — v10 judge in a bad window: raw 1.38, adjusted 1.53 (2.4% broken) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v10 outputs: 371 segments, raw **1.38**, 77 noise flags, strict-adjusted **1.53**, distribution 9/155/207 (broken 2.4%). The raw mean is window-dependent (**1.38-1.44** across runs); the adjusted band stays 1.53-1.60 and the structural results (gate {}, leftover {}) did not move.
+- Baseline and final report updated to quote the raw range plus the fixed structural numbers. No code change.
+
+---
+
 ## MIT quality loop, round 275 — merge-day runbook issue list and suite figure refreshed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
