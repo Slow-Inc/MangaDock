@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 121 — durable memory consolidated; exclamation-loss guard rejected by measurement (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Measured before building:** an exclamation-lost guard looked like the last gate gap, but mining all stored segments found only **2 candidates in 15,578** — not worth a predicate; not built (documented here and in the vault).
+- **Consolidated the loop's durable knowledge** into `Obsidian-MangaDock/project-translation-eval-set.md`: the judge-noise-adjusted numbers (raw 1.44 -> **1.70/2**, 72 % perfect), the full guard inventory with default/env-off flags and 0.43 ms/page cost, the guard discipline (predicate -> trigger -> note + forced/natural proof), the performance decisions (filter-after-strip default; batch 1.46x, preload, widen, segment-retry opt-in) and every rejected experiment with its evidence, plus pointers to the benchmark docs and DONE rounds.
+- No code change; this is the hand-off memory for the next session.
+
 ## MIT quality loop, round 120 — JP path issue closed as evaluated; PR updated with adjusted quality numbers (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
