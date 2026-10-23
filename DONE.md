@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 264 — SFX vision calls batched: textline_merge 32 s -> 8.4 s, page wall 54-68 -> 26 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Unseen-page QA showed 25-37 s textline_merge outliers; profiling traced them to one blocking 4-5 s vision request per SFX candidate, sequential, plus full-resolution PNG uploads.
+- Fix: candidates are localised concurrently (`ocr_vlm.localize_candidates`, order preserved, empty answers cached so the loop cannot re-ask them) and crops upload as 768 px JPEG instead of full-res PNG.
+- Same page: prefetch wait 14.2 -> 7.5 s, textline_merge 32.4-37.4 -> 8.4-8.8 s, wall 54-68 -> 25.8-26.0 s, gate 0. Tests added (concurrency/order + data URL); suite **991 passed**. Benchmark `2026-10-23-sfx-vlm-prefetch.md`.
+
+---
+
 ## MIT quality loop, round 263 — fourth unseen series: gate 0; A/B shows the dropped-question hit was a real catch (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

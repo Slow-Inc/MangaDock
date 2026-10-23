@@ -715,6 +715,36 @@ class MangaTranslator:
         from .ocr_vlm import placeholder_junk, sfx_false_positive, speculative_box
         dialogue_boxes = [r.xyxy for r in text_regions if not speculative_box(r)]
         dialogue_regions = [(r.xyxy, r) for r in text_regions if not speculative_box(r)]
+        # Prefetch the vision SFX localizations concurrently: this loop used to make one blocking 4-5 s request per
+        # candidate (a 7-SFX page spent ~32 s in textline_merge). The calls are independent and order is preserved.
+        prefetched_sfx = {}
+        if bool(getattr(config.ocr, 'vlm_rescue', False)) and text_regions:
+            from .ocr_vlm import should_rescue_sfx as _should_rescue
+            from .ocr_vlm import swallows_dialogue as _swallows
+            from .ocr_vlm import localize_candidates as _localize_sfx
+            from .translators.keys import (CUSTOM_OPENAI_API_BASE as _sfx_base,
+                                           CUSTOM_OPENAI_API_KEY as _sfx_key,
+                                           CUSTOM_OPENAI_MODEL as _sfx_model)
+            _owners, _crops = [], []
+            for region in text_regions:
+                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+                if _swallows((x1, y1, x2, y2),
+                             [box for box, other in dialogue_regions if other is not region]):
+                    continue
+                if not _should_rescue(region.text, getattr(region, 'from_sfx_detection', False),
+                                      x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+                    continue
+                crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                if crop.size:
+                    _owners.append(region)
+                    _crops.append(crop)
+            if _crops:
+                _localized = await _localize_sfx(
+                    _crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
+                    target_lang=config.translator.target_lang)
+                # Keep empty results too: they are the model's "no SFX" answer, and re-asking the same region
+                # sequentially in the loop below would undo the batching (measured: 6 empty answers re-queried).
+                prefetched_sfx = {id(r): out for r, out in zip(_owners, _localized)}
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
             original_text = region.text  
@@ -823,9 +853,12 @@ class MangaTranslator:
                                                CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
                 crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
                 if crop.size:
-                    rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                               api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                               target_lang=config.translator.target_lang)
+                    rescued = prefetched_sfx.get(id(region))
+                    if rescued is None:
+                        # Not prefetched (the text changed after the pre-pass): fall back to the blocking call.
+                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                                   target_lang=config.translator.target_lang)
                     if rescued:
                         logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
                         # The rescue produced the FINAL SFX in the target language. Pre-setting

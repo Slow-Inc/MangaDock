@@ -73,7 +73,7 @@ def test_localize_returns_sanitized_sfx():
     assert post.calls['url'] == 'https://gw/v1/chat/completions'
     assert post.calls['headers']['Authorization'] == 'Bearer k'
     parts = post.calls['json']['messages'][0]['content']
-    assert any(p.get('type') == 'image_url' and p['image_url']['url'].startswith('data:image/png;base64,') for p in parts)
+    assert any(p.get('type') == 'image_url' and (p['image_url']['url'].startswith('data:image/jpeg;base64,') or p['image_url']['url'].startswith('data:image/png;base64,')) for p in parts)
 
 # ── #881: a thinking model needs a budget above its reasoning need ────────────
 # The configured gateway default (qwen3.8-27b-fp8) answers only after ~154 reasoning
@@ -570,3 +570,25 @@ def test_a_normal_sfx_box_does_not_swallow_dialogue_887():
     other = (997, 678, 1074, 717)
     assert swallows_dialogue(sfx, [other]) is False
     assert swallows_dialogue(sfx, []) is False
+
+
+def test_localize_candidates_runs_concurrently_and_preserves_order():
+    import asyncio
+    import time
+
+    from manga_translator.ocr_vlm import localize_candidates
+
+    calls = []
+
+    def fake_worker(crop, *, api_base, api_key, model, target_lang):
+        calls.append(crop)
+        time.sleep(0.15)
+        return 'sfx-' + crop
+
+    started = time.time()
+    out = asyncio.run(localize_candidates(['a', 'b', 'c', 'd'], api_base='x', api_key='k', model='m',
+                                          target_lang='THA', worker=fake_worker))
+    elapsed = time.time() - started
+    assert out == ['sfx-a', 'sfx-b', 'sfx-c', 'sfx-d']
+    assert sorted(calls) == ['a', 'b', 'c', 'd']
+    assert elapsed < 0.45  # 4 sequential sleeps would be >= 0.6 s

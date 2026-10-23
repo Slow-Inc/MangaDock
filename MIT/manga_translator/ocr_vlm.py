@@ -65,6 +65,8 @@ class _Breaker:
         self.streak = 0
 
 
+SFX_UPLOAD_MAX_SIDE = 768
+
 _breaker = _Breaker()
 
 
@@ -185,10 +187,20 @@ def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float
 
 
 def _to_data_url(crop_rgb: np.ndarray) -> str:
-    """HWC RGB uint8 array → `data:image/png;base64,...`."""
+    """HWC RGB uint8 array -> a data URL, downscaled and JPEG-encoded for the vision call.
+
+    The gateway's vision model normalises input to roughly a few hundred pixels anyway, so shipping the full-resolution
+    PNG only made the upload large (a 9-candidate SFX page spent 14 s waiting on the batch). 768 px max side keeps the
+    lettering legible while cutting the payload several-fold.
+    """
+    image = Image.fromarray(crop_rgb).convert("RGB")
+    if max(image.size) > SFX_UPLOAD_MAX_SIDE:
+        scale = SFX_UPLOAD_MAX_SIDE / max(image.size)
+        image = image.resize((max(1, int(image.width * scale)), max(1, int(image.height * scale))),
+                             Image.LANCZOS)
     buf = io.BytesIO()
-    Image.fromarray(crop_rgb).convert("RGB").save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    image.save(buf, format="JPEG", quality=85)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 def _is_sfx_refusal(line: str, target_lang: str) -> bool:
@@ -384,3 +396,21 @@ def vlm_localize_sfx(
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         _breaker.fail(model)  # a failing call wastes the same page time as a truncated one
         return ''
+
+
+async def localize_candidates(crops, *, api_base, api_key, model, target_lang, worker=None):
+    """Localize independent SFX crops concurrently, preserving order.
+
+    The pipeline used to call vlm_localize_sfx once per candidate in a loop: a page with seven SFX candidates spent
+    ~32 s in textline_merge because each blocking vision call takes 4-5 s. The calls are independent, so they run in
+    threads and the stage waits once. `worker` is injectable for tests.
+    """
+    import asyncio
+
+    worker = worker or vlm_localize_sfx
+    tasks = [
+        asyncio.to_thread(worker, crop, api_base=api_base, api_key=api_key, model=model,
+                          target_lang=target_lang)
+        for crop in crops
+    ]
+    return list(await asyncio.gather(*tasks))
