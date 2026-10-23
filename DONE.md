@@ -77,6 +77,21 @@
 
 ---
 
+## #778 Light mode is on: a theme toggle in the nav (2026-10-23)
+
+**What:** with every user-facing route token-clean (#1048 light sweep, #776 auth screens), `ThemeToggle` goes into
+`NavbarActions` after the search — the same bar on desktop and phone, for guests too. It cycles light → system → dark
+(`lib/theme.ts`, persisted in `md-theme`, applied by the boot script before first paint). Its size is now `h-8 w-8`
+like the bell next to it (it was unused, so nothing else changes). `/docs` needed no island: its page carries its own
+fixed palette and looks the same in both themes; `/status` and `/metrics` are API routes.
+
+**Validated:** production build, guest, at 1440 and 390: the toggle is visible, cycles light/system/dark (`data-theme`
++ storage), and a reload keeps light; `/docs` renders identically in light and dark; the full route sweep (72 views,
+signed in) has 0 horizontal overflow with the extra control; phone nav screenshot in both themes checked. Real tsc
+clean; eslint equal to main.
+
+---
+
 ## #776 The auth-flow screens on the Strata tokens (2026-10-23)
 
 **What:** the developer lifted the parking of the auth files. The login / link / MFA / re-auth modals, the OAuth

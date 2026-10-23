@@ -11,6 +11,7 @@ import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
 import { applyCoinBalanceUpdate, type CoinBalanceUpdate } from "../lib/coinBalanceEvent";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 import Coin from "./ui/Coin";
 import { UidMascot } from "./mascot/Mascot";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
@@ -52,6 +53,8 @@ export default function NavbarActions() {
     <>
       <div className="flex items-center gap-1.5 sm:gap-2">
         <SearchBar />
+        {/* light mode is on now that every user-facing route is token-clean (#778) */}
+        <ThemeToggle />
 
         {loading ? (
   /* ── Skeleton while auth session restores ── */

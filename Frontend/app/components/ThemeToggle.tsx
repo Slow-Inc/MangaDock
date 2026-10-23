@@ -16,7 +16,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
       type="button"
       onClick={() => applyTheme(next)}
       aria-label={`${LABEL[theme]} — เปลี่ยนเป็น${LABEL[next]}`}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition-colors duration-[var(--t1)] hover:border-ink-3 hover:text-ink ${className}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 transition-colors duration-[var(--t1)] hover:border-ink-3 hover:text-ink ${className}`}
     >
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
         {theme === "dark" ? (
