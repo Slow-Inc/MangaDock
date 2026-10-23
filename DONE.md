@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 151 — next-loop backlog written for the hand-off (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-next-loop-backlog.md`: P0 (JP corpus expansion, temperature re-test clearing the noise bar, batch-default decision once progress UX allows), P1 (clause omission via a semantic verifier, fragment completion with a cut detector + shape-preserving retry, interjection/lexical senses as model ceiling), P2 (validated merge/retarget sequence, standard measurement path, external Vercel check), plus the explicit **do-not-repeat list** of already-rejected experiments.
+- #642 is still an open draft and now shows CONFLICTING against main, so the retarget step stays pending; the backlog records the exact sequence to follow when it lands.
+
+---
+
 ## MIT quality loop, round 150 — merge simulated into main: code auto-merges, merged fast suite 944 passed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

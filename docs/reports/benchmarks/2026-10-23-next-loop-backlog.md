@@ -1,0 +1,48 @@
+# Next-loop backlog — what is worth doing once new data (or a merge) lands
+
+- **Date:** 2026-10-23 · current state: branch `feat/mit-quality-loop` ready (PR #794, merge forecast validated),
+  end-state quality raw **1.44 / strict-adjusted 1.55** (range 1.55-1.68 depending on judge-noise handling).
+
+Deterministic levers for the existing 39-page EN corpus are exhausted; this is the ordered list of what to do next,
+with the acceptance rule for each.
+
+## P0 — unblocked by data
+
+1. **JP corpus expansion (the biggest quality unknown).** The repo has one real JP page (uploaded twice). Get 10-20
+   real JP→TH pages, then: re-run the guards/gate sweep (expect the same 0-leftover behaviour), run the noise-adjusted
+   judge, and re-test the opt-ins that were data-limited: `render.widen_vertical_columns` (#1006) and the JP rhetorical
+   prompt idea (negative on 1 page, needs data). Acceptance: ≥10 real JP pages, gate clean, adjusted judge not below the
+   EN baseline minus noise.
+2. **Temperature re-test with ≥40 pages or repeated runs.** The 0.5 vs 0.2 A/B (opt-in `MIT_TEMPERATURE`) leaned 0.2
+   (raw +0.04, guard hits 10->6) but was inside the noise bar. Acceptance: a paired test clearing the loop's null
+   calibration (segment-level binomial with ≥40 pages) before any default change.
+3. **Batch pipeline default decision** (#905): 1.46x measured, payload parity verified; the remaining blocker is UX
+   (no per-page live progress webhooks). If the Backend progress UX is reworked, flip the default and re-run the
+   39-page sweep for a byte-compatible comparison. Acceptance: progress UX no longer depends on per-page webhooks,
+   then replay-identical renders.
+
+## P1 — quality improvements needing design
+
+4. **Clause omission** (documented model ceiling): needs a semantic verifier, not a ratio guard (rejected in
+   `2026-10-23-clause-omission-rejected.md`). Candidate: ask the translator for a structured per-segment check of
+   source clauses, or a second-pass verifier on long lines only.
+5. **Fragment completion** (`SOR` -> `ขอโทษ`, `RIGHT..` -> `ใจแล้ว`): no deterministic licence found; a possible angle
+   is a source-side cut detector + a shape-preserving retry note. Acceptance: forced-injection proof, then a corpus
+   sweep with 0 false triggers on ordinary lines.
+6. **Interjection/lexical sense errors** (`MAN..` as a greeting, `cute` -> `ตัวเล็ก`) — model ceiling; would need a
+   different model or a verifier. Do not attempt with a predicate.
+
+## P2 — operations / maintenance
+
+7. **Merge + retarget sequence** (validated): after #642 lands, retarget #794 to main, resolve the three docs files by
+   union, re-run CI, merge. Merge simulation already proved the code auto-merges and the fast suite passes.
+8. **Keep the data pipeline clean:** `tools/quality_dashboard.py` + `audit_summary.py` + the fixture tests are the
+   standard measurement path; new audits should quote the strict-adjusted number with the 1.55-1.68 range.
+9. **Vercel check** is rate-limited externally; not a code signal. Re-run when the window clears.
+
+## Do-not-repeat list (already measured and rejected)
+
+- detection_size 2048/3200 (recall changes), in-page mask/inpaint overlap (#1050 superseded by the batch pipeline),
+- JP rhetorical prompt (no difference on the one page), hedging-lost guard (mostly false positives),
+- exclamation-lost guard (2 candidates in 15,578 segments), clause-omission word-ratio guard,
+- segment-only retry as default (quality risk), neighbour-context retry hint (no reproducible recovery).
