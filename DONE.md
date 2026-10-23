@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 164 — leak-script coverage closed: Arabic salvaged, target scripts protected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Found two gaps: the last-resort salvage table had only cjk/kana/hangul/cyrillic (the live sweep's Arabic leak would ship if retries exhausted), and salvage could strip the **target's own script** (kana deleted from a Japanese translation whose English source lacked kana).
+- One extended 22-script table now serves detector + salvage (Arabic, Greek, Hebrew, Devanagari/Bengali/Tamil/Telugu/Kannada/Malayalam/Sinhala, Lao, Khmer, Myanmar, Tibetan, Ethiopic, Armenian, Georgian); `_TARGET_OWN_SCRIPTS` makes the salvage skip legitimate target scripts; neutral kana punctuation excluded.
+- Tests: Greek/Devanagari detection + licensing, Arabic salvage (`มี قوية ด้วย` -> `มี ด้วย`), JPN target kana preserved, THA still strips; suite **953 passed**. Benchmark `2026-10-23-leak-script-coverage.md`.
+
+---
+
 ## MIT quality loop, round 163 — formatting probes: 3+ repetitions zero, edge whitespace now stripped (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

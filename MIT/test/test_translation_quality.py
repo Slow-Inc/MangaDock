@@ -337,3 +337,18 @@ def test_common_thai_typos_are_normalized_1023():
     assert normalize_common_typos("เธออ่อนโยนกับสัตว์ด้วย") == "เธออ่อนโยนกับสัตว์ด้วย"
     assert normalize_common_typos("") == ""
 
+
+def test_extended_scripts_are_detected_and_salvaged_1059b():
+    from manga_translator.translation_quality import foreign_script, strip_leaked_script
+    # lang_ratio does not model Greek/Devanagari; the extended table catches them for a Thai target
+    assert foreign_script("มี Ελληνικά εδώ", "THA", "ENGLISH SOURCE")
+    assert not foreign_script("มี Ελληνικά εδώ", "THA", "ΕΛΛΗΝΙΚΆ SOURCE")
+    assert foreign_script("यह हिंदी है", "THA", "ENGLISH SOURCE")
+    # Arabic was detected but not salvaged before; now it is stripped when the source lacks it
+    assert strip_leaked_script("มี قوية ด้วย", "ENGLISH SOURCE", "THA") == "มี ด้วย"
+
+
+def test_salvage_never_strips_the_targets_own_script_1059c():
+    from manga_translator.translation_quality import strip_leaked_script
+    assert strip_leaked_script("ドン! ลาก่อน", "HELLO", "JPN") == "ドン! ลาก่อน"
+    assert strip_leaked_script("ドン! ลาก่อน", "HELLO", "THA") != "ドン! ลาก่อน"

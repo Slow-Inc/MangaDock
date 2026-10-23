@@ -22,6 +22,45 @@ def _scripts(text: str) -> set:
             if r[0] <= cp <= r[1]}
 
 
+#: Scripts that must not leak into a target unless the source uses them (#903 / #1059 follow-up). The detector's
+#: lang_ratio ranges cover THA/CJK/KOR/ARA/Cyrillic; these regexes add the remaining scripts and double as the
+#: salvage table. strip_leaked_script skips the target's own scripts (see _TARGET_OWN_SCRIPTS).
+_LEAK_SCRIPT_CHARS = {
+    'cjk': re.compile(r'[\u3400-\u4DBF\u4E00-\u9FFF\u3005-\u3007]'),
+    'kana': re.compile(r'[\u3040-\u30FF]'),
+    'hangul': re.compile(r'[\uAC00-\uD7AF\u1100-\u11FF]'),
+    'cyrillic': re.compile(r'[\u0400-\u04FF]'),
+    'arabic': re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]'),
+    'greek': re.compile(r'[\u0370-\u03FF\u1F00-\u1FFF]'),
+    'hebrew': re.compile(r'[\u0590-\u05FF]'),
+    'devanagari': re.compile(r'[\u0900-\u097F]'),
+    'bengali': re.compile(r'[\u0980-\u09FF]'),
+    'tamil': re.compile(r'[\u0B80-\u0BFF]'),
+    'telugu': re.compile(r'[\u0C00-\u0C7F]'),
+    'kannada': re.compile(r'[\u0C80-\u0CFF]'),
+    'malayalam': re.compile(r'[\u0D00-\u0D7F]'),
+    'sinhala': re.compile(r'[\u0D80-\u0DFF]'),
+    'lao': re.compile(r'[\u0E80-\u0EFF]'),
+    'khmer': re.compile(r'[\u1780-\u17FF]'),
+    'myanmar': re.compile(r'[\u1000-\u109F]'),
+    'tibetan': re.compile(r'[\u0F00-\u0FFF]'),
+    'ethiopic': re.compile(r'[\u1200-\u137F]'),
+    'armenian': re.compile(r'[\u0530-\u058F]'),
+    'georgian': re.compile(r'[\u10A0-\u10FF]'),
+}
+#: Scripts that are legitimate OUTPUT for a target language; the salvage must never strip them.
+_TARGET_OWN_SCRIPTS = {
+    'JPN': ('cjk', 'kana'),
+    'CHS': ('cjk',),
+    'CHT': ('cjk',),
+    'KOR': ('hangul',),
+    'ARA': ('arabic',),
+    'RUS': ('cyrillic',),
+    'UKR': ('cyrillic',),
+    'SRP': ('cyrillic',),
+    'CNR': ('cyrillic',),
+}
+
 def foreign_script(text: str, target: str, source: str = '') -> bool:
     """True when ``text`` uses a non-Latin script that is neither the target's nor one the
     ``source`` already uses (a kana SFX the prompt says to keep is copied, not leaked). Latin
@@ -29,7 +68,18 @@ def foreign_script(text: str, target: str, source: str = '') -> bool:
     own = _SCRIPT_RANGES.get(target)
     if own is None:
         return False
-    return bool(_scripts(text) - set(own) - _scripts(source))
+    if _scripts(text) - set(own) - _scripts(source):
+        return True
+    # scripts lang_ratio does not model (Arabic is modelled, Greek/Devanagari/... are not)
+    own_names = _TARGET_OWN_SCRIPTS.get(str(target).upper(), ())
+    for name, pattern in _LEAK_SCRIPT_CHARS.items():
+        if name in own_names:
+            continue
+        hits = [m for m in pattern.findall(text or '') if ord(m) not in _NEUTRAL]
+        licensed = [m for m in pattern.findall(source or '') if ord(m) not in _NEUTRAL]
+        if hits and not licensed:
+            return True
+    return False
 
 
 def classify_glitch(src: str, dst: str, target: str) -> Optional[str]:
@@ -323,15 +373,6 @@ def lost_as_rare(dst: str, query: str) -> bool:
     return not any(word in src for word in ('RARE', 'RARELY', 'SCARCE'))
 
 
-#: Characters of scripts that must never appear in a Thai (or other non-CJK) target unless the source used them.
-_LEAK_SCRIPT_CHARS = {
-    'cjk': re.compile('[㐀-䶿一-鿿々-〇]'),
-    'kana': re.compile('[぀-ヿ]'),
-    'hangul': re.compile('[가-힯ᄀ-ᇿ]'),
-    'cyrillic': re.compile('[Ѐ-ӿ]'),
-}
-
-
 def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
     """Last-resort salvage: delete leaked-script characters when the retries could not fix them.
 
@@ -344,7 +385,10 @@ def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
         return trans
     src = query or ''
     out = trans
+    own_names = _TARGET_OWN_SCRIPTS.get(str(to_lang).upper(), ())
     for script, pattern in _LEAK_SCRIPT_CHARS.items():
+        if script in own_names:
+            continue  # the target's own script is never a leak
         if pattern.search(src):
             continue  # the source uses this script; copied text is not a leak
         out = pattern.sub('', out)
