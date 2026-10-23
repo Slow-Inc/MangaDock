@@ -223,10 +223,10 @@ def test_the_untranslated_word_guard_is_on_by_default_1057(monkeypatch):
     assert not t._is_glitched(src, dst, 'THA')
 
 def test_the_content_loss_guard_is_opt_in_1058(monkeypatch):
-    """#1058: far-too-short answers trigger only with the opt-in flag."""
+    """#1058: far-too-short answers trigger by default; the flag can switch it off."""
     t = CustomOpenAiTranslator()
     src, dst = "MAY THE BLESSINGS OF THE GREAT", "ขอพรจากมหา"
     monkeypatch.delenv('MIT_CONTENT_LOSS_GUARD', raising=False)
-    assert not t._is_glitched(src, dst, 'THA')
-    monkeypatch.setenv('MIT_CONTENT_LOSS_GUARD', '1')
     assert t._is_glitched(src, dst, 'THA')
+    monkeypatch.setenv('MIT_CONTENT_LOSS_GUARD', '0')
+    assert not t._is_glitched(src, dst, 'THA')

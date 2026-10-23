@@ -30,3 +30,18 @@ and **54 segments (0.6 %)** below **0.45**. Spot checks in the tail show real lo
 Added `content_loss(src, dst, to_lang)` (Thai target, ASCII source >= 24 chars, ratio < 0.45) and wired it as an
 **opt-in** trigger (`MIT_CONTENT_LOSS_GUARD=1`) with a retry note asking for the whole line; tests cover the tail and
 normal ratios. Forced-injection proof and a corpus sweep are the next step before any default decision.
+## Content-loss guard: forced proof and default decision
+
+- **Forced injection:** corrupted a long line's answer to `พริบตา` — `content_loss` fired, the translator re-asked
+  (**2 requests**) and the final line was the full translation (`ลองคัดลอกแบบร่างตามที่โฮริจัดไว้ให้ดู`); the final
+  payload had **0** content-loss regions.
+- **A first run of the same harness exposed a real false-positive source:** on retries the query carries an appended
+  `[note: ...]`, so the predicate's source length was inflated and already-retried segments flagged spuriously. The
+  predicate now strips an appended note before measuring; a test pins it (a normal-length answer with a note is not
+  loss, the truncated one still is).
+- **False positives:** 13 pages with the flag on produced **0 triggers**, gate 0 violations (threshold is the deep
+  tail: measured p10 ratio 0.66 vs the 0.45 cut).
+
+**Decision: default ON** (`MIT_CONTENT_LOSS_GUARD=0` disables). It only acts on the measured loss tail, the retry
+note asks for the whole line, and the forced proof shows the content restored. Trigger test pins the default; heavy
+glitch suite 19 green.

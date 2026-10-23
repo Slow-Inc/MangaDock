@@ -434,6 +434,9 @@ def content_loss(src: str, dst: str, to_lang: str = '') -> bool:
     if to_lang and str(to_lang).upper() not in ('THA', 'TH'):
         return False
     src, dst = src or '', dst or ''
+    # Retry attempts append '[note: ...]' to the query; that text is not part of the source line and would
+    # inflate the denominator (observed as spurious content_loss triggers on already-retried segments).
+    src = src.split(chr(10) + chr(10) + '[note:')[0]
     if len(src) < 24 or not dst or not _ASCII_LETTER.search(src):
         return False
     return len(dst) / len(src) < 0.45

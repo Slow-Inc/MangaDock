@@ -298,7 +298,7 @@ class CommonTranslator(InfererModule):
         if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
                 and untranslated_source_word(query, trans, to_lang)):
             reasons.append('untranslated_word')
-        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
                 and content_loss(query, trans, to_lang)):
             reasons.append('content_loss')
         if reasons and os.environ.get('MIT_LOG_GLITCH'):
@@ -311,7 +311,7 @@ class CommonTranslator(InfererModule):
         for the next translation attempt.
         """
         # #1058 (opt-in): the answer is far shorter than the source; ask for the whole line.
-        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
                 and content_loss(query, trans)):
             return query + ('\n\n[note: the previous answer is much shorter than the source line and dropped part of it. Translate the WHOLE line; do not omit clauses or names.]')
         # #1057 (opt-in): the answer kept an English word that the source says; ask for a translation.

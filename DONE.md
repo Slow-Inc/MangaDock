@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 110 — content-loss guard forced-proven, FP source fixed, promoted to default (#1058) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Forced injection:** corrupted a long line's answer to `พริบตา` -> `content_loss` fired, retry (**2 requests**) restored the full line, final payload had 0 content-loss regions.
+- **Found and fixed a false-positive source in the harness run itself:** retry queries carry an appended `[note: ...]`, which inflated the measured source length and spuriously flagged already-retried segments. The predicate now strips an appended note before measuring; a test pins both sides.
+- **False positives:** 13 pages with the flag on -> **0 content_loss triggers**, gate 0 (threshold is the measured deep tail, p10 0.66 vs cut 0.45).
+- **Default ON** (`MIT_CONTENT_LOSS_GUARD=0` disables); trigger test pins the default; heavy glitch suite 19 green; benchmark updated; #1058 updated.
+
 ## MIT quality loop, round 109 — baseline sweep: 2 guard false positives fixed; content-loss class measured and guarded (opt-in) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -321,3 +321,10 @@ def test_a_far_too_short_answer_is_content_loss_1058():
     assert not content_loss("MAY THE BLESSINGS OF THE GREAT", "ขอให้พรจากมหาเทพผู้ยิ่งใหญ่จงสถิตอยู่กับท่าน")
     assert not content_loss("SHORT", "สั้น")
     assert not content_loss("MAY THE BLESSINGS OF THE GREAT", "blessings", "ENG")
+
+
+def test_a_retry_note_does_not_inflate_the_source_length_1058b():
+    from manga_translator.translation_quality import content_loss
+    note = "\n\n[note: keep the question in the translation, e.g. end with ไหม.]"
+    assert not content_loss("MAY THE BLESSINGS OF THE GREAT" + note, "ขอให้พรจากมหาเทพผู้ยิ่งใหญ่จงสถิตอยู่กับท่าน")
+    assert content_loss("MAY THE BLESSINGS OF THE GREAT" + note, "ขอพรจากมหา")
