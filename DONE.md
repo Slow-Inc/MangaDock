@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 146 — debugger-hook audit completed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Grepped the whole MIT package for `breakpoint()` / `pdb` / `sys.exit(`: only three hooks exist. The XPOS one (#1059) was the sole production landmine and is fixed; the DBNet and LaMa hits sit inside `__main__`-guarded dev smoke tests, and the `sys.exit` paths are CLI-only (PDF/`--save-panels`/license-sidecar) that the worker's array path never reaches.
+- Documented in `2026-10-23-debugger-hooks-audit.md`; no further code change needed.
+
+---
+
 ## MIT quality loop, round 145 — removed a pre-existing breakpoint() landmine from OCR code (#1059) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
