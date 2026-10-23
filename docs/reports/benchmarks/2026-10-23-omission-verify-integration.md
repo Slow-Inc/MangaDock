@@ -25,3 +25,26 @@ see it: the earlier report-only tool caught it on 2 of 2 clear cases with JSON m
 - Wired into `translate_patches` behind `MIT_OMISSION_VERIFY=1`; logging behind `MIT_LOG_OMISSION_VERIFY`.
 - **Pending before any default decision:** natural proof on the Akuyaku page (verifier flags the curiosity clause, the
   re-ask restores it) and a corpus sweeper for false positives/latency; invitation to re-judge the affected pages.
+## Natural proof (Akuyaku p0, `MIT_OMISSION_VERIFY=1`)
+
+Default pipeline shipped this line with the clause gone:
+
+- source: `ALSO... THIS PIQUED MY CURIOSITY EARLIER IN THE DINING HALL,`
+- default: `แล้ว... เมื่อตอนกลางวันในโรงอาหาร`
+
+With the pass enabled:
+
+- **`แล้วอีกอย่าง... เมื่อสักครู่ในโรงอาหารนี้ ก็จุดประกายความสงสัยของฉัน`** — the curiosity clause is back.
+
+So the verifier + re-ask works on the measured case.
+
+## Cost (measured, this is why it stays opt-in)
+
+The run took **32.5 s wall** on that page (dense page, cold-ish start: detection 6.7 s), versus the ~15 s the same page
+takes in the default pipeline: the pass adds **~3 gateway round-trips** (two verifier passes on the page's long lines
+plus one re-ask batch), each on the order of seconds. That is acceptable as an opt-in for quality-critical chapters, not
+as a default.
+
+Next tuning ideas before any default decision: a single verifier pass (halves the cost; two passes were a stability
+cushion), or verify only lines that the content-loss predicate already suspects. Both need a corpus sweep with the
+translation judge to prove they keep the win.

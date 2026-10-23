@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 208 — omission pass natural proof: clause restored; cost ~3 gateway calls/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran Akuyaku p0 with `MIT_OMISSION_VERIFY=1`: the default's `แล้ว... เมื่อตอนกลางวันในโรงอาหาร` (curiosity clause gone) came back as **`แล้วอีกอย่าง... เมื่อสักครู่ในโรงอาหารนี้ ก็จุดประกายความสงสัยของฉัน`** — the measured omission is repaired end-to-end.
+- Cost is real: that page took **32.5 s wall** (vs ~15 s default) because the pass adds ~3 gateway round-trips (two verifier passes + one re-ask batch). Stays opt-in; tuning ideas recorded (single pass / content-loss-suspect lines only).
+- Benchmark updated; no default change.
+
+---
+
 ## MIT quality loop, round 207 — omission-verification pass: module + wiring behind MIT_OMISSION_VERIFY=1 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
