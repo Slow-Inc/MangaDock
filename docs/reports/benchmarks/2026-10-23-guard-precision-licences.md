@@ -28,3 +28,13 @@ Both remaining page-gate findings were false positives (the Thai preserved the s
   chapter-level name variance, which `series_context` fixes in production).
 - Tests: retort true/false matrix + guard/gate cases + the 6-word control (`test_rhetorical_retorts_are_not_questions_1033`,
   `test_rhetorical_retorts_are_not_flagged_for_dropped_question_1033`, `test_exclamation_carried_by_a_thai_emphasis_particle_1032`).
+## Live validation (2 pages, 2026-10-23 round 230)
+
+Ran the two pages whose lines had motivated the licences (Horimiya p1 with the retort, Tsuki p0 with the emphasis line)
+with `MIT_LOG_GLITCH` and `--gate`:
+
+- **No `dropped_question` trigger** on the retort page any more (previously it retried twice on every run), and the
+  emphasis line produced no gate finding.
+- Gate: **pages=2 violations=0**.
+- The only glitches were two `foreign_script` Chinese leaks (model variance) which the existing guard retried/salvaged —
+  gate stayed clean, so the retries did their job.

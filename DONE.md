@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 230 — licences validated live: retort retries gone, gate 0 on the two pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh runs of the two motivating pages: no `dropped_question` trigger on the retort page (previously two re-asks per run), no emphasis gate finding, **gate pages=2 violations=0**. The only glitches were two foreign-script Chinese leaks (model variance) that the existing guard handled. No code change; benchmark updated.
+
+---
+
 ## MIT quality loop, round 229 — retort + Thai-emphasis licences: v5 page gate now completely clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
