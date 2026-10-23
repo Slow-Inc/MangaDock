@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 195 — Kumiko profile: 509 ms/page concentrated in the recursive split; no safe micro-opt (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Profiled the slowest page: `panel._cached_split` is 0.57 s **self** time (pure-Python recursive split over ~32k segment intersections); `cv2.LSD` only 0.12 s, `get_segments` 0.29 s. Any pruning changes which splits exist -> panel/reading order changes (the reason the 0.5x downscale was rejected).
+- **No code change**: a faster split search can only be accepted with panel-for-panel identical output on all 39 pages, i.e. a vendored-code campaign beyond this loop's scope for ~4-6 % wall. Benchmark `2026-10-23-panel-detection-profile.md` records the acceptance gate.
+
+---
+
 ## MIT quality loop, round 194 — panel-detection downscale rejected: it reorders 12/33 pages (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
