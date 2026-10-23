@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 255 — v8 reproducibility sweep: gate {} again, 1 guard trigger, 6.07 s avg (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Second full sweep on the current head reproduces the clean state: dashboard page gate **{}**, leftover **{}**, only the expected chapter name variance, and just **1** guard trigger (a HEHE Chinese leak, retried to clean).
+- Wall avg 6.07 s (vs 7.83 s in v7) - run-to-run gateway/model variance, so the honest quote is the 6-8 s range. v8 row recorded. No code change.
+
+---
+
 ## MIT quality loop, round 254 — hand-off index and vault synced to the final state (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

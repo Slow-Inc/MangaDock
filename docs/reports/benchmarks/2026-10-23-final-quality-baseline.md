@@ -207,3 +207,16 @@ Late sweeps used `--no-png` (text-only); one final pass rendered real PNGs for t
 - Gate: `pages=2 violations=0`.
 
 So the shipped pipeline produces real rendered pages, not only translated text, with no layout telemetry outliers.
+## v8 reproducibility sweep (2026-10-23, current head)
+
+| metric | v7 | **v8** |
+|---|---|---|
+| pages / regions | 39 / 369 | 39 / 369 |
+| dashboard page gate | `{}` | **`{}`** |
+| dashboard leftover | `{}` | **`{}`** |
+| guard triggers | 3 | **1** (`foreign_script` HEHE -> Chinese, retried to clean) |
+| chapter name check | 1 (expected, no `series_context`) | 1 (same) |
+| wall avg | 7.83 s | **6.07 s** (run-to-run timing variance) |
+
+The clean state reproduces on a second full sweep, with the lowest guard count and a faster wall time. Single-run latency
+varies with gateway/model load, so quote the 6-8 s range rather than one run.
