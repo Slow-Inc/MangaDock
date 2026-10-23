@@ -66,3 +66,17 @@ The batched canvas also recovered the `/SLAND -> ISLAND` repair that a cap of 4 
 Still **opt-in** (`MIT_OCR_REREAD=1`) because there is still a latency tradeoff (the loop rule: tradeoff -> opt-in), but
 it is now a cheap, bounded lever: +4 % wall for deterministic repairs of the lowest-confidence 10 % of source lines,
 with zero layout movement. Remaining check before a default decision: re-judge the tuned corpus (planned next).
+## Text-level A/B (new tool `tools/ocr_text_ab.py`)
+
+Rather than relying on the translation judge (noise-dominated), the 34 changed source lines were judged directly:
+"which read is the correct English OCR of the artwork?" (A = baseline, B = re-read).
+
+| outcome | count |
+|---|---|
+| **B (re-read) better** | **30 / 34 (88 %)** |
+| A (baseline) better | 2 (not reproducible in a per-pair recheck — judge variance) |
+| tie | 2 |
+
+Combined with the sweep (10 % of source strings improved, 2/39 layout changes, +0.33 s/page), this is the strongest
+evidence so far that the OCR second pass improves quality rather than churning it. The tool is committed with tests
+(`test_ocr_text_ab.py`) and can A/B any two doctor dirs, so future OCR levers get the same objective check.

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 178 — OCR re-read wins the text-level A/B: 30/34 lines better (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/ocr_text_ab.py` (+3 tests): judges two doctor dirs' changed source lines directly ("which is the correct OCR of the artwork?"). On baseline vs re-read: **B (re-read) better 30/34 (88 %)**, 2 baseline wins that did not reproduce in a per-pair recheck (judge variance), 2 ties.
+- This gives the OCR second pass an objective quality signal independent of the noisy translation judge; benchmark updated. Still opt-in (`MIT_OCR_REREAD=1`) per the tradeoff rule (+0.33 s/page), with much stronger evidence behind it now.
+
+---
+
 ## MIT quality loop, round 177 — OCR second pass batched: same repairs at +0.33 s/page (4 % wall) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
