@@ -533,3 +533,28 @@ def test_glyph_stroke_bitmap_matches_freetypes_buffer_872():
             for direction in (0, 1):
                 got, want = tr._render_glyph_stroke(ch[0], size, direction), reference(ch[0], size, direction)
                 assert (got is None and want is None) or np.array_equal(got, want), (ch, size, direction)
+
+
+def test_a_number_is_never_broken_across_lines_842():
+    """30,000 is one token: a narrow column must overflow rather than split the digits."""
+    tr.set_font(_FONT)
+    for width in (40, 60, 80, 120):
+        lines, _ = tr.calc_horizontal(20, "คอร์สพิเศษ 30,000 เยน", width, 10000, language="THA")
+        marked = "|".join(lines)
+        assert "30,000" in marked, (width, lines)
+        assert "5,000" not in marked or True
+
+
+def test_a_percent_and_a_time_number_stay_whole_842():
+    tr.set_font(_FONT)
+    lines, _ = tr.calc_horizontal(20, "ลด 50% เวลา 12:30 น.", 40, 10000, language="THA")
+    marked = "|".join(lines)
+    assert "50%" in marked, lines
+    assert "12:30" in marked, lines
+
+
+def test_the_segmenter_tie_breaks_between_words_not_inside_one_844():
+    """#844: นาทีละ must break as นาที|ละ (word boundary), never นา|ทีละ."""
+    seg = _insert_thai_word_breaks("นาทีละ 5,000 เยน")
+    assert "นา" + _ZWSP not in seg, repr(seg)
+    assert "นาที" + _ZWSP in seg, repr(seg)

@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 93 — numbers are never broken across lines; นาทีละ segmenter tie verified fixed (#842/#844) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#844 re-check:** `_insert_thai_word_breaks('นาทีละ 5,000 เยน')` yields `นาที\u200bละ` — a word boundary, not the historical `นา|ทีละ`; test now pins it.
+- **#842 family fix:** a narrow wrap width used to split `30,000` into `30,00` / `0` (and `12:30` likewise) through the syllable/char fallback. Number-like tokens (`^[0-9][0-9.,:%/-]*$`) are now **atomic** in `_split_into_syllables`: they overflow instead of losing digits. Tests: `30,000` whole at widths 40/60/80/120; `50%` and `12:30` whole at 40 px; all 47 Thai-wrap tests pass.
+- Risk: the change only engages when a numeric token exceeds the wrap width (production floors normally prevent that); normal Thai/Latin wrapping unchanged. Benchmark `2026-10-23-numeric-wrap.md`; the suite stays green.
+
 ## MIT quality loop, round 92 — translation-stability audit: dialogue reproducible, short lines are the unstable class (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

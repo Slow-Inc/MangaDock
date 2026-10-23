@@ -16,6 +16,8 @@ from ..utils import BASE_PATH, is_punctuation
 from ..line_break import find_optimal_line_breaks
 
 # ── Thai word segmentation (optional) ────────────────────────────────────────
+#: Number-like tokens (5,000 / 30,000 / 12:30 / 50%) must never be split across lines.
+_NUMERIC_TOKEN = re.compile(r'^[0-9][0-9.,:%/\\-]*$')
 _THAI_RE = re.compile(r'[\u0E00-\u0E7F]')
 _ZWSP = '\u200b'
 try:
@@ -876,6 +878,11 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
     syllables = []
     hyphenator = select_hyphenator(language)
     for word in words:
+        if _NUMERIC_TOKEN.match(word.strip()):
+            # #842/#844: splitting a number is never acceptable (no meaningful hyphenation),
+            # so keep it atomic even if it overflows max_width.
+            syllables.append([word])
+            continue
         new_syls = []
         if hyphenator and len(word) <= 100:
             try:
