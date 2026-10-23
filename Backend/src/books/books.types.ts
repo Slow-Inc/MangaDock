@@ -20,6 +20,8 @@ export type MangaDetail = {
   genres: string[];
   /** Description extracted from MangaDex attributes */
   description?: string;
+  /** MangaDex content rating (#1101): the popup badges erotica/pornographic as 18+. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 export type MangaPreview = {
@@ -76,6 +78,8 @@ export type LandingBook = {
   categories: string[];
   averageRating: number;
   ratingsCount: number;
+  /** MangaDex content rating (#1101): the frontend badges erotica/pornographic as 18+. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 export type LandingRow = {
