@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 92 — translation-stability audit: dialogue reproducible, short lines are the unstable class (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New reusable metric/tool `tools/stability_audit.py`: translate a page 3x, match by source, measure min pairwise similarity per segment (stable >= 0.85 / moderate 0.5-0.85 / unstable < 0.5).
+- **Results:** Boku p0 16 segments -> 6 stable / 3 moderate / **7 unstable**; Otome p0 and Maou p0 have **0 unstable** (only synonym-level paraphrase). Boku's unstable set is concentrated in short interjection lines (`SOR`, `MAN..`, `OH..`, `Siiig`) where wording naturally varies.
+- **One real semantic drift found:** `IVE GOT ALLERGIES SO I DONT EAT SNACKS.` -> `ฉันแพ้ของกินเล่น...` (2 runs) vs `ฉันแพ้สารอาหารในขนม...` (wrong sense). A garbled variant (`ทักคู้บ`) also appeared on an unstable line — instability and garbling co-occur on that segment class.
+- **Decision:** self-consistency would mostly target low-value short lines for a second page call, so it remains an idea (restrict to short segments if ever tried); the audit becomes a regression metric. Benchmark `2026-10-23-stability-audit.md`.
+
 ## MIT quality loop, round 91 — neighbour-context hint for segment retry: tried, did not reproducibly help, reverted (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
