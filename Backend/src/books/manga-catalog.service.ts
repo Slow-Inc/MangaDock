@@ -14,6 +14,7 @@ import {
   type MangaDetail,
   type MangaPreview,
 } from './books.types';
+import { OFF_SCOPE, type RatingScope } from '../common/content-rating';
 
 const QUERY_CACHE_PREFIX = 'books:query:';
 /** Year-range search scans upstream in MangaDex-max pages, capped (#661). */
@@ -40,8 +41,9 @@ export class MangaCatalogService {
   getMangaChapters(
     mangaId: string,
     forceLocal = false,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<MangaChapter[]> {
-    return this.mangaDex.getMangaChapters(mangaId, forceLocal);
+    return this.mangaDex.getMangaChapters(mangaId, forceLocal, scope);
   }
 
   getMangaChapterPages(
@@ -51,20 +53,33 @@ export class MangaCatalogService {
     return this.mangaDex.getMangaChapterPages(chapterId, forceLocal);
   }
 
-  getMangaPreview(mangaId: string): Promise<MangaPreview | null> {
-    return this.mangaDex.getMangaPreview(mangaId);
+  getMangaPreview(
+    mangaId: string,
+    scope: RatingScope = OFF_SCOPE,
+  ): Promise<MangaPreview | null> {
+    return this.mangaDex.getMangaPreview(mangaId, scope);
   }
 
   getMangaDetail(mangaId: string, forceLocal = false): Promise<MangaDetail> {
     return this.mangaDex.getMangaDetail(mangaId, forceLocal);
   }
 
-  getNewReleases(page = 1, limit = 28, tag?: string) {
-    return this.mangaDex.getNewReleases(page, limit, tag);
+  getNewReleases(
+    page = 1,
+    limit = 28,
+    tag?: string,
+    scope: RatingScope = OFF_SCOPE,
+  ) {
+    return this.mangaDex.getNewReleases(page, limit, tag, scope);
   }
 
-  getGenreManga(slug: string, page = 1, limit = 28) {
-    return this.mangaDex.getGenreManga(slug, page, limit);
+  getGenreManga(
+    slug: string,
+    page = 1,
+    limit = 28,
+    scope: RatingScope = OFF_SCOPE,
+  ) {
+    return this.mangaDex.getGenreManga(slug, page, limit, scope);
   }
 
   async getRelated(id: string, limit = 10): Promise<LandingBook[]> {
@@ -101,13 +116,14 @@ export class MangaCatalogService {
     status?: 'ongoing' | 'completed' | 'hiatus',
     yearFrom?: number,
     yearTo?: number,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{ items: LandingBook[]; total: number }> {
     const cacheKey = `${QUERY_CACHE_PREFIX}${query
       .toLowerCase()
       .replace(
         /\s+/g,
         '_',
-      )}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:yf${yearFrom}` : ''}${yearTo != null ? `:yt${yearTo}` : ''}:${offset}:${limit}`;
+      )}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:yf${yearFrom}` : ''}${yearTo != null ? `:yt${yearTo}` : ''}:${offset}:${limit}${scope.key}`;
 
     const cached = await this.cache.get<{
       items: LandingBook[];
@@ -137,8 +153,9 @@ export class MangaCatalogService {
           offset,
           status,
           inYearRange,
+          scope,
         )
-      : await this.searchPage(query, lang, limit, offset, status);
+      : await this.searchPage(query, lang, limit, offset, status, scope);
 
     // Enhance: also match user-uploaded alt names in chapter_versions. First page only — appended to
     // every page they repeated on each one and pushed later pages past `limit` (#661).
@@ -148,7 +165,7 @@ export class MangaCatalogService {
         const altMatches = await this.findTitleIdsByAltName(query);
         const newIds = altMatches.filter((id) => !existingIds.has(id));
         if (newIds.length > 0) {
-          let extra = await this.mangaDex.fetchMangaByIds(newIds);
+          let extra = await this.mangaDex.fetchMangaByIds(newIds, scope);
           if (hasYearRange) extra = extra.filter(inYearRange);
           result.items.push(...extra);
           result.total += extra.length;
@@ -186,6 +203,7 @@ export class MangaCatalogService {
     offset: number,
     status: 'ongoing' | 'completed' | 'hiatus' | undefined,
     inYearRange: (b: LandingBook) => boolean,
+    scope: RatingScope,
   ): Promise<{ items: LandingBook[]; total: number }> {
     const matches: LandingBook[] = [];
     for (
@@ -199,6 +217,7 @@ export class MangaCatalogService {
         YEAR_SCAN_PAGE_SIZE,
         upstreamOffset,
         status,
+        scope,
       );
       matches.push(...items.filter(inYearRange));
       if (

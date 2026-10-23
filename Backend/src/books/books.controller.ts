@@ -26,6 +26,10 @@ import {
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
 import { verifyTurnstileToken } from '../auth/turnstile.verify';
 import { queryInt } from '../common/query-int';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
+import type { MaybeAuthenticatedRequest } from '../auth/authenticated-request';
+import { ContentLevelService } from '../content/content-level.service';
+import { ratingScope, type RatingScope } from '../common/content-rating';
 
 @Controller('books')
 export class BooksController {
@@ -34,7 +38,19 @@ export class BooksController {
   constructor(
     private readonly booksService: BooksService,
     private readonly statsIncrement: StatsIncrementService,
+    private readonly contentLevels: ContentLevelService,
   ) {}
+
+  /**
+   * Which MangaDex ratings this caller may see (#1101): from their stored 18+ level, never from the request;
+   * anonymous callers are `off`. `adultOnly` is the search page's "เฉพาะ 18+" filter.
+   */
+  private async scopeOf(
+    req: MaybeAuthenticatedRequest,
+    adultOnly = false,
+  ): Promise<RatingScope> {
+    return ratingScope(await this.contentLevels.getLevel(req.uid), adultOnly);
+  }
 
   @Post('verify-captcha')
   async verifyCaptcha(
@@ -82,7 +98,9 @@ export class BooksController {
   }
 
   @Get('new-releases')
-  getNewReleases(
+  @UseGuards(OptionalAuthGuard)
+  async getNewReleases(
+    @Req() req: MaybeAuthenticatedRequest,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('tag') tag?: string,
@@ -91,11 +109,14 @@ export class BooksController {
       queryInt(page, 1, { min: 1 }),
       queryInt(limit, 35, { min: 1, max: 100 }),
       tag,
+      await this.scopeOf(req),
     );
   }
 
   @Get('genre/:slug')
-  getGenreManga(
+  @UseGuards(OptionalAuthGuard)
+  async getGenreManga(
+    @Req() req: MaybeAuthenticatedRequest,
     @Param('slug') slug: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -104,6 +125,7 @@ export class BooksController {
       slug,
       queryInt(page, 1, { min: 1 }),
       queryInt(limit, 28, { min: 1, max: 100 }),
+      await this.scopeOf(req),
     );
   }
 
@@ -116,8 +138,12 @@ export class BooksController {
   }
 
   @Get('manga/:id/preview')
-  getMangaPreview(@Param('id') id: string) {
-    return this.booksService.getMangaPreview(id);
+  @UseGuards(OptionalAuthGuard)
+  async getMangaPreview(
+    @Req() req: MaybeAuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.booksService.getMangaPreview(id, await this.scopeOf(req));
   }
 
   @Get('manga/:id/cover')
@@ -136,11 +162,17 @@ export class BooksController {
   }
 
   @Get('manga/:id/chapters')
-  getMangaChapters(
+  @UseGuards(OptionalAuthGuard)
+  async getMangaChapters(
+    @Req() req: MaybeAuthenticatedRequest,
     @Param('id') id: string,
     @Query('forceLocal') forceLocal?: string,
   ) {
-    return this.booksService.getMangaChapters(id, forceLocal === 'true');
+    return this.booksService.getMangaChapters(
+      id,
+      forceLocal === 'true',
+      await this.scopeOf(req),
+    );
   }
 
   @UseGuards(TurnstileGuard)
@@ -362,7 +394,9 @@ export class BooksController {
   }
 
   @Get('search')
-  searchBooks(
+  @UseGuards(OptionalAuthGuard)
+  async searchBooks(
+    @Req() req: MaybeAuthenticatedRequest,
     @Query('q') query: string,
     @Query('lang') lang?: string,
     @Query('limit') limit?: string,
@@ -370,6 +404,7 @@ export class BooksController {
     @Query('status') status?: 'ongoing' | 'completed' | 'hiatus',
     @Query('yearFrom') yearFrom?: string,
     @Query('yearTo') yearTo?: string,
+    @Query('adult') adult?: string,
   ) {
     return this.booksService.searchBooks(
       query ?? '',
@@ -379,6 +414,7 @@ export class BooksController {
       status,
       queryInt(yearFrom, 0, { min: 0 }) || undefined,
       queryInt(yearTo, 0, { min: 0 }) || undefined,
+      await this.scopeOf(req, adult === 'only'),
     );
   }
 

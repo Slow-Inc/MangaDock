@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from './supabase/supabase.module';
+import { ContentModule } from './content/content.module';
 import { StorageModule } from './common/storage/storage.module';
 import { BooksModule } from './books/books.module';
 import { UsersModule } from './users/users.module';
@@ -36,6 +37,7 @@ import { validate } from './common/env.validation';
       validate,
     }),
     SupabaseModule,
+    ContentModule,
     StorageModule,
     CacheModule,
     BooksModule,
