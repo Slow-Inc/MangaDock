@@ -12,7 +12,7 @@ def test_a_clean_page_has_no_violations():
 
 
 def test_dropped_punctuation_is_flagged_but_an_interrobang_is_accepted():
-    kinds = [v["kind"] for v in check_page([_r("WHAT?!", "อะไร")])]
+    kinds = [v["kind"] for v in check_page([_r("WHAT?!", "ไปแล้ว")])]
     assert "dropped_?" in kinds and "dropped_!" in kinds
     assert check_page([_r("WHAT?!", "อะไร⁈")]) == []
 
@@ -54,7 +54,7 @@ def test_a_thai_question_particle_covers_a_dropped_question_mark():
 
 def test_a_punctuation_marble_inside_an_ocr_word_is_not_a_question_990e():
     assert check_page([_r("IF?YOU THINK ABOUT THATS QUITE SAD.", "ถ้าคิดแบบนั้น ก็ถือว่าเศร้ามากเลยนะ")]) == []
-    assert [v["kind"] for v in check_page([_r("WHY? ARE YOU SURE?", "ทำไม เธอแน่ใจ")])] == ["dropped_?"]
+    assert [v["kind"] for v in check_page([_r("WHY? ARE YOU SURE?", "เธอแน่ใจมาก")])] == ["dropped_?"]
 
 
 def test_a_question_mark_covers_an_exclamation_in_thai_990f():
@@ -69,3 +69,9 @@ def test_latin_names_shared_with_the_source_are_not_an_added_language_990h():
     assert check_page([_r("TRANSLATED BY DALE", "แปลโดย DALE")]) == []
     assert check_page([_r("TYPESETTING BY RTSD, ZERO", "จัดหน้าโดย RTSD, ZERO")]) == []
     assert [v["kind"] for v in check_page([_r("GO!", "ไปเลย GOING!")])] == ["added_latin"]
+
+
+def test_question_words_near_the_end_also_cover_a_dropped_mark_990i():
+    assert check_page([_r("DO YOU KNOW WHAT A DEMON LORD IS?", "รู้ไหมว่าจอมมารคืออะไร")]) == []
+    assert check_page([_r("ARENT THEY THE STRONGEST WIZARDS?", "พวกเขาไม่ใช่จอมเวทที่เก่งกาจที่สุดหรือไง")]) == []
+    assert check_page([_r("WHAT SHOULD I DO?", "ฉันควรทำอะไรสักอย่าง")]) == []  # อะไร mid-sentence is accepted as a question marker

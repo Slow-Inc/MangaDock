@@ -3,6 +3,16 @@
 
 ---
 
+## MIT quality loop, round 85 — fresh 8-page audit: guard caught a live CJK leak, gate question rule widened, fragment class recorded (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited 8 pages never used before (Kumo, Lv2 Cheat, Mushoku Tensei, Anta, Ki ni Natteru, Maou no Ore, Osoraku, Taida): gate-clean after one fix, judge raw mean **1.43/2** (53 segments).
+- **Guard true positive on live traffic:** the #903 foreign-script guard caught a Chinese leak (`...接连ไม่หยุด`), the segment was re-asked, and the shipped line is clean (`...ซ้ำแล้วซ้ำเล่า`).
+- **Gate fix:** two `dropped_?` on the Maou page were Thai questions whose marker is not at the string end (`...คืออะไร`, `...หรือไง`). The rule now looks at the final 16 characters and recognises `อะไร/ทำไม/ยังไง/เท่าไหร่/แค่ไหน`; re-gate = **0 violations on all 8 pages**, gate tests 12 green.
+- **Judge triage:** genuine flags are the **fragment class** (`ITS..`, `IN AN..`, `UNO?!`, trailing `S`) where the model commits to an unrelated word. No deterministic licence exists from the strings, so it is recorded as a known limitation rather than guarded.
+- **Housekeeping:** D: filled up mid-round; deleted the 2,722 regenerable `*.rendered.png`/`*.doctor.png` under `MIT/result` (4.36 GB) — all JSON evidence and corpus inputs kept.
+- Benchmark `2026-10-23-fresh8-audit.md`; #990 updated with the question-marker refinement.
+
 ## MIT quality loop, round 84 — live 10-page guard sweep: guards fire correctly, gate refined twice (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

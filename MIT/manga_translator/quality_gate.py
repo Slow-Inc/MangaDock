@@ -26,7 +26,8 @@ _PUNCT = ('!', '?', '…')
 #: Thai manga often drops the '?' when the sentence ends on a question particle; those count as preserved.
 #: OCR sometimes lands punctuation INSIDE a word ('IF?YOU THINK') - not a real question mark.
 _OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z0-9])\?(?=[A-Za-z0-9])')
-_THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|รึเปล่า|เปล่า|ไหน|งั้นเหรอ|จริงเหรอ)\s*[.!…]*$')
+#: Thai question markers can sit near the end rather than at the very end ('...คืออะไร', '...หรือไง'),
+_THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|เปล่า|ไหน|อะไร|ทำไม|ยังไง|เท่าไหร่|แค่ไหน)', re.UNICODE)
 
 
 def _thai_target(query, dst):
@@ -68,7 +69,7 @@ def check_page(regions, page='?'):
                     continue  # one interrobang covers both marks
                 if mark == '!' and '?' in dst:
                     continue  # a Thai rhetorical question keeps only the ?
-                if mark == '?' and _THAI_QUESTION.search(dst):
+                if mark == '?' and _THAI_QUESTION.search(dst[-16:]):
                     continue  # final Thai question particle carries the question
                 if mark == '…' and '...' in dst:
                     continue
