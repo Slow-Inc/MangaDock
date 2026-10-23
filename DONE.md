@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 221 — root fix for the Vercel docs-function size: exclude binaries from tracing; images restored (#1064) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Root cause of the 253.42 MB `docs` function: `Frontend/app/docs/page.tsx` scans the repo `docs/` tree, so Next traced every benchmark **image** into the function, though it only reads UTF-8 text and never serves binaries.
+- Added `outputFileTracingExcludes` for `/docs` (png/jpg/jpeg/webp/gif) in `Frontend/next.config.ts` (issue #1064). With images out of the bundle, the earlier downscaling workaround is unnecessary: **restored all 34 evidence images to their original size** (16.6 MB) so the docs evidence stays crisp.
+- Local `next build` could not run in this worktree (no node_modules); the config field is standard Next 12.3+ and Vercel/CI will validate it.
+
+---
+
 ## MIT quality loop, round 220 — evidence images downscaled to 900px for a ~244 MB docs function (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
