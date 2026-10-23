@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 95 — #899 investigated: grey-fill symptom gone at HEAD; the fix needs the erased background (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-measured the issue's real JP page: lettering is two-tone (dark ~41 / bright ~244 luma, 20 %/80 %), but the OCR colour head now samples the **dark** cluster (fg_l 8-44), not a mid-grey average — **the grey symptom does not reproduce at HEAD**.
+- Tried a pure bimodal fill heuristic (bright cluster as fill, dark as outline) behind an opt-in flag: it does not fire on this page, and a wider rule would also flip normal black-on-white lettering — no safe criterion from the lettering clusters alone. **Reverted, no code shipped.**
+- Remaining real risk: the rendered text is black over a bimodal background (black hair/white paper), so the dark half still has poor worst-case contrast. The correct fix must look at the **erased patch background** and pick the fill with the best minimum contrast (the issue's alternative), then gate on the 39-page replay. Benchmark `2026-10-23-899-bimodal-investigation.md`; #899 updated.
+
 ## MIT quality loop, round 94 — traceability pass over the open render issues: most are fixed and only waiting for merge (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
