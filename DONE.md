@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 153 — omission verifier full-corpus sweep: 33 pages, 85 long pairs, 2 true-positive flags; run-to-run instability documented (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full 39-page sweep: 33 pages had long lines (**85 long pairs**), 33 verifier calls, **2 flags both true positives** — the Akuyaku curiosity clause and a Komi `100 (IOO)` loss.
+- **Stability caveat:** the earlier 10-page probe also flagged Chainsaw `PAIZ` (paid); the full sweep did not re-flag it. Akuyaku flagged in both runs, the other two once each — fine for a report-only QA lead generator, not yet for an automatic retry trigger. Integration would need two-pass agreement + forced proof + wider precision sweep; documented in the probe note.
+
+---
+
 ## MIT quality loop, round 152 — semantic omission verifier prototyped: 2/2 true positives on long lines (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
