@@ -210,7 +210,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         if (!closingRef.current) {
           closingRef.current = true;
           setVisible(false);
-          setTimeout(onClose, 300);
+          // the same wait as handleClose: the desktop exit runs 400 ms, and a 300 ms unmount cut it short (#1060)
+          setTimeout(onClose, window.innerWidth < 768 ? 300 : 400);
         }
         return true;
       },
@@ -343,7 +344,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
       {/* Modal container */}
       <div
-        className={`relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-surface shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
+        className={`relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-surface shadow-2xl transition-[transform,translate,scale,rotate,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 md:hidden">
           <div

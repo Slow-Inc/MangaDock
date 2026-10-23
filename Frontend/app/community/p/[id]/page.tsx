@@ -393,7 +393,7 @@ export default function PostDetailPage() {
 
                   {menuOpen && (
                     <div
-                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-surface border border-line rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
+                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-surface border border-line rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform,translate,scale,rotate] duration-150 ease-out ${
                         menuVisible
                           ? "opacity-100 scale-100 translate-y-0"
                           : "opacity-0 scale-95 -translate-y-1"

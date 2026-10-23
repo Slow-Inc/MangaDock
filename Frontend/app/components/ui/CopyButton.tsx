@@ -29,8 +29,8 @@ export default function CopyButton({ value, label, className = "" }: { value: st
   return (
     <button type="button" onClick={copy} className={buttonClass("secondary", "sm", className)}>
       <span className="relative inline-flex h-4 w-4" aria-hidden>
-        <Copy className={`absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-[var(--t1)] ${state === "copied" ? "scale-50 opacity-0" : "opacity-100"}`} />
-        <Check className={`absolute inset-0 h-4 w-4 text-ok transition-[opacity,transform] duration-[var(--t1)] ${state === "copied" ? "opacity-100" : "scale-50 opacity-0"}`} />
+        <Copy className={`absolute inset-0 h-4 w-4 transition-[opacity,transform,translate,scale,rotate] duration-[var(--t1)] ${state === "copied" ? "scale-50 opacity-0" : "opacity-100"}`} />
+        <Check className={`absolute inset-0 h-4 w-4 text-ok transition-[opacity,transform,translate,scale,rotate] duration-[var(--t1)] ${state === "copied" ? "opacity-100" : "scale-50 opacity-0"}`} />
       </span>
       {label}
       <span role="status" aria-live="polite" className="sr-only">
