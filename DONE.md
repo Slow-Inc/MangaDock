@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 235 — leftover definition documented; dashboard named as source of truth (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Confirmed from the dashboard code that "leftover" covers `foreign_script`, `content_loss`, `untranslated_word`, `dropped_question`; older table rows used a narrower custom scan (which is why only the v6 row reports an `untranslated_word` leftover).
+- Added the definition footnote to the final baseline doc and restated the classes in the final report. No code change.
+
+---
+
 ## MIT quality loop, round 234 — CORRECTION: v6 leftovers are `{untranslated_word: 1}` (the rare leak), not {} (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

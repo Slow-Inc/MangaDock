@@ -149,3 +149,10 @@ The one real gate line is a **rare guard failure**: the source `DID ANYONE BRING
 (`material` -> `ATERIAL`), exhausting the budget. A direct A/B of three retry notes (none / current / stronger) on that
 line produced **0 Latin leaks in 9/9 samples**, so the leak is model variance rather than a weak note; no note change is
 justified. Every other gate item is the expected chapter-level name variance that `series_context` fixes in production.
+## Footnote: what "leftover" means in these tables
+
+The official `tools/quality_dashboard.py` counts live guard classes still firing **after** the retry loop:
+`foreign_script`, `content_loss`, `untranslated_word`, `dropped_question`. Rows in this document that predate v6 were
+either taken from the dashboard or from an equivalent custom scan; the v1/v2 rows labelled "foreign script / content
+loss / typo tokens" used that narrower custom set, which is why the v6 row is the first to report an
+`untranslated_word` leftover (the rare `ATERIAL` line). When in doubt, the dashboard output is the source of truth.
