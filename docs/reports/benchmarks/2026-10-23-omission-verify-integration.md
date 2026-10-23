@@ -111,3 +111,14 @@ An independent probe with the per-line verifier flagged the same pair **4/4 runs
 - The replay page took ~29.6 s wall (translation itself 5 ms because it is replayed): ~2 verifier round-trips (six
   candidates, two passes each, throttled to 3 concurrent) plus one re-ask call.
 - Still opt-in, and only runs for the custom_openai gateway translator; other translators skip it.
+## Live probe after the fixes (2 pages, no false flags)
+
+Ran two live pages (Akuyaku p0/p1) with the working pass:
+
+- `entered candidates=6, agreed=[]` / `entered candidates=2, agreed=[]` — both pages' live translations were complete, so the
+  verifier flagged nothing (no false positives on these two pages).
+- Wall 29.5 s / 14.8 s; the first page includes model loading. The added verifier cost is ~8-12 s per page with long
+  lines, which is why the pass stays opt-in.
+
+Precision on genuinely omitted lines is proven by the replay test (one flagged line, restored); precision on clean pages
+is supported by this probe but needs a wider sweep before any default discussion.

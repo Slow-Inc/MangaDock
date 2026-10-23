@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 212 — omission pass live probe: no false flags on two clean pages; cost still high (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Live probe of the fixed pass on Akuyaku p0/p1: `agreed=[]` on both (their live translations were complete) — no false flags; wall 29.5 s / 14.8 s with ~8-12 s of verifier cost per page with long lines.
+- Precision on true omissions remains the replay proof from round 211; a wider sweep is still needed before discussing a default. No code change; benchmark updated.
+
+---
+
 ## MIT quality loop, round 211 — omission pass: three real bugs fixed; deterministic replay proof (CORRECTION) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
