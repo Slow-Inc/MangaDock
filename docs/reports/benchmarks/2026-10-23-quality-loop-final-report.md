@@ -36,6 +36,9 @@ benchmarks linked below.
 
 - `MIT_BATCH_PIPELINE=1` (1.46×, no per-page progress), `MIT_PRELOAD=1` (first page 21.5→18.1 s, holds VRAM),
   `MIT_SEGMENT_RETRY=1`, `MIT_CONTEXT_PAGES`, `MIT_TEMPERATURE` (0.2 A/B inside the noise band), render knobs.
+- **`MIT_OMISSION_VERIFY=1`** (2026-10-23 late): semantic verifier for long lines, two agreeing schema-enforced passes,
+  re-ask only what it agrees is missing. Deterministic replay proof (clause restored), 0 false flags in 19 clean
+  candidates, ~2 verifier requests + 1 re-ask per page on long-line pages. Opt-in because of that latency.
 
 ## Rejected with evidence (do not rebuild)
 
@@ -61,3 +64,6 @@ cd MIT && .venv/Scripts/python.exe tools/doctor_page.py <pages> --target THA --s
 ```
 
 PR: #794 (draft, mergeable). CI: logic gate / heavy ML / backend green; Vercel is an external rate limit.
+
+Latest test count: **978 passed** (omit the torch-contract test). All end-state numbers above are from the v4 sweep;
+the omission pass is opt-in and not part of those numbers.

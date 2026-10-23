@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 217 — final report now includes the omission pass; suite count refreshed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `2026-10-23-quality-loop-final-report.md` gained the opt-in omission-verification entry (replay TP proof, 0/19 clean-page flags, cost) and the current test count (978). No code change.
+
+---
+
 ## MIT quality loop, round 216 — omission pass added to PR body/comment with TP+FP evidence (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
