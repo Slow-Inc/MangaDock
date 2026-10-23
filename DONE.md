@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 111 — final post-default regression: 1.48/2 with all guards on (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 8 fresh pages with every guard at its default (foreign-script + salvage, negation, runaway, filler, lost/rare, dropped_question, untranslated_word, content_loss, contract, series name memory, filter-after-strip): **gate 0 violations, judge 86 segments mean 1.48/2, one 0-score**, and only **1 glitch trigger** (a content_loss true positive on an OCR-merged credit line).
+- Baseline holds: full corpus 1.44/2, previous post-default sweep 1.48. The guard profile is now quiet on ordinary pages (the earlier 7-trigger sweep deliberately used defect-rich pages).
+- All eight guards sit at their evidence-based default with escape-hatch flags and forced-injection/unit proofs; opt-in list unchanged (batch pipeline, preload, widen columns, segment retry, fit-below-floor, concise bubbles, context pages). Benchmark `2026-10-23-post-default-regression-48.md`.
+
 ## MIT quality loop, round 110 — content-loss guard forced-proven, FP source fixed, promoted to default (#1058) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
