@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 253 — rendered-PNG acceptance: real outputs, zero layout telemetry, gate 0 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Final pass with PNG rendering (late sweeps were text-only): two pages produced 1.81/1.13 MB annotated images and 1.51/0.92 MB rendered images; render telemetry all zeros (`spill/overlap/small_font/suppressed`) and gate 0. Confirms the shipped pipeline renders real pages end-to-end after every late change.
+
+---
+
 ## MIT quality loop, round 252 — stability-audit logic extracted and unit-tested (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -198,3 +198,12 @@ distribution 0/1/2 = 8 / 145 / 216  (broken 2.2 % — best of any sweep / partia
 
 Raw now reads **1.42-1.44** across the v1-v7 runs (run-to-run judge noise); the strict-adjusted stays inside
 **1.53-1.60**, and the broken share is the lowest measured (8 segments, 2.2 %).
+## Rendered-PNG acceptance (round 200, current head)
+
+Late sweeps used `--no-png` (text-only); one final pass rendered real PNGs for two pages (Akuyaku p0, Tsuki p0):
+
+- Outputs exist and are non-trivial: `doctor.png` **1.81 / 1.13 MB**, `rendered.png` **1.51 / 0.92 MB**.
+- Render telemetry: `root=0 inherited=0 spill=0 overlap=0 small_font=0 suppressed=0` -> **OK** on both pages.
+- Gate: `pages=2 violations=0`.
+
+So the shipped pipeline produces real rendered pages, not only translated text, with no layout telemetry outliers.
