@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 99 — #1050 decided: the overlap already exists at page granularity (#905); in-page threading rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the single-page overlap opportunity (mask+inpaint 0.70 s/page, independent of translation) against the batch pipeline: `run_pipelined` already runs page i's **back stages (mask/inpaint/render) concurrently with page i+1's translation** — the same overlap at chapter granularity (1.37x in-process measured earlier).
+- **In-page threading rejected:** redundant for chapter throughput, and running GPU back stages + model unloaders in a worker thread next to the event loop is a reliability risk for ~0.5-0.9 s/page on one path. #1051 (default ON this round) already removed the original blocker, so the door is open if a single-page client ever needs it.
+- Recommendation recorded: enable the batch pipeline for chapter jobs that do not need per-page live progress (`MIT_BATCH_PIPELINE=1`, plus the quality wins of context + glossary); revisit the default when the Backend progress UX stops depending on per-page callbacks.
+- Benchmark `2026-10-23-1050-overlap-decision.md`; **#1050 closed as superseded by #905** with this rationale.
+
 ## MIT quality loop, round 98 — #1051 implemented correctly: filter after the noise strip, default ON; unblocks #1050 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
