@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 174 — unclip_ratio 2.6 A/B: fixes DEFEND locally, overall parity, default unchanged (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested the knob that grows the detector box without moving layout (`unclip_ratio` 2.3 -> 2.6) on the full 39-page corpus with the judge.
+- It **fixes the DEFEND case** (Otome 0.80 -> 1.40; Taida 1.25 -> 2.00; Kumo 1.00 -> 2.00) but changes **119/365 source strings (32.6 %)**, **8/39 page layouts**, and lands at **judge 1.39 vs 1.44** (inside the noise band; page wins 19 / losses 16) with losses as real as the wins (Tsuki 1.79 -> 1.14).
+- **Default stays 2.3**; documented as an investigation knob (`2026-10-23-unclip-ratio-ab.md`). Root fix remains localized re-detection around suspicious lines. No code change.
+
+---
+
 ## MIT quality loop, round 173 — same-crop OCR re-read tested and disproven; the fix is detector box geometry (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
