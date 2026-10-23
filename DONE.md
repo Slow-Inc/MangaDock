@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 213 — omission pass: 0 false positives across 6 clean pages (9 candidates) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wider clean-page sweep (Boku/Horimiya/Mieruko/Iruma/Mushoku/Dungeon): 9 long-line candidates, **agreed=[] on every page** — no false flags on complete translations.
+- Together with the replay true-positive this gives deterministic TP evidence + a 0/9 clean-page FP sample; wall 14-23 s/page with ~4-8 s verifier cost when candidates exist. Still opt-in; full-corpus sweep + judge comparison remain the gate for any default.
+
+---
+
 ## MIT quality loop, round 212 — omission pass live probe: no false flags on two clean pages; cost still high (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

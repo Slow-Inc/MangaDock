@@ -122,3 +122,17 @@ Ran two live pages (Akuyaku p0/p1) with the working pass:
 
 Precision on genuinely omitted lines is proven by the replay test (one flagged line, restored); precision on clean pages
 is supported by this probe but needs a wider sweep before any default discussion.
+## Wider clean-page sweep (6 pages, 9 long-line candidates)
+
+Ran six more pages across series with the flag on (Boku, Horimiya, Mieruko, Iruma, Mushoku, Dungeon):
+
+| page candidates | agreed |
+|---|---|
+| 1, 2, 3, 1, 0, 2 (9 total) | **0 on every page** |
+
+Every candidate pair was a complete translation, and the verifier flagged none — **no false positives in 9 candidates**
+across six clean pages. Combined with the replay true-positive (one flagged line restored), the evidence is now:
+true-positive proven deterministically, false-positive rate on clean pages 0/9 in this sample.
+
+Cost per page stayed in the 14-23 s wall range (verifier adds ~4-8 s when candidates exist; a page with 0 candidates
+adds nothing). The pass stays opt-in until a full-corpus sweep and a translation-judge comparison are run.
