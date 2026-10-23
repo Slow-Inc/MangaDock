@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 147 — clause-omission guard measured and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined 7,080 real segments with a Thai/English word-count ratio (pythainlp): median 1.14, p10 0.80. The low tail is **titles/credits** (correct but compact); a dropped clause inside a long sentence stays around 0.7-0.9, inside the normal band.
+- **No guard added** — a word-ratio predicate would fire on titles and miss real omissions; recorded in `2026-10-23-clause-omission-rejected.md` so it is not rebuilt without a different signal.
+
+---
+
 ## MIT quality loop, round 146 — debugger-hook audit completed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
