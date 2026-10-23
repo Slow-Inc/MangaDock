@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 204 — consider guard FP scan: 2 hits / 19,327 regions, inventory updated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned all stored doctor dirs with the new predicate: **19,327 regions, exactly 2 hits**, both the known bad `CONSIDER BUYING` renderings — **zero false positives**.
+- Updated the vault guard inventory (11 default-ON classes) and posted a PR comment with the FP scan and the natural retry proof. No code change.
+
+---
+
 ## MIT quality loop, round 203 — new guard `consider_as_please`: natural retry turned กรุณาซื้อ into ลองพิจารณาซื้อ (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

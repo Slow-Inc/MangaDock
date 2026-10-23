@@ -25,3 +25,7 @@ final shipped: ลองพิจารณาซื้อฉบับพิม�
 
 The guard fired on the bad rendering and the re-ask produced the correct suggestion wording. Trigger test added
 (`test_consider_as_please_is_reasked_1040`); full suite 967 passed.
+## False-positive scan
+
+Scanned **19,327 stored regions** across every doctor dir in the repo: the predicate fires exactly **2 times**, both the
+known bad `CONSIDER BUYING ...` renderings — zero false positives on corpus.

@@ -59,7 +59,7 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - **อัปเดต v3 (หลัง OCR pass + tag licence):** gate เหลือ **1 (`dropped_!` จริง)** + **leftover {}**; wall 8.03s (รันเดียว, variance)
 
 ### Guard inventory (default ON ทั้งหมด, มี env ปิด)
-- `foreign_script` + leaked-script salvage (#903) · `negation_lost` (#898) · `runaway` (#901) · `spurious_filler` (#1039) · `lost_as_rare` (#1052) · `dropped_question` (#1056) · `untranslated_word` (#1057) · `content_loss` (#1058) · numbered-contract (#1026) · series name memory (#980)
+- `foreign_script` + leaked-script salvage (#903) · `negation_lost` (#898) · `runaway` (#901) · `spurious_filler` (#1039) · `lost_as_rare` (#1052) · `dropped_question` (#1056) · `untranslated_word` (#1057) · `content_loss` (#1058) · `consider_as_please` (2026-10-23, CONSIDER→กรุณา) · numbered-contract (#1026) · series name memory (#980)
 - ต้นทุนรวมทุก predicate: **0.025 ms/segment, 0.43 ms/หน้า** — คุณภาพไม่แลกความเร็ว; จ่ายเฉพาะ retry เมื่อยิง
 - วินัย: predicate → trigger (`_is_glitched`) → note (`_modify_invalid_translation_query`) + direct trigger test; default ต้องมี **forced-injection proof** (`tools/forced_guard_bench.py`) หรือ natural sweep; threshold อิงหางที่วัด (content_loss 0.45 vs p10 0.66)
 
@@ -104,3 +104,4 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - fix เพิ่มรอบท้าย: interjection ไม่ถูกนับเป็นชื่อ (`HEHE` เคยทำให้ series memory เรียน `HEHE→เข่า`), `ไม→ไม่` กันชื่อ Mai, OCR pass fail-open/float hardening, gate+guard ใช้ tag-question licence เดียวกัน
 - ตัวเลข judge ยังคง raw **1.44** / strict-adjusted **1.55–1.60** (v4 ไม่ได้ re-judge; การเปลี่ยนกระทบเฉพาะ OCR source และ retry ที่หายาก)
 - CI เขียวทุก job (Vercel เหลือ external rate limit); PR #794 draft/mergeable, base #642 ยังไม่ merge
+- **`consider_as_please` (2026-10-23):** `CONSIDER BUYING ...` -> `กรุณาซื้อ...` (suggestion -> request) เกิด 2/6 renderings; predicate ตรวจ exact licence (src CONSIDER ไม่มี PLEASE, Thai กรุณา ไม่มี พิจารณา) — สแกน 19,327 regions เจอเฉพาะ 2 เคสจริง **FP 0**; natural run guard ยิงแล้ว retry ได้ `ลองพิจารณาซื้อฉบับพิมพ์`
