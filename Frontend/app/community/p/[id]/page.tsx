@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from "react";
 import PostImage from "../../../components/PostImage";
+import PostImageViewer from "../../../components/PostImageViewer";
 import Mascot from "../../../components/mascot/Mascot";
 import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
@@ -84,6 +85,7 @@ export default function PostDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+  const [viewerAt, setViewerAt] = useState<number | null>(null); // the post image open full size (#1094)
 
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostTitle, setEditPostTitle] = useState("");
@@ -538,12 +540,13 @@ export default function PostDetailPage() {
                   const trimmed = url.trim();
                   const safeUrl = /^\s*(javascript|data|vbscript|file):/i.test(trimmed) ? '#' : trimmed;
                   return (
-                  <a
+                  <button
                     key={i}
-                    href={safeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`relative block overflow-hidden bg-fill rounded-lg group ${
+                    type="button"
+                    onClick={() => setViewerAt(i)}
+                    disabled={post.category === 'spoiler' && !spoilerRevealed}
+                    aria-label={`ดูรูปที่ ${i + 1} ขนาดใหญ่`}
+                    className={`relative block w-full overflow-hidden bg-fill rounded-lg group ${
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
@@ -553,9 +556,12 @@ export default function PostDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </div>
-                  </a>
+                  </button>
                   );
                 })}
+                {viewerAt !== null && (
+                  <PostImageViewer urls={post.imageUrls} start={viewerAt} onClose={() => setViewerAt(null)} />
+                )}
               </div>
             )}
 
