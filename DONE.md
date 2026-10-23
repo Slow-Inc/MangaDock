@@ -77,6 +77,21 @@
 
 ---
 
+## #1053 Hover scale animates instead of snapping on /new, /mylist, /categories (2026-10-23)
+
+**What:** the developer saw low-fps hover on the `MangaGrid` pages but smooth hover on Home. Measured per frame on a
+production build: the cover image scaled over 26 frames, the card around it had **0** in-between frames — it jumped
+1 → 1.05. Tailwind v4's `scale-*` / `translate-*` / `rotate-*` set the CSS `scale` / `translate` / `rotate`
+properties, and `.smooth-hover` / `.smooth-hover-fast` only transitioned `transform`, so those never animated (Home's
+`BookRow` uses Tailwind's `transition`, which includes `scale`). No frame was dropped; the snap around a gliding image
+read as stutter. Both classes now transition `scale` / `translate` / `rotate` at the existing `transform` timing — which
+also fixes the search-page cards, the `active:scale-95` buttons and the Studio landing cards' lift.
+
+**Validated:** per-frame probe on `/new` and `/categories/action`: card in-between frames 0 → 12 (in + out), image
+unchanged at 26. The developer can try it on the running build.
+
+---
+
 ## #1048 Light mode: the logo keeps its "Manga"; the empty upload slot loses its scrim (2026-10-23)
 
 **What:** a light-mode sweep for #778 (23 user-facing routes × 1440/390 px, production build, local fake session:
