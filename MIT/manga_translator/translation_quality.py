@@ -423,7 +423,14 @@ def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
 #: English tag-question endings: the '?' is a discourse particle ('..., y know?'), and Thai renders it with a particle
 #: or exclamation without a question marker. Measured: `ITS JUST AINT FAIR, YKNOW?` came back as
 #: `มันไม่แฟร์เลยนะเนี่ย!` and survived two re-asks, so the class is licensed.
-_EN_TAG_QUESTIONS = re.compile(r"\b(?:YKNOW|YOU\s+KNOW|RIGHT|EH|HUH|OK|OKAY|HMM)\s*[?.!]*\s*$", re.I)
+_EN_TAG_QUESTIONS = re.compile(
+    r"(?:"
+    r"\b(?:YKNOW|YOU\s+KNOW|RIGHT|EH|HUH|OK|OKAY|HMM)\s*[?.!]*\s*$"
+    # Standalone / comma-attached opinion tags (#1066-style): "..., SEE?" "SEE?" "... UNDERSTAND?"
+    r"|(?:^|,\s*)(?:SEE|UNDERSTAND|GOT\s+IT|CAPEESH|DIG)\s*[?.!]*\s*$"
+    r")",
+    re.I,
+)
 
 #: Thai question markers: explicit '?' or a question particle/word.
 _THAI_Q_MARKERS = re.compile(

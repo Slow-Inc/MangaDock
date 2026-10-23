@@ -382,3 +382,13 @@ def test_rhetorical_retorts_are_not_questions_1033():
     assert not is_retort_question('ARE YOU OK?')
     assert not is_retort_question('DONT YOU THINK WE SHOULD GO HOME TONIGHT?')
     assert dropped_question('IS THAT SO?', 'มันเป็นอย่างนั้นจริงๆ')
+
+
+def test_opinion_tags_are_not_dropped_questions_1066():
+    from manga_translator.translation_quality import dropped_question, is_tag_question
+    # measured on an unseen Kaguya page: this line retried twice before the tag licence
+    assert is_tag_question("THATS WHY EVERYONES READING, SEE?")
+    assert is_tag_question("SEE?")
+    assert is_tag_question("YOU KNOW WHAT I MEAN, UNDERSTAND?")
+    assert not is_tag_question("CAN YOU SEE?")
+    assert not dropped_question("THATS WHY EVERYONES READING, SEE?", "นั่นแหละที่ทุกคนกำลังอ่านอยู่ไง")

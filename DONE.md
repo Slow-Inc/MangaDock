@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 260 — opinion-tag licence (SEE?/UNDERSTAND?) removes 2 retries on an unseen page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Kaguya pages: gate 0, render telemetry all zeros, but `THATS WHY EVERYONES READING, SEE?` retried twice (19 s translation) for an opinion tag the licence list lacked. Extended `is_tag_question` to standalone/comma-attached SEE / UNDERSTAND / GOT IT / CAPEESH / DIG; real questions (`CAN YOU SEE?`) remain guarded.
+- Re-run: **no guard trigger**, gate 0, translation 5.4 s (was 19.2 s). Test added; suite **990 passed**.
+
+---
+
 ## MIT quality loop, round 259 — generalization test on a brand-new real manga page (Kaguya ch.11) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

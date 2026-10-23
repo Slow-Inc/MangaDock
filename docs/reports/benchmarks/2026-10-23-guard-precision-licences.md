@@ -50,3 +50,12 @@ The v6 sweep's one real leftover was an `untranslated_word` case where **both** 
   glitches are transient and usually fixed on the first retry, so the third attempt mostly adds latency.
 - Decision: **keep 2**. Revisit only if future sweeps show repeated leaks surviving two retries (then the fix should name
   the leaked token in the retry note rather than just raising the budget).
+## Opinion tags: `SEE?` / `UNDERSTAND?` licensed (round 211, from unseen-page testing)
+
+Generalization test on four unseen Kaguya pages (chapter 11) found `THATS WHY EVERYONES READING, SEE?` retried twice
+(19 s of translation on that page) while both attempts shipped the same meaning with the Thai assertion particle `ไง`.
+`SEE?` is an opinion tag like `RIGHT?`/`HUH?`, so `is_tag_question` now also accepts a standalone or comma-attached
+`SEE` / `UNDERSTAND` / `GOT IT` / `CAPEESH` / `DIG` tag. Real questions are untouched (`CAN YOU SEE?` is not a tag).
+
+- Re-ran the page: **no guard trigger**, gate 0, translation time 5.4 s (was 19.2 s when the retries fired).
+- Other three pages: gate 0, render telemetry all zeros. Tests added; suite **990 passed**.
