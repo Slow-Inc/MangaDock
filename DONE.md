@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 168 — stress run: bad model batch (whole Chinese lines) left zero defects (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A full-corpus sweep hit a visibly worse model batch: **16 guard triggers** over 39 pages (vs 9 before), including **eleven whole-line Chinese answers** plus content-loss/question/filler hits.
+- Leftover scan of the final payloads: **0 foreign script, 0 content loss, 0 typo tokens**; gate 1 violation (expected `inconsistent_name` without `series_context`). The retry loop + extended-script salvage absorbed the bad batch entirely.
+- External model variance, not a code regression; strongest natural-traffic evidence for the guard set. Benchmark `2026-10-23-stress-run-guards.md`.
+
+---
+
 ## MIT quality loop, round 167 — master-plan critical item re-checked: readable-floor does not reproduce at HEAD (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
