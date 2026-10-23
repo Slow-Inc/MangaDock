@@ -1,0 +1,16 @@
+[
+  {
+    "width": 390,
+    "flow": "feed + collection CRUD + share + guest read + privacy revocation + item removal",
+    "result": "pass"
+  },
+  {
+    "width": 1280,
+    "flow": "feed + collection CRUD + share + guest read + privacy revocation + item removal",
+    "result": "pass"
+  },
+  {
+    "flow": "failed feed load and retry",
+    "result": "pass"
+  }
+]

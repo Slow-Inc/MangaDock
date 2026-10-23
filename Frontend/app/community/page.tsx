@@ -1,4 +1,5 @@
 "use client";
+import Link from 'next/link';
 
 import { useEffect, useState, useCallback, useRef, Suspense, useId } from "react";
 import { ROLE } from "../lib/types/user";
@@ -231,6 +232,7 @@ function CommunityContent() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="w-full sm:w-auto">
           <h1 className="text-3xl font-extrabold text-ink mb-1">คอมมูนิตี้</h1>
+          <Link href="/feed" className="inline-block py-2 text-sm text-accent underline underline-offset-4">ฟีดจากคนที่ติดตามและสำหรับคุณ</Link>
           <p className="text-ink-3 text-sm font-medium">พื้นที่แบ่งปันและพูดคุยเกี่ยวกับมังงะที่คุณรัก</p>
         </div>
         

@@ -121,7 +121,9 @@ Status is based on code in the default branch, dated engineering reports, and ou
 **Exit Criteria:** Core browsing, reading, and account journeys run in native screens without WebView dependency, while the web application continues to operate independently against the same backend.
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**Status:** WIP — first Android push client slice implemented on a feature branch; Backend delivery, provider configuration and device acceptance remain pending
+**Status:** WIP — Web feeds/collections and Backend push source locally verified on the Phase 5 branch; live migration, provider configuration and device acceptance remain pending
+
+**2026-10-24:** [Implementation, tests, screenshots and release gates](docs/reports/phase5-2026-10-24/README.md). Following and rule-ranked feeds, private/public collections and the durable server push contract/pipeline are implemented. Native/provider rollout remains disabled; this is not production acceptance.
 
 **2026-10-23:** [Mobile push contract and verification](Mobile/docs/2026-10-23-phase5-push.md). Rollout is disabled. This does not complete the Phase 5 feed, custom collections or multi-node notification delivery pipeline.
 
@@ -276,7 +278,9 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **เกณฑ์เสร็จสิ้น:** ผู้ใช้สามารถสำรวจมังงะ อ่านมังงะ และจัดการบัญชีผ่านหน้าจอ Native ได้โดยไม่ต้องพึ่ง WebView ขณะที่ Web App ยังทำงานแยกต่างหากบน Backend เดียวกัน
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**สถานะ:** WIP — เริ่ม slice แรกของ Android Push Client บน feature branch ยังต้องทำท่อส่ง Backend ตั้งค่า provider และรับผลบนอุปกรณ์
+**สถานะ:** WIP — ทำและตรวจ Feed/คอลเลกชันเว็บกับ source ท่อส่ง Backend Push บน branch Phase 5 แล้ว ยังรอ migration จริง ตั้งค่า provider และรับผลบนอุปกรณ์
+
+**2026-10-24:** [รายละเอียดการพัฒนา ผลทดสอบ ภาพหน้าจอ และเกณฑ์ก่อนเปิดใช้](docs/reports/phase5-2026-10-24/README.md) มี Following/Personalized Feed, คอลเลกชันส่วนตัว/สาธารณะ และสัญญา/ท่อส่ง Push แบบ durable แล้ว ยังปิด rollout และไม่อ้างตรวจรับ production
 
 **2026-10-23:** [สัญญาและผลตรวจ Mobile Push](Mobile/docs/2026-10-23-phase5-push.md) ยังปิด rollout ไม่ใช่ผลเสร็จของ Feed, Custom Collections หรือระบบส่งหลาย node ทั้ง Phase 5
 

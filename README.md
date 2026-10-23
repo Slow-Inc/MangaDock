@@ -1,4 +1,6 @@
 <!-- lang:en -->
+
+Phase 5 development: see the [implementation, local acceptance and release gates](docs/reports/phase5-2026-10-24/README.md). Run `npm run test:phase5` from `Backend/` for isolated database/HTTP/worker integration. Web routes: `/feed`, `/collections`, `/collections/:id`. Source is implemented; production migrations and real push acceptance remain pending.
 # MangaDock
 
 MangaDock is split into 3 main parts:
@@ -213,6 +215,8 @@ npx jest -c jest.ci.config.js --runInBand   # the exact CI command
 <!-- lang:end -->
 
 <!-- lang:th -->
+
+การพัฒนา Phase 5: ดู[รายละเอียด ผลตรวจภายในเครื่อง และขั้นตอนก่อนเปิดใช้](docs/reports/phase5-2026-10-24/README.md) รัน `npm run test:phase5` ใน `Backend/` เพื่อตรวจฐานข้อมูล/HTTP/worker แบบแยกจาก production มีหน้าเว็บ `/feed`, `/collections`, `/collections/:id` ทำ source แล้ว ยังรอ migration และรับ Push จริง
 # MangaDock
 
 MangaDock เป็นระบบที่แยกออกเป็น 3 ส่วนหลัก:

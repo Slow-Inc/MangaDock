@@ -1,5 +1,30 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-24 — Phase 5 retention and Backend push
+
+1. **What changed** — New `Backend/src/retention`, Web `/feed` and `/collections`, Push device/preferences service and worker, two transactional migrations. Existing Expo client is reused. / เพิ่ม Feed/คอลเลกชันเว็บและ Backend Push ใช้ client เดิม
+2. **Results / outcome** — Local creation/sharing/privacy revocation and feed flows work; server contract and durable dispatch pass isolated integration. No live rollout claimed. / ใช้ภายในเครื่องและตรวจสัญญาผ่าน ยังไม่รับผล production
+3. **Expected performance gain %** — Not measured; no percentage claimed. / ไม่วัดและไม่สมมติเปอร์เซ็นต์
+4. **Benefits** — Readers can follow discussions, rank relevant posts, organize manga and share selected lists. / ติดตามบทสนทนา จัดมังงะ และแชร์เฉพาะชุดที่เลือก
+5. **Purpose — what the refactor is for** — Implement authorized Phase 5 Web/Backend scope on the existing feature branch; not a general refactor. / พัฒนา Phase 5 ตามคำสั่งบน branch เดิม
+6. **Why we changed it + architectural impact** — Existing follow/inbox/client primitives lacked the new product journeys and delivery server. New modules attach at auth/Supabase/Redis seams. / ต่อส่วนที่ขาดผ่านขอบเขตระบบเดิม
+7. **Problems before the refactor** — No following/ranked feed, custom shareable lists, durable registration acknowledgement or server sender. / ขาด Feed คอลเลกชันและท่อส่ง Backend
+8. **Goals** — Private-by-default collections, authenticated ownership, ranking before paging and recoverable notification dispatch. / ส่วนตัวเป็นค่าเริ่มต้น ตรวจเจ้าของ จัดอันดับก่อนแบ่งหน้า และกู้คิวได้
+9. **Architecture Before** — Existing `user_follows`, favorites/history/series, community posts, inbox and rollout-disabled Expo client. / มีพื้นฐาน Follow และ inbox/client
+10. **Architecture After** — Retention controller/service + service-role-only SQL; separate Redis notification dispatch + PostgreSQL transactional outbox/leases/receipt state. Cache leader is unchanged. / แยกโมดูล retention และท่อส่งจาก cache leader
+11. **Refactor list** — No broad refactor. New API/SQL/UI; two navigation links; optional selector label/placeholder; notifications module/provider wiring. / เพิ่มเฉพาะจุดเชื่อมที่จำเป็น
+12. **Metrics** — 18 new integration cases, 96 Backend affected-area regressions, 254 Mobile tests; two browser viewport sizes. Web/API builds and focused lint pass. Broad-suite limits and unmeasured throughput are recorded in the linked report. / บันทึกจำนวนผลจริงและข้อจำกัด ไม่อ้างชุดรวมผ่าน
+13. **Technical Debt Removed** — The proposed Mobile device contract now has a durable implementation. No unrelated debt removed. / ทำสัญญาที่เสนอไว้ให้มี source รองรับ
+14. **Risk Reduction** — Auth-derived ownership, no-store collection reads, revoked direct table/RPC access, bounded quotas, binding snapshots, lease CAS, retry budget and dead-letter outcomes. / ลดความเสี่ยงสิทธิ์ ข้อมูลเก่า และงานส่งซ้ำ
+15. **Developer Experience Impact** — `npm run test:phase5`, reproducible isolated preview/browser harness, additive migrations and [ADR 033](../adr/033-phase5-retention-and-push-delivery.md). / มีคำสั่งทดสอบและจุดทำต่อชัดเจน
+16. **Future Opportunities** — Real schema migration/deploy, EAS/Firebase/device acceptance, native feed/collection routes, external chapter polling and production housekeeping/load validation. / งานต่อก่อนเปิดใช้งานจริงอยู่ในรายงาน
+17. **Lessons Learned** — The historical shell checkout is stale; this branch already uses Expo. Test real PostgreSQL visibility/lease semantics and rendered UI, while clearly separating simulated provider/Redis boundaries. / ใช้สาขาจริงและแยกผลจำลองจากผลบริการจริง
+18. **KPI** — Local acceptance passed; production activation, physical receipt and load KPIs are pending. / ผ่านภายในเครื่อง ยังไม่รับผล production
+
+**Validation / quality:** [Full evidence, screenshots and limitations](phase5-2026-10-24/README.md). Ranking considers the caller's interests only, live posts exclude deletions and live comment counts omit deleted comments. Following is chronological. Quotas are enforced by database locks. Source/HTTP/browser paths were traced with the scrutinize workflow; the existing PostCard/auth/proxy/Expo primitives were chosen over duplicate implementations.
+
+**Risk / rollback:** Rollout disabled by default; apply migrations before deploying compatible routes. Disable delivery flags first; revert source and remove event triggers through a reviewed rollback if necessary. Database schema was not applied remotely. At-least-once uncertainty and same-owner/same-token cleanup limitations remain explicit. Performance delta is not measured. Branch `feat/mobile-phase5-push-20261023`; user-authorized implementation, no external issue/PR action.
+
 ## 2026-10-22 — Native Phase 4 integration with current main
 
 [Integration evidence and resume point](../../Mobile/docs/2026-10-22-main-integration.md). Landing status is recorded by the integration PR. / หลักฐานและจุดทำต่ออยู่ในรายงาน สถานะ merge ให้ดู PR รวม

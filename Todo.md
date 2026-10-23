@@ -66,12 +66,14 @@
 
 ---
 
-## Phase 5: Retention & Ecosystem (FUTURE)
-- [ ]  [Backend/Frontend] Social Graph Engine (Follow System)
-- [ ]  [Frontend] Personalized Reading Collections Sharing
+## Phase 5: Retention & Ecosystem (SOURCE WIP / LIVE ACCEPTANCE PENDING)
+- [X]  [Backend/Web source] Existing follows + chronological Following Feed and database-ranked Personalized Feed (local acceptance)
+- [X]  [Backend/Web source] Private/public custom reading collections, CRUD, manga items and share URLs (local acceptance)
 - [ ]  [Backend/Mobile] Push Notification Framework (OS-Level)
 - [X]  [Mobile source] Android Expo Push opt-in, token lifecycle and existing native destination routing (2026-10-23; rollout disabled)
-- [ ]  [Backend] Implement the [push-device API and delivery contract](Mobile/docs/2026-10-23-phase5-push.md)
+- [X]  [Backend source] Implement the [push-device API and delivery pipeline](docs/reports/phase5-2026-10-24/README.md): durable outbox, independent Redis queue, leases/retries/receipts (local integration tests)
+- [ ]  [Release] Verify real schema, apply migrations and deploy; validate real Redis/provider throughput and outbox housekeeping
+- [ ]  [Native follow-up] Native feed/collection screens and collection deep links; Web URL sharing already works
 - [ ]  [Mobile QA] EAS/Firebase setup, enabled native build and physical remote-push acceptance
 <!-- lang:end -->
 
@@ -143,11 +145,13 @@
 
 ---
 
-## Phase 5: Retention & Ecosystem (อนาคต)
-- [ ]  [Backend/Frontend] Social Graph Engine (ระบบ Follow)
-- [ ]  [Frontend] แชร์คอลเล็กชันการอ่านส่วนตัว
+## Phase 5: Retention & Ecosystem (SOURCE WIP / รอรับผลใช้งานจริง)
+- [X]  [Backend/Web source] ใช้ Follow เดิม เพิ่ม Following Feed เรียงเวลาและ Personalized Feed จัดอันดับในฐานข้อมูล (ผ่านภายในเครื่อง)
+- [X]  [Backend/Web source] คอลเลกชันส่วนตัว/สาธารณะ CRUD เพิ่ม/นำเรื่องออก และแชร์ URL (ผ่านภายในเครื่อง)
 - [ ]  [Backend/Mobile] Push Notification Framework (ระดับ OS)
 - [X]  [Mobile source] เปิด/ปิด Expo Push บน Android จัดการ token และเปิดหน้า Native เดิม (2026-10-23; ยังปิด rollout)
-- [ ]  [Backend] ทำ [API ลงทะเบียนและสัญญาท่อส่ง Push](Mobile/docs/2026-10-23-phase5-push.md)
+- [X]  [Backend source] ทำ [API ลงทะเบียนและท่อส่ง Push](docs/reports/phase5-2026-10-24/README.md) มี durable outbox, Redis queue แยก, lease/retry/receipt (ผ่าน integration ภายในเครื่อง)
+- [ ]  [Release] ตรวจ schema จริง ลง migration และ deploy รับผล Redis/provider throughput จริงและจัด housekeeping outbox
+- [ ]  [Native งานต่อ] หน้าจอ Feed/คอลเลกชันและ collection deep link; แชร์ URL เปิดเว็บได้แล้ว
 - [ ]  [Mobile QA] ตั้ง EAS/Firebase สร้าง Native build ที่เปิดฟีเจอร์ และรับผล remote push บนเครื่องจริง
 <!-- lang:end -->

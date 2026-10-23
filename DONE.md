@@ -1,5 +1,12 @@
 <!-- lang:en -->
 
+## Phase 5 retention and Backend push — 2026-10-24
+
+- Continued `feat/mobile-phase5-push-20261023` in `C:/Users/woral/md-phase5-mobile`. Added chronological Following Feed, database-ranked Personalized Feed, owner/private/public collections with Web URL sharing, and Backend device/preferences/outbox/Redis-worker/receipt integration matching the existing Expo client.
+- Local validation: 18 new PostgreSQL/Nest HTTP/worker integration cases, 96 affected-area Backend regressions, 254 existing Mobile tests and Mobile TypeScript passed. Backend and Web builds, frontend TypeScript and focused new/changed-code lint passed. Production-build browser flows passed at 390/1280 px with synthetic accounts and real isolated PostgreSQL feature paths; screenshots and [full limits/resume steps](docs/reports/phase5-2026-10-24/README.md) are recorded.
+- Broad suites are not green: Backend Jest stops in an unchanged books timer path; Frontend Bun reports 492 pass/8 fail/2 errors including docs SSR. Redis/Expo transport is simulated in the new integration tests. No production schema/deployment/provider configuration, remote push, merge or push was performed. Server/native rollout stays disabled; native collection/feed UI and physical delivery remain separate acceptance gates.
+- ภาษาไทย: พัฒนาต่อ branch Phase 5 เดิม ทำ Feed เว็บสองโหมด คอลเลกชันส่วนตัว/สาธารณะพร้อมแชร์ URL และ Backend Push ตามสัญญา Expo เดิม ตรวจใหม่ 18 กรณี regression Backend 96 และ Mobile 254/types ผ่าน build เว็บ/API และ browser 390/1280 ผ่านโดยใช้บัญชีจำลองกับ PostgreSQL แยก ชุดรวมยังมี failure ในโมดูลเดิมนอกงานนี้ ไม่ลง migration/deploy/ตั้ง provider/ส่ง Push จริง/merge/push ยังปิด rollout และบันทึกงานต่อไว้ในรายงาน
+
 ## Native main integration validation — 2026-10-22
 
 - Combined main `cb1f7d9` and native Phase 4 `ef301fb`; resolved five conflicts while preserving main history and joined-profile normalization. Mobile 235/235, Backend 98 suites/1,014 tests/build/focused lint, tooling 58/58 and types/env pass; vendor hashes 10/10. [Integration record and outstanding acceptance](Mobile/docs/2026-10-22-main-integration.md). Draft #860 and six unrelated local operational docs excluded; no new APK or physical/live-service acceptance claimed. Landing status belongs to the integration PR.

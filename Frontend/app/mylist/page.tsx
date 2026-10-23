@@ -1,4 +1,5 @@
 "use client";
+import Link from 'next/link';
 
 import { Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -403,6 +404,7 @@ function MyListContent() {
             <p className="mt-1 text-sm text-ink-3">
               มังงะที่คุณบันทึก ถูกใจ และกำลังอ่าน
             </p>
+            <Link href="/collections" className="inline-block py-2 text-sm text-accent underline underline-offset-4">จัดและแชร์คอลเลกชัน</Link>
           </div>
           {user && activeTab === "history" && history.length > 0 && (
             <button
