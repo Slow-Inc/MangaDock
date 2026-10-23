@@ -59,3 +59,16 @@ Generalization test on four unseen Kaguya pages (chapter 11) found `THATS WHY EV
 
 - Re-ran the page: **no guard trigger**, gate 0, translation time 5.4 s (was 19.2 s when the retries fired).
 - Other three pages: gate 0, render telemetry all zeros. Tests added; suite **990 passed**.
+## Reader-site credits and rhetorical exclamations (round 271, #1098)
+
+Unseen Kaiju pages surfaced two false positives that cost retries but changed nothing:
+
+1. `READ MORE CHAPTERS AT KDTSCANS.COM` -> `อ่านตอนต่อได้ที่ KDTSCANS.COM`: keeping the domain is the only correct
+   answer, yet `untranslated_word` fired in the guard and gate (two retries per page). `untranslated_source_word` now
+   ignores words inside a URL/domain (`https://`, `www.`, dotted token); real lost words are still caught
+   (`MATERIALS` -> `ATERIALS` remains a true positive).
+2. `... SUCCESS!` -> `...ความสำเร็จงั้นเหรอ`: the Thai question particle carries the exclamation; the gate's emphasis
+   licence now also accepts `งั้นเหรอ`/`เหรอ`/`หรอ`/`ไม่ใช่เหรอ`.
+
+Evidence: the three affected pages re-run with **no guard triggers and gate 0**; translation 2.7-4.7 s vs 6.6-11.1 s
+before. Tests added; suite **993 passed**.

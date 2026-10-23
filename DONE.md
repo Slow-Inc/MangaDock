@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 271 — reader-site credits + rhetorical exclamations licensed; retries and gate FPs gone (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Unseen Kaiju pages 5-8 exposed two FPs: reader-site credits (`...KDTSCANS.COM` kept legitimately) flagged by untranslated_word in both guard and gate, and a rhetorical `!` carried by the Thai particle `งั้นเหรอ` flagged as dropped_!.
+- Fixed: untranslated_source_word ignores words inside URLs/domains (real leaks like MATERIALS still caught); the gate emphasis licence accepts `งั้นเหรอ/เหรอ/หรอ/ไม่ใช่เหรอ`. Re-run of the three pages: **no guard triggers, gate 0**, translation 2.7-4.7 s vs 6.6-11.1 s. Tests added; suite **993 passed**. Issue #1098.
+
+---
+
 ## MIT quality loop, round 270 — fifth unseen series (Kaiju No. 8): gate 0, no guard triggers (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

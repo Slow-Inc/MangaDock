@@ -392,3 +392,10 @@ def test_opinion_tags_are_not_dropped_questions_1066():
     assert is_tag_question("YOU KNOW WHAT I MEAN, UNDERSTAND?")
     assert not is_tag_question("CAN YOU SEE?")
     assert not dropped_question("THATS WHY EVERYONES READING, SEE?", "นั่นแหละที่ทุกคนกำลังอ่านอยู่ไง")
+
+
+def test_reader_site_urls_are_not_untranslated_words_1067():
+    from manga_translator.translation_quality import untranslated_source_word as u
+    # measured on unseen Kaiju pages: the credit keeps the domain, everything else is Thai
+    assert not u('READ MORE CHAPTERS AT KDTSCANS.COM', 'อ่านตอนต่อได้ที่ KDTSCANS.COM')
+    assert u('DID ANYONE BRING THE RESOURCE MATERIALS?', 'มีใครเอามATERIALS มาบ้างไหม?')

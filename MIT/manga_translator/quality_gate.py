@@ -35,7 +35,7 @@ _OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z0-9])\?(?=[A-Za-z0-9])')
 _THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|เปล่า|ไหน|อะไร|ทำไม|ยังไง|เท่าไหร่|แค่ไหน)', re.UNICODE)
 #: A source `!` can be carried by a Thai emphasis particle instead of the mark (measured: all 44 corpus lines
 #: with a source `!` carry either the mark or one of these; `ไอ้เทพธิดาพวกนั้นมันแย่จริงๆ` is the flagging case).
-_THAI_EMPHASIS = re.compile(r'(นะ|สิ|เลย|จริงๆ|จริง ๆ|มาก|เหลือเกิน|เต็มที่|สุดๆ|สุด ๆ|เนี่ย|นี่นะ|ล่ะ|ซะ|จัง|โว้ย|วะ|เชียว)')
+_THAI_EMPHASIS = re.compile(r'(นะ|สิ|เลย|จริงๆ|จริง ๆ|มาก|เหลือเกิน|เต็มที่|สุดๆ|สุด ๆ|เนี่ย|นี่นะ|ล่ะ|ซะ|จัง|โว้ย|วะ|เชียว|งั้นเหรอ|เหรอ|หรอ|ไม่ใช่เหรอ)')
 
 
 def _thai_target(query, dst):

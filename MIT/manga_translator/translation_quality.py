@@ -498,6 +498,17 @@ _CREDIT_SRC = re.compile(
 _VOWELS = set('AEIOUaeiou')
 
 
+_URLISH = re.compile(r'(?:https?://|www\.)\S+|\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\b')
+
+
+def _url_words(text):
+    """Upper-case words that appear inside a URL/domain (reader-site credits, handles)."""
+    words = set()
+    for match in _URLISH.finditer(text or ''):
+        words.update(w.upper() for w in _LATIN_WORD.findall(match.group(0)))
+    return words
+
+
 def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
     """True when a Thai answer kept an English source word instead of translating it (#1057).
 
@@ -521,6 +532,9 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
     if _CREDIT_SRC.search(src):
         return False
     src_words = {w.upper() for w in _LATIN_WORD.findall(src)}
+    # URLs / domains in the source or answer are legitimate Latin: `READ MORE CHAPTERS AT KDTSCANS.COM`
+    # ships as `อ่านต่อได้ที่ KDTSCANS.COM`, not a lost translation (measured on unseen pages).
+    url_words = _url_words(src) | _url_words(dst)
     for word in _LATIN_WORD.findall(dst):
         upper = word.upper()
         # exact source word, or a partial copy glued into the Thai (observed: MATERIALS -> 'ATERIALS' after the
@@ -529,6 +543,8 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
             len(upper) >= 4 and upper in src_word and len(upper) >= 0.6 * len(src_word)
             for src_word in src_words)
         if not matched:
+            continue
+        if upper in url_words:
             continue
         if not (set(word) & _VOWELS):
             continue

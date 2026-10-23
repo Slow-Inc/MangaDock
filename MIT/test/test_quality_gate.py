@@ -131,3 +131,13 @@ def test_rhetorical_retorts_are_not_flagged_for_dropped_question_1033():
     assert check_page([retort]) == []
     real = check_page([{'src': 'IS THAT SO?', 'dst': 'มันเป็นอย่างนั้นจริงๆ'}])
     assert any(v['kind'] == 'dropped_?' for v in real), real
+
+
+def test_reader_site_credit_and_rhetorical_exclamation_are_not_flagged_1067():
+    from manga_translator.quality_gate import check_page
+    credit = {'src': 'READ MORE CHAPTERS AT KDTSCANS.COM', 'dst': 'อ่านตอนต่อได้ที่ KDTSCANS.COM'}
+    assert check_page([credit]) == []
+    rhetorical = {'src': 'THIS IS THE GOD OF LUCK IN WORK AND... SUCCESS!', 'dst': 'นี่คือเทพแห่งโชคในการงานและ...ความสำเร็จงั้นเหรอ'}
+    assert check_page([rhetorical]) == []
+    plain = check_page([{'src': 'SUCCESS!', 'dst': 'ความสำเร็จ'}])
+    assert any(v['kind'] == 'dropped_!' for v in plain), plain
