@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 224 — production series-memory recheck attempt hit a transient SDK connection error (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tried to re-run the two-page production-path series-memory check with the current code; the OpenAI SDK raised `APIConnectionError` twice while `GET /models` on the same gateway returned 200 (connectivity fine, transient SDK call failure).
+- No series-memory code changed this round beyond the unit-tested interjection filter in `candidate_names`, so the earlier production-path acceptance plus the 7 series-memory tests stand. Re-run deferred to the next healthy window.
+
+---
+
 ## MIT quality loop, round 223 — v5 acceptance sweep: 4 guard triggers, 0 leftovers, 3 explainable gate findings (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
