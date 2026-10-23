@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 259 — generalization test on a brand-new real manga page (Kaguya ch.11) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Pulled page 1 of Kaguya-sama ch.11 (English) from the MangaDex public API (kept in tmp, not committed) and ran the full pipeline: **gate 0**, natural Thai on all 7 regions, wall 16.4 s including cold model load.
+- Found one minor render-side defect: a free-standing text region spills ~7 px out of its container (`spill=1`), and confirmed the outlined-art-lettering detection gap extends to overlaid chapter subtitles. Both are outside the translation loop; recorded in `2026-10-23-new-manga-generalization.md`. No code change.
+
+---
+
 ## MIT quality loop, round 258 — stylised heading: ruled out resolution, documented as a detector gap (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
