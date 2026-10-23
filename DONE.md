@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 277 — new Kaguya chapter: gate 0, second render-spill data point logged on #642 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four pages from a different unseen Kaguya chapter: gate 0 everywhere, no guard triggers; one render spill (a free-standing text box whose right edge sits 6.5 px outside its container).
+- Posted the box deltas as a second instance on #642 (render reconciliation) and updated the unseen-data aggregate: 27 pages, 26 gated clean, two render spills. No code change.
+
+---
+
 ## MIT quality loop, round 276 — v10 judge in a bad window: raw 1.38, adjusted 1.53 (2.4% broken) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

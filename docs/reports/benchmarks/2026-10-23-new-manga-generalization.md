@@ -96,3 +96,11 @@ looks solid on unseen series, and the SFX batching bounds the worst merge time.
 - **3/3 pages: gate 0**, render telemetry clean, no guard triggers; wall 1.8-26.6 s (one dialogue page, one SFX page, one
   near-blank credits page at 1.8 s).
 - The reader-site credit licence from round 271 holds: no untranslated-word retries appear on these pages.
+## Sixth unseen batch: a different Kaguya chapter (4 pages)
+
+- **4/4 pages: gate 0**, no guard triggers; wall 5.4-26.4 s.
+- Render telemetry flagged one spill: region 6 (`ILL BE TAGGING ALONG WITH YOU AS WELL!`) has its box right edge
+  6.5 px outside its container (`dst_box` 806.5 vs `container` 800). This is the second instance of the same render-side
+  class (free-standing text near a panel edge), now logged on #642.
+- Unseen data now: Kaguya 8 pages (2 spill instances), Bocchi 4 (3 legitimate-name gate findings), Yotsuba 4, Oshi 4,
+  Kaiju 7 -> **27 unseen pages, 26 gated clean**, two render spills.
