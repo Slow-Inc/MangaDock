@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 197 — OCR pass hardening: confidence normalized to float (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The OCR second pass now converts old/new line confidence to `float` where read, so comparisons and the debug log cannot fail when a model path returns a numpy scalar or torch tensor (the flag is default ON, so this is a production path).
+- Suite 964 passed; benchmark note added.
+
+---
+
 ## MIT quality loop, round 196 — latency outlier re-triage on v3 defaults (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

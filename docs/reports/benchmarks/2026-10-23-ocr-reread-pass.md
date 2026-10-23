@@ -104,3 +104,8 @@ single batched canvas. Swept 39 pages at 0.75 with the cap raised to 8 and A/B-j
 
 - Changed sources 20/369 (5.4 %), layout change 1 page, **OCR stage +69 ms/page only** (one canvas per page either way).
 - Both runs agree on the direction, so the new default is **threshold 0.75 / cap 8**.
+## Hardening (2026-10-23, round 197)
+
+OCR confidence can arrive as a numpy scalar or a torch tensor depending on the model path. The pass now converts both
+the old and the new confidence to `float` right where they are read, so the comparisons and the debug log
+(`f'{prob:.2f}'`) can never fail on a non-Python scalar while the flag is on. Suite unchanged at 964.

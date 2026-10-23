@@ -91,6 +91,8 @@ async def reread_textlines(image, textlines, ocr_key, ocr_config, device, dispat
             break
         old_text = getattr(textline, 'text', '') or ''
         old_prob = getattr(textline, 'prob', None)
+        if old_prob is not None:
+            old_prob = float(old_prob)  # normalize tensors/numpy scalars before comparisons and formatting
         if not needs_reread(old_text, old_prob, threshold):
             continue
         x1, y1, x2, y2 = expand_box(np.array(textline.pts), width, height, pad_ratio)
@@ -131,6 +133,8 @@ async def reread_textlines(image, textlines, ocr_key, ocr_config, device, dispat
             continue
         new_text = getattr(quad_out, 'text', '') or ''
         new_prob = getattr(quad_out, 'prob', None)
+        if new_prob is not None:
+            new_prob = float(new_prob)
         if not better_read(slot['old_text'], slot['old_prob'], new_text, new_prob):
             continue
         slot['line'].text = new_text.strip()
