@@ -158,7 +158,7 @@ export function MangaPickerModal({
       {!searching && query && (
         <button
           type="button"
-          onClick={() => setQuery("")}
+          onClick={() => setQuery("")} aria-label="ล้างคำค้นหา"
           className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-fill text-ink-2 transition hover:bg-raised hover:text-ink"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
