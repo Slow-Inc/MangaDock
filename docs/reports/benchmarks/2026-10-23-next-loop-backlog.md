@@ -101,3 +101,19 @@ Scanned v7: 40 regions have an English negation; only 4 Thai outputs lacked a ne
 
 A negation guard would have retried on idiomatic/threshold false positives while almost never meeting a real defect.
 Revisit only with a semantic verifier, not a marker scan.
+### Candidate for a future loop: term/register consistency memory (evidence 2026-10-23, round 193)
+
+`tools/stability_audit.py --runs 3` on the current defaults shows the model is stable in meaning but **varies recurring
+terms and pronouns** across runs/pages:
+
+| segment | run-to-run variants |
+|---|---|
+| `I BECAME A DEMON LORD` | `ฉันกลายเป็นเจ้าชายปีศาจ` / `ข้ากลายเป็นจอมมาร` / `ข้ากลายเป็นจอมมารแล้ว` |
+| `DO YOU KNOW WHAT KIND OF THING A DEMON LORD IS?` | `เจ้าชายปีศาจ` / `จอมมาร` |
+| `IVE GOT ALLERGIES...` | `ฉันแพ้...` / `ฉันแพ้สาร...` (fine) |
+| pronouns | `ฉัน` vs `ข้า` for the same speaker |
+
+Names are already covered by the series name memory; **common terms** (`DEMON LORD`) are not, because the memory only learns
+name-focused lines (single Latin name + short Thai run). A term memory would need: recurring-titlecase extraction, a
+target registered in the series key, and a licence so ordinary words are never enforced. This is a new feature with real
+FP risk - do it as its own loop with a judge A/B, not as a tail-end patch.

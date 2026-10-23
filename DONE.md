@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 251 — stability audit finds term/register variance, queued as a future-loop candidate (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `stability_audit.py --runs 3` on current defaults: meaning is stable, but recurring terms vary (`จอมมาร` vs `เจ้าชายปีศาจ` for DEMON LORD) and pronouns vary (`ฉัน` vs `ข้า`). Names are covered by the series memory; common terms are not (it only learns name-focused lines).
+- Recorded as a future-loop candidate with the required design/FP guards, not a tail-end patch. No code change.
+
+---
+
 ## MIT quality loop, round 249 — English negation-lost guard evaluated and rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
