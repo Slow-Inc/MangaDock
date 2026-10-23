@@ -238,3 +238,12 @@ def test_edge_whitespace_is_stripped_from_the_answer():
     t.client.chat.completions.create = mock.AsyncMock(return_value=_reply('<|1|>  สวัสดีครับ  '))
     out = asyncio.run(t.translate('ENG', 'THA', ['HELLO THERE']))
     assert out[0] == "สวัสดีครับ", repr(out[0])
+
+def test_consider_as_please_is_reasked_1040():
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    src = 'CONSIDER BUYING THE OFFICIAL VOLUMES'
+    assert t._is_glitched(src, 'กรุณาซื้อมังงาฉบับรวมเล่มทางการ', 'THA')
+    assert not t._is_glitched(src, 'ลองพิจารณาซื้อฉบับทางการ', 'THA')
+    assert not t._is_glitched('PLEASE CONSIDER BUYING IT', 'กรุณาซื้อมันด้วย', 'THA')
+

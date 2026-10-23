@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 203 — new guard `consider_as_please`: natural retry turned กรุณาซื้อ into ลองพิจารณาซื้อ (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the v4 real judge findings; one was a measured semantic swap: `CONSIDER BUYING THE OFFICIAL VOLUMES` -> `กรุณาซื้อ...` (suggestion -> request). Mined 6 unique CONSIDER renderings: **2 please-style**, 4 correct.
+- Added `consider_as_please` (exact licence: source CONSIDER and not PLEASE; Thai กรุณา and not พิจารณา), wired into the retry trigger with its own note, plus a trigger test.
+- Natural validation on the Chainsaw credits page: the guard fired (`กรุณาสนับสนุน...`) and the re-ask shipped **`ลองพิจารณาซื้อฉบับพิมพ์`** (correct suggestion). Suite 967 passed. Benchmark `2026-10-23-consider-as-please-guard.md`.
+
+---
+
 ## MIT quality loop, round 202 — v4 official judge: raw 1.44, strict-adjusted 1.58, 62 % perfect (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

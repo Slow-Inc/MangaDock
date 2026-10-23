@@ -378,6 +378,21 @@ def lost_as_rare(dst: str, query: str) -> bool:
     return not any(word in src for word in ('RARE', 'RARELY', 'SCARCE'))
 
 
+def consider_as_please(dst: str, query: str) -> bool:
+    """True when CONSIDER (a suggestion) became a request with กรุณา ('please').
+
+    Measured on the credits line `CONSIDER BUYING THE OFFICIAL VOLUMES`: 2 of 6 sampled runs rendered
+    `กรุณาซื้อ...` ('please buy'), losing the soft suggestion. The licence is exact: the source says CONSIDER
+    and not PLEASE, the Thai contains กรุณา and not พิจารณา (the correct 'consider' word).
+    """
+    if not dst or 'กรุณา' not in dst or 'พิจารณา' in dst:
+        return False
+    src = (query or '').upper()
+    if 'CONSIDER' not in src or 'PLEASE' in src:
+        return False
+    return True
+
+
 def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
     """Last-resort salvage: delete leaked-script characters when the retries could not fix them.
 

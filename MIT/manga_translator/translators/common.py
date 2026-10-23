@@ -8,7 +8,7 @@ from abc import abstractmethod
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
                                    runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
                           dropped_question, untranslated_source_word, content_loss,
-                          normalize_common_typos)
+                          consider_as_please, normalize_common_typos)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -294,6 +294,8 @@ class CommonTranslator(InfererModule):
             reasons.append('spurious_filler')
         if lost_as_rare(trans, query):
             reasons.append('lost_as_rare')
+        if consider_as_please(trans, query):
+            reasons.append('consider_as_please')
         if dropped_question(query, trans, to_lang):
             reasons.append('dropped_question')
         if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
@@ -325,6 +327,9 @@ class CommonTranslator(InfererModule):
         # #1052: LOST rendered as หายาก ("rare") — a meaning-changing near-homophone.
         if lost_as_rare(trans, query):
             return query + ('\n\n[note: LOST means หาย/สูญหาย. หายาก means RARE — do not use it here.]')
+        # CONSIDER is a soft suggestion, not a request.
+        if consider_as_please(trans, query):
+            return query + ('\n\n[note: CONSIDER means พิจารณา / ลอง (a suggestion), not a request. Do not use กรุณา here.]')
         # #1039: the model added an endurance verb the source never says ('I heard your conversation' ->
         # 'ฉันทนฟังบทสนทนา'). Tell the retry what to drop.
         if spurious_filler(trans, query):
