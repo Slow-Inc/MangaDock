@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 237 — JP-path sanity: one real JP page, gate 0, no regressions (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the single distinct JP page through the current defaults (`--source JPN --target THA --gate`): **gate 0**, no guard triggers, wall 13.9 s (cold model load included). The late translation-side changes do not regress the JP path.
+- Recorded in the final baseline doc. No code change.
+
+---
+
 ## MIT quality loop, round 236 — branch hygiene/security scan clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

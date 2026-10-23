@@ -156,3 +156,12 @@ The official `tools/quality_dashboard.py` counts live guard classes still firing
 either taken from the dashboard or from an equivalent custom scan; the v1/v2 rows labelled "foreign script / content
 loss / typo tokens" used that narrower custom set, which is why the v6 row is the first to report an
 `untranslated_word` leftover (the rare `ATERIAL` line). When in doubt, the dashboard output is the source of truth.
+## JP-path sanity after all late fixes (2026-10-23, round 172)
+
+One real JP page (`result/jp/jp_chapter_p0.jpg`, the only distinct JP page in the repo) through the default pipeline
+(`--source JPN --target THA --gate`):
+
+- **gate: pages=1 violations=0**, no guard triggers.
+- wall 13.9 s (detection 5.7 s includes the cold model load; translation 2.3 s).
+
+The translation-side changes (OCR second pass, guards, licences, series memory) do not regress the JP path.
