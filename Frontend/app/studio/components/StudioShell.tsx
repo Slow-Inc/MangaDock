@@ -119,6 +119,7 @@ export default function StudioShell({ children }: { children: ReactNode }) {
     else if (e.key === "ArrowRight") commit(width + SIDEBAR.step);
     else if (e.key === "Home") commit(SIDEBAR.min);
     else if (e.key === "End") commit(SIDEBAR.max);
+    else if (e.key === "Enter") commit(SIDEBAR.initial); // the double-click reset, from the keyboard (#1083)
     else return;
     e.preventDefault();
   };

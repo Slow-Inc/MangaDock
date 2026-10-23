@@ -128,6 +128,16 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => !uploading && fileInputRef.current?.click()}
+              // keyboard: the hidden file input is out of the Tab order, so the zone is the button (#1083)
+              role="button"
+              tabIndex={0}
+              aria-disabled={uploading}
+              aria-label="เลือกรูปภาพเพื่ออัปโหลด"
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                e.preventDefault();
+                if (!uploading) fileInputRef.current?.click();
+              }}
               className={`p-6 text-center cursor-pointer transition-all ${
                 dragOver ? 'bg-fill border-accent/30' : 'hover:bg-fill'
               }`}

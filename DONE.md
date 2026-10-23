@@ -77,6 +77,25 @@
 
 ---
 
+## #1083 Four pointer-only controls work from the keyboard (2026-10-23)
+
+**What:**
+- **Post image drop zone.** It was a `<div onClick>` with a hidden file input. It's now `role="button"` and
+  focusable, and Enter/Space opens the picker.
+- **Own-comment actions below `sm`.** The edit/delete sheet opened only on a touch long-press. A "ตัวเลือกความคิดเห็น"
+  button now opens it too.
+- **Banner reposition.** It was drag only. The surface is now a vertical slider: arrows step 5, PageUp/PageDown step
+  20, Home and End go to the ends (`lib/bannerPosition.ts`, unit-tested). It takes focus when reposition opens.
+- **Studio sidebar separator.** Enter resets to the default width, as double-click does.
+
+**Validated:** production-build probe, fake session, API answered locally.
+- **Before:** none of the three new controls existed, and on main the separator's `onKeyDown` has no Enter.
+- **After:** Enter opens the file picker, the comment button opens the sheet, and the slider is focused on open with
+  2×ArrowUp going 50 → 60. On the separator, 2×ArrowRight goes 220 → 240, then Enter goes back to 220.
+- Unit 497/497. Real tsc is clean, and eslint matches main.
+
+---
+
 ## #1081 Profile banner controls and the password hint reachable from the keyboard (2026-10-23)
 
 **What:** a hover-only sweep turned up two real cases.
