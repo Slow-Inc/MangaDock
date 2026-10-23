@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 288 — closing evidence battery + loop-close record (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the final battery at head 3fce711f: suite **997 passed**, all checks pass (logic 1m48s, heavy ML 5m9s, backend 51s, Vercel completed), #642 is the only blocker (open draft CONFLICTING), merge-tree conflicts limited to the three docs, worktree clean.
+- Wrote `2026-10-23-loop-close.md`: verified state, end-state numbers, remaining external steps and the evidence index. No code change.
+
+---
+
 ## MIT quality loop, round 287 — team vault synced to the v6-v11 final state (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
