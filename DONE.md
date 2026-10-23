@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 239 — v6 judge: raw 1.44 stable, adjusted band widens to 1.53-1.60 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v6 outputs: 370 segments, raw **1.44**, noise flags **49**, strict-adjusted **1.53**, distribution 10/155/205 (2.7 % broken / 41.9 % partial / 55.4 % perfect).
+- Raw is stable across v1-v6; the adjusted value tracks the run's noise-flag count (49-138), so the honest band is now **1.53-1.60**. Baseline doc, final report and vault updated to quote the band plus the stable raw value. No code change.
+
+---
+
 ## MIT quality loop, round 238 — final-state PR comment; GitHub CI green on e73c98ee (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

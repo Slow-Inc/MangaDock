@@ -165,3 +165,13 @@ One real JP page (`result/jp/jp_chapter_p0.jpg`, the only distinct JP page in th
 - wall 13.9 s (detection 5.7 s includes the cold model load; translation 2.3 s).
 
 The translation-side changes (OCR second pass, guards, licences, series memory) do not regress the JP path.
+### v6 official judge run (widens the honest band)
+
+```
+segments 370 | raw mean 1.44/2 | noise flags 49 | strict-adjusted 1.53/2
+distribution 0/1/2 = 10 / 155 / 205  (broken 2.7 % / partial 41.9 % / perfect 55.4 %)
+```
+
+Raw is stable at **1.44** across every sweep (v1-v6). The strict-adjusted value depends on how many segments the judge
+flags as typo/note noise that run: 49 flags here vs 65-138 earlier, so the adjusted mean ranges **1.53-1.60**. Quote the
+band and the raw value; do not treat the adjusted movement as a pipeline change.

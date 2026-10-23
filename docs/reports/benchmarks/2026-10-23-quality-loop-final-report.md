@@ -10,7 +10,7 @@ benchmarks linked below.
 | corpus | 39 real pages, 365 regions (EN→TH) |
 | gate (page-level) | **0 on v5 outputs; v6 live: one rare `untranslated_word` leak (model variance) + name variance** |
 | leftovers (foreign script / content loss / typo / filler / lost-as-rare) | **0 / 0 / 0 / 0 / 0** |
-| judge | raw **1.44/2**, strict-adjusted **1.58** (band 1.55-1.60), 3.6 % broken / 34.4 % partial / 62.0 % perfect |
+| judge | raw **1.44/2**, strict-adjusted **1.58** (band 1.53-1.60), 3.6 % broken / 34.4 % partial / 62.0 % perfect |
 | guard triggers in the sweep | 5 |
 | wall | avg **7.80 s**, median **6.62 s** |
 | guard cost | 0.023 ms/segment, 0.40 ms/page |
@@ -49,7 +49,7 @@ benchmarks linked below.
 
 ## Remaining
 
-- Model-ceiling sense/nuance in fluent lines (judge range 1.55-1.60 is the honest read).
+- Model-ceiling sense/nuance in fluent lines (judge range 1.53-1.60 is the honest read).
 - Cross-page context is opt-in; single-page production gets name consistency from the series memory only.
 - Render/detection campaigns (reference_layout default, SFX default, vertical layout) are separate from this loop.
 - **#642 must merge first**, then retarget #794 to `main`, union the three docs conflicts, CI, merge.
