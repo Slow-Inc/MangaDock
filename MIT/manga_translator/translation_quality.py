@@ -263,7 +263,7 @@ def leaked_script(trans: str, query: str) -> str | None:
 _ENDURE_WORDS = ("ENDURE", "ENDURED", "BEAR", "BEARS", "BORE", "STAND", "STOOD", "TOLERATE", "TOLERATED",
                  "SUFFER", "SUFFERED", "TOLERANCE", "PUT UP WITH", "TAKE IT", "HANDLE IT")
 #: Only clearly broken shapes: a name/pronoun glued to ทน followed by an object-ish verb, or a bare "pronoun + ทน + verb". "ทนไม่ได้" (cannot bear to) and "ทนไม่ไหว" are natural Thai idioms and are NOT flagged.
-_THAI_TOLERANCE = re.compile(r"(ฉันทน(?!ที|ไม่|ได)(?=[ก-๙])|เธอทน(?!ที|ไม่|ได)(?=[ก-๙])|เราทน(?!ที|ไม่|ได)(?=[ก-๙])|ข้าทน(?!ที|ไม่|ได)(?=[ก-๙])|ทน(?:ฟัง|ดู|อยู่|มานาน|มาแล้ว)(?=[ก-๙]?))")
+_THAI_TOLERANCE = re.compile(r"(ฉันทน(?!ที|ไม่|ได|ทาน)(?=[ก-๙])|เธอทน(?!ที|ไม่|ได|ทาน)(?=[ก-๙])|เราทน(?!ที|ไม่|ได|ทาน)(?=[ก-๙])|ข้าทน(?!ที|ไม่|ได|ทาน)(?=[ก-๙])|ทน(?:ฟัง|ดู|อยู่|มานาน|มาแล้ว)(?=[ก-๙]?))")
 _THAI_NOT_IN_TIME = re.compile(r"(?:ฉัน|เธอ|เรา|ข้า|แก|คุณ)ทัน(?!ที)(?=[\u0E01-\u0E2E])")
 _TIME_WORDS = ("IN TIME", "ON TIME", "JUST IN TIME", "TIMELY", "BEFORE IT", "IN THE NICK OF TIME")
 

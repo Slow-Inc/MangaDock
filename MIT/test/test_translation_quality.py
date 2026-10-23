@@ -271,3 +271,10 @@ def test_the_filler_and_lost_guards_are_real_retry_triggers_1039_1052():
     assert is_glitched(None, "LOST ITEMS.", "ของหายาก", "THA")
     assert not is_glitched(None, "HELLO THERE!", "สวัสดี!", "THA")
     assert not is_glitched(None, "RARE ITEMS.", "ของหายาก", "THA")
+
+
+def test_spurious_filler_keeps_the_word_tough_ton_tan_1039d():
+    from manga_translator.translation_quality import spurious_filler
+    # live false positive: "IM PRETTY TOUGH" -> "ข้าทนทานดี" (ทนทาน = tough/durable), caught in a sweep
+    assert not spurious_filler("นางบอกว่าข้าทนทานดี แล้วเหวี่ยงข้าจากที่สูง", "SHE SAID IM PRETTY TOUGH AND DROPPED ME FROM A HEIGHT")
+    assert spurious_filler("ฉันทนฟังบทสนทนา", "I HEARD YOUR CONVERSATION WITH THE GODDESS.")

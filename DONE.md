@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 87 — full-corpus audit complete: 39/39 pages, 1.44/2, 2.7 % broken; filler FP fixed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Completed judge coverage of the whole real corpus: 39/39 pages, 403 segments, mean 1.44/2, broken 2.7 %** (11 / 205 / 187 distribution). Batch means 1.36-1.58; the raw score is depressed by the judge's typo noise.
+- **Guard live catches over the same runs:** 3 `foreign_script` (CJK leaks) and 2 `spurious_filler` triggers, all true positives; shipped lines verified clean twice after re-ask.
+- **Fixed a guard false positive found live:** `ข้าทนทานดี` (ทนทาน = tough, for `IM PRETTY TOUGH`) was flagged as filler — the pronoun+ทน pattern now also excludes `ทาน`; regression test added (35 translation-quality tests green).
+- **Limitation recorded:** with the retry budget exhausted, the last (still-glitched) answer ships — observed on Tsuki p0 (`ICANT EVEN GIVE YOU ANY POWER`: CJK -> CJK -> filler). Follow-ups listed (extra retry for foreign_script only, or strip leaked chars as salvage) but not shipped without an A/B.
+- Also recorded: cross-page name inconsistency outside the opt-in batch glossary (`TSUKUYOMI` on Tsuki p0/p1); `--no-png` kept the whole sweep JSON-only. Benchmark `2026-10-23-full-corpus-audit.md`.
+
 ## MIT quality loop, round 86 — p1-page audit: 1.58/2 judge mean, second live guard catch, disk-safe doctor flag (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
