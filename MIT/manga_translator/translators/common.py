@@ -183,17 +183,32 @@ class CommonTranslator(InfererModule):
             await self._ratelimit_sleep()
 
             # Translate
-            _translations = await self._translate(*self.parse_language_codes(from_lang, to_lang, fatal=True), queries)
+            _langs = self.parse_language_codes(from_lang, to_lang, fatal=True)
+            _segment_retry = (i > 0 and str(os.environ.get('MIT_SEGMENT_RETRY', '')).strip().lower()
+                              in ('1', 'true', 'yes', 'on'))
+            if _segment_retry:
+                # #1055 (opt-in): a retry only needs the segments that are still invalid. Sending the whole page
+                # again re-translates clean lines (most of the page) for every glitch; this sends the flagged
+                # subset instead. The tradeoff is that the retried line loses its page-mates as context, so the
+                # whole-page retry stays the default.
+                _subset = [queries[j] for j in untranslated_indices]
+                _sub = await self._translate(*_langs, _subset)
+                if len(_sub) < len(untranslated_indices):
+                    _sub.extend([''] * (len(untranslated_indices) - len(_sub)))
+                for _k, j in enumerate(untranslated_indices):
+                    translations[j] = _sub[_k]
+            else:
+                _translations = await self._translate(*_langs, queries)
 
-            # Extend returned translations list to have the same size as queries
-            if len(_translations) < len(queries):
-                _translations.extend([''] * (len(queries) - len(_translations)))
-            elif len(_translations) > len(queries):
-                _translations = _translations[:len(queries)]
+                # Extend returned translations list to have the same size as queries
+                if len(_translations) < len(queries):
+                    _translations.extend([''] * (len(queries) - len(_translations)))
+                elif len(_translations) > len(queries):
+                    _translations = _translations[:len(queries)]
 
-            # Only overwrite yet untranslated indices
-            for j in untranslated_indices:
-                translations[j] = _translations[j]
+                # Only overwrite yet untranslated indices
+                for j in untranslated_indices:
+                    translations[j] = _translations[j]
 
             if self._INVALID_REPEAT_COUNT == 0:
                 break

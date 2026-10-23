@@ -173,3 +173,35 @@ def test_a_leak_that_survives_every_retry_is_salvaged_903b():
     assert t.client.chat.completions.create.call_count == 3
     assert all(ch < '\u0400' or ch > '\u04ff' for ch in out[0]), out[0]
     assert not any('\u4e00' <= ch <= '\u9fff' for ch in out[0]), out[0]
+
+
+def _prompt_line_count(call):
+    return call.kwargs['messages'][-1]['content'].count('<|')
+
+
+def test_segment_retry_resends_only_the_flagged_line_1065(monkeypatch):
+    """Opt-in: a retry sends the still-invalid segments instead of the whole page."""
+    monkeypatch.setenv('MIT_SEGMENT_RETRY', '1')
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|> okay\n<|2|>ฉัน甚至连พลังให้เธอไม่ได้'),
+        _reply('<|1|>ฉันให้พลังเธอไม่ได้'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['FINE', 'I CANT EVEN GIVE YOU ANY POWER']))
+    assert [a for a in out][1].startswith('ฉัน'), out
+    calls = t.client.chat.completions.create.call_args_list
+    assert _prompt_line_count(calls[0]) == 2
+    assert _prompt_line_count(calls[1]) == 1
+
+
+def test_the_default_retry_still_resends_the_whole_page_1065(monkeypatch):
+    monkeypatch.delenv('MIT_SEGMENT_RETRY', raising=False)
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|> okay\n<|2|>ฉัน甚至连พลังให้เธอไม่ได้'),
+        _reply('<|1|>โอเค\n<|2|>ฉันให้พลังเธอไม่ได้'),
+    ])
+    asyncio.run(t.translate('ENG', 'THA', ['FINE', 'I CANT EVEN GIVE YOU ANY POWER']))
+    calls = t.client.chat.completions.create.call_args_list
+    assert _prompt_line_count(calls[0]) == 2
+    assert _prompt_line_count(calls[1]) == 2

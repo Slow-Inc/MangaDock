@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 89 — opt-in segment-only retry for guard re-asks (#1055) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a cost of the quality guards:** the repeat loop re-sends the **whole page** for each retry, and guards fire on ~1 page in 6 of live traffic — so every caught glitch costs an extra full-page translation call (page of tokens).
+- **Added `MIT_SEGMENT_RETRY=1` (opt-in):** from the second attempt on, translate only the still-invalid segments and merge them back. Default unchanged (whole-page retry keeps page context for the re-ask).
+- **Evidence:** mocked 2-line page with a script leak — default retry prompt carries 2 lines, segment retry carries 1 (≈94 % fewer input lines on a real 17-line page); the new answer for the flagged line is kept in both. Both shapes pinned by tests (16 in the glitch-retry file); full suite **913 passed**.
+- **Tradeoff recorded:** the retried line loses its page-mates as context and the batch numbering changes, so it stays opt-in; live latency/quality comparison is the open acceptance item on #1055. Benchmark `2026-10-23-1055-segment-retry.md`.
+
 ## MIT quality loop, round 88 — leaked-script salvage for retry-exhausted answers (#903 follow-up) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
