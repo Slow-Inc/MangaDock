@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 166 — mark-only typo mining: no new safe mappings (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined recurring OOV tokens (count >= 3) whose base letters match a dictionary word: 11 candidates, **all SFX (`ฟึ่ก/ปึ่ก/ฟึ่บ/ซึ๊ง/เบ`) or names/loanwords (`เฮย์/ยิ/การ์/นี/บะ/นัม`)**. No new unambiguous typo beyond the already-normalised `แล่ว/ไม/ให/ไมใช`.
+- Recorded in the typo-normalizer benchmark so the search is not repeated; no code change.
+
+---
+
 ## MIT quality loop, round 165 — extended-script detection keeps the guard cost at 0.40 ms/page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

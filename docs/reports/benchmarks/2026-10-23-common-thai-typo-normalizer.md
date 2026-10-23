@@ -68,3 +68,15 @@ So the typo normalizer is wired into the live cleanup path, not just the unit te
 - **Double spaces / space before punctuation / unbalanced brackets / odd quotes**: **0** in stored outputs.
 - **Edge whitespace**: 42 stored regions ended with a trailing space (`'ฮ่า ฮ่า ฮ่า '`). It is never meaningful in a
   bubble line, so the final cleanup now returns `trans.strip()` (test added in the glitch-retry suite).
+## Mark-only typo mining (round 4): no new safe mappings
+
+Grouped every recurring OOV token (count >= 3) by its base letters (combining marks stripped) and looked for a
+dictionary word with the same base. 11 candidates, all but none safe to auto-correct:
+
+| candidate | count | context | verdict |
+|---|---|---|---|
+| `ฟึ่ก`, `ปึ่ก`, `ฟึ่บ`, `ซึ๊ง` | 136 | sound effects | intentional SFX |
+| `เฮย์`, `ยิ`, `การ์`, `นี`, `บะ`, `นัม` | ~90 | inside names (`เฮย์ระคุ`, `ยามายิ`, `มิดการ์`, `เทลิคานี`, `บะนาซา`, `ปีนัม`) | names/loanwords |
+| `เบ` | 39 | SFX | intentional |
+
+No missing/wrong-mark typo beyond the already-normalised `แล่ว/ไม/ให/ไมใช` surfaced, so no further mapping is added.
