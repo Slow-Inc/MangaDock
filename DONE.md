@@ -77,6 +77,24 @@
 
 ---
 
+## #1085 One keyboard-ownership rule for dialogs; book popup on useModalDialog (2026-10-23)
+
+**What:** a `/simplify` pass on #1073 found the question "is this keyboard event this dialog's?" answered four ways.
+`ownsKeyboardNow` now serves the Tab trap, Escape in `useModalDialog`, the reader and the book popup.
+`focusInNestedDialog` and `focusWrapTarget`'s `focusInOtherLayer` are removed as dead. `useModalDialog` gets an optional
+`isTop` and reads `onClose` at key time, so it no longer re-subscribes per render. `BookDetailModal` drops its own Escape
+listener for `useModalDialog`. `keepTabStops`' condition is shorter. The single layer stack is a proposal, #1086.
+
+**Validated:** production build.
+- Every dialog probe from #1069, #1073, #1076, #1078, #1081 and #1083 passes.
+- In the book popup, focus stays inside through 20 Tab/Shift+Tab presses, Escape closes it, focus returns to the
+  opener, and the URL is restored.
+- Unit 496/496: one test went with the removed option.
+- Real tsc is clean, and eslint error and warning counts match main per file. In `BookDetailModal` the TDZ error is
+  gone, and a pre-existing `setState`-in-effect error from March, which it had masked, now shows.
+
+---
+
 ## #1083 Four pointer-only controls work from the keyboard (2026-10-23)
 
 **What:**

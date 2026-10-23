@@ -17,7 +17,7 @@ import { useCoverSrc } from "../hooks/useCoverSrc";
 import { lockPageScroll } from "../lib/scrollLock";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
-import { ownsEscapeNow, useDialogFocus } from "../hooks/useDialogFocus";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
@@ -133,8 +133,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const modalContentRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<Popup | null>(null);
-  // Focus in on open, Tab stays inside while this is the top-most popup, focus back on close (#837).
-  useDialogFocus(dialogRef, () => !!popupRef.current && modalStack.isTop(popupRef.current), mounted);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
   const router = useRouter();
@@ -224,12 +222,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       historyPushedRef.current = true;
     }
 
-    const onKey = (e: KeyboardEvent) => {
-      // only the top-most popup, and only while it holds focus: a dialog inside it (the top-up) or over it (the login
-      // prompt) owns that Escape (#1073)
-      if (e.key === "Escape" && modalStack.isTop(popup) && ownsEscapeNow(dialogRef.current)) handleClose();
-    };
-    window.addEventListener("keydown", onKey);
     const releaseScroll = lockPageScroll(); // shared with the reader opened over it (#936)
 
     // Auto-translate description (#151) via the shared cached helper (F7): start
@@ -266,7 +258,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }
 
     return () => {
-      window.removeEventListener("keydown", onKey);
       modalStack.remove(popup);
       releaseScroll();
     };
@@ -308,6 +299,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       onClose();
     }, delay);
   };
+  // Focus in on open, Tab stays inside and Escape closes while this is the top-most popup, focus back on close (#837);
+  // a dialog inside it (the top-up) or over it (the login prompt) owns its own Escape (#1073)
+  useModalDialog(dialogRef, handleClose, mounted, () => !!popupRef.current && modalStack.isTop(popupRef.current));
 
   // A picked alternative cover wins; otherwise step through the book's own sources, and show the placeholder once none
   // is left (#923). A picked cover that fails goes back to the book's own cover without advancing its sources.
