@@ -1626,7 +1626,40 @@ class MangaTranslator:
         except Exception:
             logger.warning(f'[series-glossary] skipped:\n{traceback.format_exc()}')
 
+        # Opt-in MIT_OMISSION_VERIFY=1: long lines the verifier agrees dropped a clause get one re-ask before render.
+        try:
+            from .omission_guard import enabled as omission_verify_enabled
+            if omission_verify_enabled():
+                await self._verify_omissions(config, ctx)
+        except Exception:
+            logger.warning(f'[omission-verify] skipped:\n{traceback.format_exc()}')
+
         return await self._finish_patches(ctx, config, source_icc)
+
+    async def _verify_omissions(self, config, ctx):
+        """Opt-in: re-ask long lines whose Thai answer the verifier says dropped a clause."""
+        from .omission_guard import (apply_results, build_query, collect_candidates, verify_candidates)
+        candidates = collect_candidates(ctx.text_regions)
+        if not candidates:
+            return
+        from .translators import keys
+        base = keys.CUSTOM_OPENAI_API_BASE.rstrip('/') + '/chat/completions'
+        agreed = await verify_candidates(candidates, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL)
+        if not agreed:
+            return
+        src_lang = str(getattr(config.translator, 'source_lang', '') or '').strip()
+        if not src_lang or src_lang.upper() == 'AUTO':
+            return
+        tgt_lang = str(getattr(config.translator, 'target_lang', '') or 'THA')
+        from .text_translation_dispatcher import build_chatgpt_translator
+        translator = build_chatgpt_translator(config.translator.translator)
+        translator.parse_args(config.translator)
+        flagged = [c for c in candidates if c['idx'] in agreed]
+        queries = [build_query(c['src'], agreed[c['idx']]) for c in flagged]
+        translated = await translator.translate(src_lang, tgt_lang, queries)
+        applied = apply_results(ctx.text_regions, [c['idx'] for c in flagged], translated)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] candidates={len(candidates)} flagged={len(agreed)} applied={applied}', flush=True)
 
     async def _finish_patches(self, ctx, config, source_icc):
         """Post-translation half of `translate_patches` (#905 slice 2).

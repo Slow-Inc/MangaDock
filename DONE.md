@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 207 — omission-verification pass: module + wiring behind MIT_OMISSION_VERIFY=1 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built `manga_translator/omission_guard.py`: long-line candidates, batched JSON-mode verifier (two passes must agree), retry note naming the missing words, accept only when the new answer is longer, every failure caught. 7 tests.
+- Wired after the translation stage behind **`MIT_OMISSION_VERIFY=1`** (documented in `MIT/.env.example`); unset = byte-identical. Retry intentionally uses a fresh translator (no page context) — the tradeoff that keeps it opt-in.
+- Suite 974 passed. Pending: natural proof on the Akuyaku page + corpus FP/latency sweep before any default decision.
+
+---
+
 ## MIT quality loop, round 206 — final report written (index of shipped defaults, opt-ins, rejects, remaining) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
