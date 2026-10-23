@@ -70,6 +70,9 @@
 - [ ]  [Backend/Frontend] Social Graph Engine (Follow System)
 - [ ]  [Frontend] Personalized Reading Collections Sharing
 - [ ]  [Backend/Mobile] Push Notification Framework (OS-Level)
+- [X]  [Mobile source] Android Expo Push opt-in, token lifecycle and existing native destination routing (2026-10-23; rollout disabled)
+- [ ]  [Backend] Implement the [push-device API and delivery contract](Mobile/docs/2026-10-23-phase5-push.md)
+- [ ]  [Mobile QA] EAS/Firebase setup, enabled native build and physical remote-push acceptance
 <!-- lang:end -->
 
 <!-- lang:th -->
@@ -144,4 +147,7 @@
 - [ ]  [Backend/Frontend] Social Graph Engine (ระบบ Follow)
 - [ ]  [Frontend] แชร์คอลเล็กชันการอ่านส่วนตัว
 - [ ]  [Backend/Mobile] Push Notification Framework (ระดับ OS)
+- [X]  [Mobile source] เปิด/ปิด Expo Push บน Android จัดการ token และเปิดหน้า Native เดิม (2026-10-23; ยังปิด rollout)
+- [ ]  [Backend] ทำ [API ลงทะเบียนและสัญญาท่อส่ง Push](Mobile/docs/2026-10-23-phase5-push.md)
+- [ ]  [Mobile QA] ตั้ง EAS/Firebase สร้าง Native build ที่เปิดฟีเจอร์ และรับผล remote push บนเครื่องจริง
 <!-- lang:end -->

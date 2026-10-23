@@ -15,6 +15,7 @@
       "permissions": ["INTERNET"]
     },
     "plugins": [
+      ["expo-notifications", { "defaultChannel": "mangadock-updates" }],
       [
         "expo-media-library",
         {

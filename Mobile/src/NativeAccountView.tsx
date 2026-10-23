@@ -29,6 +29,7 @@ import { readingStats } from "./reading-stats.ts";
 import { NativeSecurityView } from "./NativeSecurityView.tsx";
 import { pickImages } from "./native-images.ts";
 import { design } from "./design.ts";
+import { NativePushSettings } from "./NativePushSettings.tsx";
 const languages = [
   "th",
   "en",
@@ -280,6 +281,7 @@ export function NativeAccountView({
               <View style={styles.section}>
                 {button("เช็กอินรายวัน", () => setScreen("checkin"))}
                 {button("การแจ้งเตือน", () => setScreen("notifications"))}
+                <NativePushSettings push={runtime.push} />
                 {button("ประวัติเหรียญ", () => setScreen("wallet"))}
                 {Number(profile.role) >= 8 &&
                   button("หน้าทีมงาน", () => onNavigate({ kind: "staff" }))}

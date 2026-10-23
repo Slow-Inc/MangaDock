@@ -6,6 +6,8 @@ import * as WebBrowser from "expo-web-browser";
 import { fetch as nativeFetch } from "expo/fetch";
 import { AppState, Platform } from "react-native";
 import * as Linking from "expo-linking";
+import { createPushNotifications } from "./push-notifications.ts";
+import { connectNativePush, pushPlatform } from "./native-push.ts";
 import { installAuthCrypto } from "./authCrypto.ts";
 import { getDeviceId } from "./device.ts";
 import { createMobileSession } from "./session.ts";
@@ -47,11 +49,13 @@ export async function createRuntime() {
       flowType: "pkce",
     },
   });
+  let beforeSignOut = async () => {};
   const session = createMobileSession({
     supabase,
     apiOrigin,
     deviceId,
     fetch,
+    beforeSignOut: () => beforeSignOut(),
     openAuthSession: (url, redirectTo) =>
       WebBrowser.openAuthSessionAsync(url, redirectTo),
   });
@@ -67,6 +71,25 @@ export async function createRuntime() {
   let destination: NotificationDestination | null = null;
   const destinations = new Set<() => void>();
   let disposed = false;
+  let initialized = false;
+  const pushEnabled =
+    Platform.OS === "android" &&
+    process.env.EXPO_PUBLIC_PUSH_ENABLED === "true";
+  const push = createPushNotifications({
+    apiOrigin,
+    deviceId,
+    fetch,
+    session,
+    storage: AsyncStorage,
+    platform: pushPlatform,
+    enabled: pushEnabled,
+    navigate(next) {
+      destination = next;
+      destinations.forEach((subscriber) => subscriber());
+    },
+  });
+  beforeSignOut = () => push.beforeSignOut();
+  const disconnectPush = pushEnabled ? connectNativePush(push) : () => {};
   async function receiveLink(url: string) {
     if (disposed) return false;
     if (await auth.handleCallback(url)) return true;
@@ -80,8 +103,10 @@ export async function createRuntime() {
     void receiveLink(event.url).catch(() => {});
   });
   const refresh = (state: string) => {
-    if (state === "active") supabase.auth.startAutoRefresh();
-    else supabase.auth.stopAutoRefresh();
+    if (state === "active") {
+      supabase.auth.startAutoRefresh();
+      if (initialized) void push.refresh();
+    } else supabase.auth.stopAutoRefresh();
   };
   refresh(AppState.currentState);
   const listener = AppState.addEventListener("change", refresh);
@@ -92,6 +117,7 @@ export async function createRuntime() {
     apiOrigin,
     deviceId,
     fetch,
+    push,
     destination: {
       snapshot: () => destination,
       subscribe(listener: () => void) {
@@ -114,12 +140,18 @@ export async function createRuntime() {
         await session.restore();
         if (url) await receiveLink(url).catch(() => {});
       }
+      initialized = true;
+      // A restored account already queued registration via the session listener.
+      // Optional push connectivity must not delay opening the product.
+      if (session.snapshot().status !== "signedIn") void push.refresh();
     },
     dispose() {
       disposed = true;
       destinations.clear();
       links.remove();
       listener.remove();
+      disconnectPush();
+      push.dispose();
       auth.dispose();
       supabase.auth.stopAutoRefresh();
       session.dispose();

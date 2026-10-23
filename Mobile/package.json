@@ -24,6 +24,7 @@
     "expo-image-picker": "~56.0.25",
     "expo-linking": "~56.0.15",
     "expo-media-library": "~56.0.9",
+    "expo-notifications": "~56.0.26",
     "expo-sharing": "~56.0.26",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",

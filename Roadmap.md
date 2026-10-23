@@ -121,7 +121,9 @@ Status is based on code in the default branch, dated engineering reports, and ou
 **Exit Criteria:** Core browsing, reading, and account journeys run in native screens without WebView dependency, while the web application continues to operate independently against the same backend.
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**Status:** NOT STARTED (dedicated Phase 5 scope) — user follows and in-app notifications already exist as reusable foundations
+**Status:** WIP — first Android push client slice implemented on a feature branch; Backend delivery, provider configuration and device acceptance remain pending
+
+**2026-10-23:** [Mobile push contract and verification](Mobile/docs/2026-10-23-phase5-push.md). Rollout is disabled. This does not complete the Phase 5 feed, custom collections or multi-node notification delivery pipeline.
 
 **Audit (2026-10-22):** Current user_follows APIs and the in-app notifications service are not the planned personalized Following/ranked feed or OS-level push delivery. Existing favorites, followed series and reading history are not custom public/shareable collections. No end-to-end delivery of the new Phase 5 scope is claimed.
 
@@ -274,7 +276,9 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **เกณฑ์เสร็จสิ้น:** ผู้ใช้สามารถสำรวจมังงะ อ่านมังงะ และจัดการบัญชีผ่านหน้าจอ Native ได้โดยไม่ต้องพึ่ง WebView ขณะที่ Web App ยังทำงานแยกต่างหากบน Backend เดียวกัน
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**สถานะ:** NOT STARTED (ตาม Scope Phase 5 ใหม่) — มี Follow และ In-app Notifications เดิมให้ Reuse
+**สถานะ:** WIP — เริ่ม slice แรกของ Android Push Client บน feature branch ยังต้องทำท่อส่ง Backend ตั้งค่า provider และรับผลบนอุปกรณ์
+
+**2026-10-23:** [สัญญาและผลตรวจ Mobile Push](Mobile/docs/2026-10-23-phase5-push.md) ยังปิด rollout ไม่ใช่ผลเสร็จของ Feed, Custom Collections หรือระบบส่งหลาย node ทั้ง Phase 5
 
 **ผลตรวจ (2026-10-22):** มี user_follows API และ In-app Notifications จริง แต่ไม่ใช่ Personalized Following/Ranked Feed หรือ OS Push Notifications และ Favorites/Series Follows/Reading History ที่มีอยู่ไม่ใช่ Custom Collections ที่แชร์ Public Link ได้ตาม Phase 5 จึงยังไม่อ้างว่าส่งมอบ Phase 5 สำเร็จ
 

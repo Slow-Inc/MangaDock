@@ -5,6 +5,7 @@ export function fixture(
   options: {
     loadAccount?: () => Promise<Response>;
     mfa?: boolean;
+    beforeSignOut?: () => Promise<void>;
     browser?: () => Promise<{ type: string; url?: string }>;
     externalFetch?: typeof globalThis.fetch;
     onRequest?: (input: RequestInfo | URL, init?: RequestInit) => void;
@@ -118,6 +119,7 @@ export function fixture(
     fetch,
     apiOrigin: "https://api.example.test",
     deviceId: "mdock_native_test",
+    beforeSignOut: options.beforeSignOut,
     openAuthSession: options.browser,
   });
   return {

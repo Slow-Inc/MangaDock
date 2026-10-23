@@ -2066,3 +2066,80 @@ vault. **Remaining = user-gated:** merge #533 + prod-enable of the proven-good f
 **Risk.** Low — five of six PRs are test/docs/IO-hardening; the encoding + timer fixes are additive-safe (no legacy non-ASCII files existed pre-fix; timer cleanup is a no-op when unset). Base-staleness verified disjoint for every merge (no clobber possible).
 
 **Remaining.** #614 (load_dotenv extraction) + #615 (BaseGPTTranslator) filed as focused leftovers; CLAUDE.md copy of the #620 rule deferred to Stage B.
+
+## 2026-10-23: Phase 5 Mobile Expo Push client, gated first slice
+
+### 1. What changed
+Mobile adds `push-notifications.ts`, the Expo OS adapter and accessible account settings; runtime/session get notification routing and pre-logout cleanup. New build config/plugin/env and regression coverage. [Full contract and evidence](../../Mobile/docs/2026-10-23-phase5-push.md).
+
+### 2. Results / outcome
+Client logic and native compilation are verified; rollout remains off. No live push delivery, new Backend endpoint, enabled-device acceptance or Phase 5 completion claimed.
+
+### 3. Expected performance gain %
+Not measured; this is a new capability, not a performance optimization. Optional push does not block product startup. Registration refresh occurs on accepted identity, foreground and token changes, without polling.
+
+### 4. Benefits
+Explicit opt-in, no launch prompt, acknowledged registration state, recipient-scoped navigation, stale-account protection and bounded cleanup/retry.
+
+### 5. Purpose
+Allow Mobile to implement Phase 5 OS push in parallel with the server and web teams.
+
+### 6. Why we changed it + architectural impact
+Main already has native Expo screens and an in-app inbox but no OS push. Attach a small injected controller and Expo adapter to the existing session/router. Define a concrete Backend contract rather than silently invent a deployed service.
+
+### 7. Problems before the refactor
+No OS push registration/response path. The historical original checkout is an unborn/untracked WebView tree, while current main is native; development therefore uses an isolated worktree from current main.
+
+### 8. Goals
+Build/test the Android client, preserve account boundaries, document missing infrastructure and leave rollout disabled until live integration.
+
+### 9. Architecture Before
+Native Auth/runtime -> existing account inbox and allow-listed product deep links; no push transport.
+
+### 10. Architecture After
+Account opt-in -> Expo Push token -> proposed authenticated push-device API; Expo tap -> recipient check -> existing native parser/router. Backend delivery is still planned as the roadmap's outbox + separate Redis notification workers.
+
+### 11. Refactor list
+Additive controller/OS/UI seams; one optional session pre-signout hook; runtime subscriptions; Expo config/plugin. No business-service rewrite or Frontend/Backend/MIT source change.
+
+### 12. Metrics
+Baseline235 -> final254 passing Mobile tests; TypeScript passes; Android export834 modules/11 assets/~3.2MB. ARM64 debug assembly + vital release analysis pass,426 tasks. Full debug lint:1 camera manifest error/31 warnings. Runtime latency/memory not measured.
+
+### 13. Technical Debt Removed
+No existing debt claimed removed. Reuses the established destination parser, Auth, device headers and native design tokens instead of duplicating them.
+
+### 14. Risk Reduction
+Default-off build flag, required provider identity for enabled builds, account-scoped preferences, serialized/cancellable work, response deduplication and explicit server acknowledgement. Offline failure of both revocation paths remains a documented limitation; Backend leases/receipts and ownership checks are required.
+
+### 15. Developer Experience Impact
+Standalone controller/Expo-boundary tests and a bilingual API handoff allow independent implementation. Worktree `C:/Users/woral/md-phase5-mobile`, branch `feat/mobile-phase5-push-20261023`. Dependency changes are SDK-compatible expo-notifications and its required transitive updates.
+
+### 16. Future Opportunities
+Implement push-device API, outbox/worker/receipts, EAS/Firebase configuration, real Android tests, then signed distribution. iOS, Following feed and shareable custom collections remain separate.
+
+### 17. Lessons Learned
+Read current main: the old WebView checkout is not current architecture. JVM Thai calendar produced2569 in apkzlib, which accepts1980–2107; the same task passed with only JVM locale changed to en-US. Do not suppress the unrelated full-lint camera finding. Scrutinize corrected startup coupling, ambiguous-error opt-out and pending-token cancellation.
+
+### 18. KPI
+Automated client regression254/254; native build/vital gate pass. Live delivery, physical UX and signed-release KPI: not accepted. Rollback: keep `EXPO_PUBLIC_PUSH_ENABLED=false` and rebuild if withdrawing an already-enabled binary; no database or cloud rollback applied by this slice. Links: [ADR032](../adr/032-mobile-phase5-push-lifecycle.md), [contract/results](../../Mobile/docs/2026-10-23-phase5-push.md); base commit66d5f8b, no external issue/PR published.
+
+### ภาษาไทย (mirror)
+
+1. **เปลี่ยนอะไร:** เพิ่ม controller/Expo adapter/ตั้งค่าแจ้งเตือนในบัญชี เชื่อม runtime/router และ cleanup ก่อน logout เพิ่ม build config/plugin/env/tests ดูรายงานด้านบน
+2. **ผล:** ยืนยัน logic/build ฝั่ง Mobile เท่านั้น ยังปิด rollout ไม่อ้าง Push จริง API ใหม่ใน production หรือ Phase 5 เสร็จ
+3. **Performance:** ไม่วัดและไม่อ้างเปอร์เซ็นต์ ไม่มี polling ต่อเนื่อง Push ไม่บล็อก startup อัปเดตเมื่อบัญชี/foreground/token เปลี่ยน
+4. **ข้อดี:** ขอสิทธิ์เมื่อเลือกเปิด มี server acknowledgement ป้องกันข้อมูลและงานเก่าข้ามบัญชี ตรวจผู้รับ/ลิงก์และจำกัดเวลารอ cleanup
+5. **จุดประสงค์:** ทำ Mobile คู่ขนานกับ Backend/เว็บได้
+6. **เหตุผล/สถาปัตยกรรม:** main มี Expo/inbox เดิมแต่ยังไม่มี OS Push จึงเพิ่ม controller กับ adapter ที่รอยต่อ Auth/router เดิม และทำสัญญา API ที่ระบุชัดว่ายังไม่ deploy
+7. **ก่อนทำ:** ไม่มีเส้นทางลงทะเบียน/รับ Push และ checkout เดิมเป็น unborn/untracked WebView จึงแยก worktree จาก native main ปัจจุบัน
+8. **เป้าหมาย:** build/test Android คงขอบเขตบัญชี ระบุ infra ค้างและปิด rollout จนเชื่อมจริงครบ
+9. **ก่อน:** native Auth/runtime ต่อ inbox/deep links เดิม ไม่มี Push transport
+10. **หลัง:** opt-in -> Expo token -> API ที่เสนอใหม่ ส่วนกดแจ้งเตือนตรวจผู้รับแล้วใช้ parser/router เดิม Backend outbox/Redis notification workers ยังต้องทำตาม roadmap
+11. **รายการ:** เพิ่ม seams controller/OS/UI hook ก่อน logout และ runtime subscriptions/config ไม่ rewrite service ธุรกิจหรือแก้ source Frontend/Backend/MIT
+12. **ตัวเลข:** Mobile235 ->254 tests ผ่าน types/export834 modules/11 assets/~3.2MB และ debug ARM64/vital ผ่าน426 tasks Full lint ยัง1 camera error/31 warnings ไม่วัด latency/memory จริง
+13. **Debt:** ไม่อ้างล้าง debt เดิม ใช้ parser/Auth/headers/design tokens เดิม
+14. **ความเสี่ยง:** default-off ตรวจ provider identity เก็บ preference แยกบัญชี ยกเลิก/เรียงงานและกัน callback ซ้ำ ต้องมี Backend leases/receipts/owner checks หากถอนทะเบียนทั้งสองทางล้มเหลว offline ยังมีข้อจำกัดตามรายงาน
+15. **การพัฒนาต่อ:** tests/สัญญาสองภาษา/worktree/branch ตามด้านบน อัปเดตเฉพาะ dependency ที่ Expo Notifications ต้องใช้
+16. **งานถัดไป:** API/outbox/worker/receipts, EAS/Firebase, มือถือจริงและ signed release ส่วน iOS/Feed/Collections ยังแยก
+17. **บทเรียน:** ใช้ main ปัจจุบัน พบปี พ.ศ.2569 ใน apkzlib ที่รับ1980–2107 และพิสูจน์ locale JVM en-US ทำให้ task เดิมผ่าน ไม่ suppress full-lint camera error ตรวจ scrutinize แล้วแก้ startup coupling การปิดหลัง error และการยกเลิก token ที่ค้าง
+18. **KPI/rollback:** tests254/254/native build/vital ผ่าน ยังไม่รับ live/device/release ปิด flagและ rebuild หากเคยแจก binary ที่เปิดฟีเจอร์ ไม่มี schema/provider ให้ rollback ใน slice นี้ ดู ADR/report ฐาน66d5f8b ยังไม่เผยแพร่ issue/PR

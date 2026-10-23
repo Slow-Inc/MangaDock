@@ -8,6 +8,7 @@ import { createAuthManagement } from "../src/auth-management.ts";
 import type { MobileRuntime } from "../src/runtime.ts";
 import { createReader } from "../src/reader.ts";
 import { createReadingSocial } from "../src/reading-social.ts";
+import { createPushNotifications } from "../src/push-notifications.ts";
 const { NativeSessionView } = await import("../src/NativeSessionView.tsx");
 const { pickImages } = await import("../src/native-images.ts");
 const { NativeReadingView } = await import("../src/NativeReadingView.tsx");
@@ -17,6 +18,7 @@ const { NativeReviewSection } = await import("../src/NativeReadingSocial.tsx");
 const { NativeAccountActivity } =
   await import("../src/NativeAccountActivity.tsx");
 const { createAccountActivity } = await import("../src/account-activity.ts");
+const { NativePushSettings } = await import("../src/NativePushSettings.tsx");
 function setup(authOptions: Parameters<typeof fixture>[0] = {}) {
   const auth = fixture({
     externalFetch: async (input) =>
@@ -35,9 +37,22 @@ function setup(authOptions: Parameters<typeof fixture>[0] = {}) {
     supabase: auth.supabase,
   };
   const management = createAuthManagement(options);
+  const push = createPushNotifications({
+    ...options,
+    enabled: false,
+    storage: { getItem: async () => null, setItem: async () => {} },
+    platform: {
+      permission: async () => false,
+      token: async () => "",
+      unregister: async () => {},
+      preview: async () => {},
+    },
+    navigate() {},
+  });
   const runtime: MobileRuntime = {
     ...options,
     auth: management,
+    push,
     destination: {
       snapshot: () => null,
       subscribe: () => () => {},
@@ -45,6 +60,7 @@ function setup(authOptions: Parameters<typeof fixture>[0] = {}) {
     },
     initialize: async () => {},
     dispose() {
+      push.dispose();
       management.dispose();
       auth.app.dispose();
     },
@@ -62,6 +78,65 @@ function button(ui: ReactTestRenderer, label: string) {
           .some((text) => text.children.join("") === label),
     )!;
 }
+
+test("native push settings render permission, acknowledged-on, preview and off states through the real controller", async (t) => {
+  const { auth, runtime } = setup({
+    externalFetch: async (_input, init) =>
+      init?.method === "DELETE"
+        ? new Response(null, { status: 204 })
+        : Response.json({ registered: true }),
+  });
+  await runtime.session.signIn("reader@example.test", "correct-test-password");
+  let allowed = false,
+    prompts = 0,
+    previews = 0;
+  const push = createPushNotifications({
+    ...runtime,
+    enabled: true,
+    storage: { getItem: async () => null, setItem: async () => {} },
+    platform: {
+      permission: async () => {
+        prompts++;
+        return allowed;
+      },
+      token: async () => "fcm-test-token",
+      unregister: async () => {},
+      preview: async () => {
+        previews++;
+      },
+    },
+    navigate() {},
+  });
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    push.dispose();
+    runtime.dispose();
+  });
+  await act(async () => {
+    ui = create(React.createElement(NativePushSettings, { push }));
+  });
+  assert.equal(prompts, 0);
+  await act(async () => {
+    await button(ui, "เปิดรับแจ้งเตือนบนเครื่อง").props.onPress();
+  });
+  assert.equal(push.snapshot().status, "blocked");
+  assert.ok(button(ui, "เปิดการตั้งค่าเครื่อง"));
+  allowed = true;
+  await act(async () => {
+    await push.enable();
+  });
+  assert.ok(button(ui, "ปิดแจ้งเตือนบนเครื่อง"));
+  await act(async () => {
+    button(ui, "ทดสอบแจ้งเตือนบนเครื่อง").props.onPress();
+  });
+  assert.equal(previews, 1);
+  await act(async () => {
+    await push.disable();
+  });
+  assert.ok(button(ui, "เปิดรับแจ้งเตือนบนเครื่อง"));
+  assert.equal(auth.app.snapshot().status, "signedIn");
+});
 test("empty required review data renders a retryable error instead of crashing the review section", async (t) => {
   for (const emptyPart of ["summary", "list"]) {
     const { runtime } = setup({

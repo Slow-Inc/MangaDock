@@ -30,6 +30,7 @@ const mocks: Record<string, string> = {
     const os = globalThis.__mangaNativeBoundary;
     export const View='View', Text='Text', TextInput='TextInput', Pressable='Pressable', ScrollView='ScrollView', Modal='Modal', ActivityIndicator='ActivityIndicator', KeyboardAvoidingView='KeyboardAvoidingView';
     export const Platform={OS:'android'}, StyleSheet={create:x=>x,absoluteFillObject:{}};
+    export const Linking={openSettings:async()=>{}};
     export const Alert={alert(){}}, AppState={currentState:'active',addEventListener:()=>({remove(){}})};
     export const BackHandler={addEventListener:(name,fn)=>{os.back.push(fn);return {remove(){const i=os.back.indexOf(fn);if(i>=0)os.back.splice(i,1);}}}};
     export const Image=Object.assign((props)=>React.createElement('Image',props),{getSize:(uri,done)=>done(100,140),prefetch:async()=>true,abortPrefetch(){}});

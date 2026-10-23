@@ -17,6 +17,7 @@ export function createMobileSession(options: {
   apiOrigin: string;
   deviceId: string;
   fetch: typeof globalThis.fetch;
+  beforeSignOut?: () => Promise<void>;
   openAuthSession?: (
     url: string,
     redirectTo: string,
@@ -137,6 +138,7 @@ export function createMobileSession(options: {
       await accept(data.session, current);
     },
     async signOut() {
+      await options.beforeSignOut?.();
       generation++;
       publish({ status: "signedOut", account: null });
       const { error } = await options.supabase.auth.signOut({ scope: "local" });

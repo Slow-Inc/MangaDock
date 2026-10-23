@@ -1,5 +1,9 @@
 # MangaDock Mobile
 
+2026-10-23: first **Phase 5 Android Push** implementation is on `feat/mobile-phase5-push-20261023`. Uses Expo Push Service, explicit account opt-in, token lifecycle and existing native notification destinations. Rollout stays **off** until the proposed Backend API and EAS/Firebase credentials are ready; no live push/device acceptance claimed. [Contract, configuration, verification and resume point](docs/2026-10-23-phase5-push.md).
+
+ภาษาไทย: เริ่ม Phase 5 Push บน Android แล้ว ใช้ Expo Push Service มีเปิด/ปิดจากบัญชี จัดการ token และเปิดหน้า Native เดิม ยังปิด rollout จน Backend API ที่เสนอและ EAS/Firebase พร้อม ไม่อ้างรับผล Push จริงหรือเครื่องจริง ดูสัญญา/วิธีตั้งค่า/ผลตรวจในรายงานด้านบน
+
 2026-10-22: native Phase 4 integration candidate validated against current main: Mobile **235/235**, Backend **1,014/1,014 (98 suites)** and tooling **58/58** pass. Draft #860 and release acceptance remain separate. [Integration decisions, evidence and remaining work](docs/2026-10-22-main-integration.md).
 
 ภาษาไทย: ตรวจชุดรวม native Phase 4 กับ main แล้ว Mobile **235/235** Backend **1,014/1,014 (98 suites)** และ tooling **58/58** ผ่าน ยังแยก draft #860 และการรับผล release ไว้ ดูหลักฐานและงานค้างในรายงานด้านบน
