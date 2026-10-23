@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 101 — batch pipeline vs single-page: 1.46x faster, names consistent, quality within judge noise (#905) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured a real 2-page chapter (Tsuki c2 p0/p1) through both paths: single-page **29.4 s**, batch pipeline **20.2 s** -> **1.46x**.
+- **Quality:** deterministic win on names — batch keeps `TSUKUYOMI` consistent across the chapter (`ทสึคึโยมิ` twice) while single-page produced two spellings (gate `inconsistent_name`). Judge: single 1.55 vs batch 1.39 over 33 segments, a gap inside the 1.36-1.58 noise band measured for the same config; most lowered flags are the judge's known Thai-spelling false positives.
+- **Stays opt-in:** batch mode has no live per-page progress and a higher memory footprint — the documented tradeoff. Recommendation: use it for chapter jobs that don't need per-page progress; revisit the default when the Backend UX stops depending on per-page callbacks.
+- Benchmark `2026-10-23-batch-vs-single.md`; #905 updated.
+
 ## MIT quality loop, round 100 — forced-guard harness proves the filler and LOST->หายาก guards fix live output (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
