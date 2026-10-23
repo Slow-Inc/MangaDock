@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 185 — PR body numbers refreshed to the v2 range (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body's quality lines now quote the post-OCR-pass range: raw 1.44, strict-adjusted **1.55-1.60** (v2 dashboard 1.60), EN and Thai mirrors both updated. No code change.
+
+---
+
 ## MIT quality loop, round 184 — official dashboard on v2: adjusted 1.60, leftover {}, wall 7.64 s (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
