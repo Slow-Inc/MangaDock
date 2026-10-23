@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 177 — OCR second pass batched: same repairs at +0.33 s/page (4 % wall) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The v1 pass paid one model dispatch per candidate line (~0.27 s overhead each, +1.45 s/page). Rewrote it to paste all candidate crops of a page into one white canvas and dispatch **once**, mapping results back by quad y-position; tuned threshold 0.65 and cap 6.
+- Batched sweep (39 pages): **41 accepted re-reads** (10.0 % of source strings), **2/39 layout changes**, OCR stage **+0.33 s/page (+4 % wall)**. Otome p1 now reads `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.` (both `DEFEND` and `ISLAND` repaired; the cap-4 candidate list had dropped the latter).
+- Suite green; flag remains **opt-in** per the loop's tradeoff rule; benchmark updated. Next: re-judge the tuned corpus before any default decision.
+
+---
+
 ## MIT quality loop, round 176 — opt-in OCR second pass shipped: 67 misreads repaired, +1.4 s/page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

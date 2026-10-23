@@ -44,13 +44,18 @@ def test_reread_replaces_only_improved_lines_and_respects_the_cap():
     high = types.SimpleNamespace(text='HELLO THERE', prob=0.95, pts=np.array([[10, 40], [60, 40], [60, 60], [10, 60]], dtype=np.float32))
     calls = []
 
-    async def fake_dispatch(ocr_key, crop, quads, cfg, device, verbose):
-        calls.append((ocr_key, crop.shape))
-        return [types.SimpleNamespace(text='TO DEFEND', prob=0.90)]
+    async def fake_dispatch(ocr_key, canvas, quads, cfg, device, verbose):
+        calls.append((ocr_key, canvas.shape, len(quads)))
+        # echo one read back for the first slot (canvas coordinates of the pasted crop)
+        assert len(quads) == 1
+        h = int(quads[0].pts[:, 1].max())
+        return [types.SimpleNamespace(text='TO DEFEND', prob=0.90,
+                                      pts=np.array([[0, 0], [50, 0], [50, h], [0, h]], dtype=np.float32))]
 
     changed = asyncio.run(reread_textlines(image, [good, high], '48px', None, 'cpu', fake_dispatch))
     assert changed == 1
     assert good.text == 'TO DEFEND'
     assert high.text == 'HELLO THERE'
     assert len(calls) == 1
+    assert calls[0][2] == 1
 

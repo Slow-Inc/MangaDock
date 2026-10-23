@@ -44,3 +44,25 @@ also needs the confidence margin.
 raise the confidence bar to ~0.65 and lower the cap to 4 (most churn attempts happen between 0.65-0.78), re-measure the
 stage cost, then re-run the sweep + judge before considering a default. The flag also lets operators use it on
 credit/title-heavy chapters where the OCR wins are largest.
+## Tuned (round 177): one batched model call per page, threshold 0.65, cap 6
+
+The first version dispatched once per candidate line (~0.27 s of overhead each, +1.45 s/page). Now all candidate crops of a
+page are pasted into a single white canvas (8 px side margin, 12 px gaps) and dispatched **once**; results are mapped
+back to lines by the returned quad's y-position. Threshold 0.65 (0.65-0.78 was mostly punctuation churn) and cap 6.
+
+| metric | per-line v1 | batched v2 |
+|---|---|---|
+| accepted re-reads (39 pages) | 67 | **41** |
+| source strings changed | 14.9 % | **37/369 (10.0 %)** |
+| page layout changes | 2/39 | **2/39** |
+| OCR stage delta | +1.45 s/page | **+0.33 s/page (+4 % wall)** |
+| Otome p1 line | `DEEEND` | `DEFEND` + `ISLAND` both repaired (master page now `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.`) |
+
+The batched canvas also recovered the `/SLAND -> ISLAND` repair that a cap of 4 had pushed out of the candidate list
+(Otome page: candidates 6, accepted 5).
+
+## Status
+
+Still **opt-in** (`MIT_OCR_REREAD=1`) because there is still a latency tradeoff (the loop rule: tradeoff -> opt-in), but
+it is now a cheap, bounded lever: +4 % wall for deterministic repairs of the lowest-confidence 10 % of source lines,
+with zero layout movement. Remaining check before a default decision: re-judge the tuned corpus (planned next).
