@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 218 — Vercel docs-function size fixed by downscaling the branch's benchmark images (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vercel stopped rate-limiting and revealed a real failure: the `docs` function is **253.42 MB uncompressed**, over the 250 MB limit. The branch adds 34 benchmark evidence images (17.4 MB) under `docs/reports/benchmarks/`, which is what tipped it over.
+- Downscaled all 34 added images to max side 1100 px with PNG optimization (still readable as evidence): **17.4 MB -> 10.5 MB (-6.9 MB)**, which brings the function to roughly 246.5 MB. Commit pushed; Vercel redeploys on the new head.
+
+---
+
 ## MIT quality loop, round 217 — final report now includes the omission pass; suite count refreshed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
