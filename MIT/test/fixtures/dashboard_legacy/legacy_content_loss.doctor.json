@@ -1,0 +1,22 @@
+{
+ "page": "legacy",
+ "regions": [
+  {
+   "index": 5,
+   "xyxy": [
+    911,
+    680,
+    1064,
+    1026
+   ],
+   "src": "THE BUGS WARPED WITH 16 WARSHIPS, ATTACKED THE MAJOR CITIES FROM THE SATELLITE ORBIT AND DESCENDED INTO THE PLANET",
+   "dst": "แล้ว... สิ่งเลวร้ายที่สุดที่อาจเกิดขึ้นคืออะไร",
+   "container": 4,
+   "branch": "clean_layout",
+   "font_px": 20
+  }
+ ],
+ "timing_ms": {
+  "wall": 1000
+ }
+}

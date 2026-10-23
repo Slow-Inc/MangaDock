@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 137 — dashboard positive-control fixture (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a **positive control**: a trimmed legacy payload whose region has the measured `content_loss` defect (114→46 chars). The dashboard test asserts it reports `content_loss` in **both** the gate violations and the leftover scan — proving the clean-page fixtures are not passing by blind luck.
+- 2 dashboard fixture tests now (clean pages → 0 leftovers; legacy defect → detected).
+
+---
+
 ## MIT quality loop, round 136 — dashboard pinned on real payload fixtures (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
