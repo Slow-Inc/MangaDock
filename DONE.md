@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 206 — final report written (index of shipped defaults, opt-ins, rejects, remaining) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-quality-loop-final-report.md`: v4 end-state numbers (gate 0, leftover 0, adjusted 1.58, wall 7.80/6.62 s), everything shipped as default with its evidence link, the opt-in list, the rejected-with-evidence list, remaining work and the exact reproduce commands. It is the one-page entry point for the reviewer/user.
+- No code change.
+
+---
+
 ## MIT quality loop, round 205 — CI green on the consider-guard head (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
