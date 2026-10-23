@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 180 — PR #794 body/comment updated with round-3; CI green on the new head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Appended the round-3 section to the PR body (OCR second pass default ON + escape, OCR A/B tool, typo normalizer, extended leak-script salvage, edge strip, debugger-hook removal, unclip A/B) with a full Thai mirror, and posted a round-3 change-set comment.
+- CI on head `029e2325`: **logic gate pass (1m58s), heavy ML pass (5m0s), backend pass (53s)**; Vercel still the external 24 h rate limit. PR remains mergeable and draft.
+
+---
+
 ## MIT quality loop, round 179 — OCR second pass flipped to DEFAULT ON (+4 % wall, escape env) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
