@@ -220,3 +220,16 @@ So the shipped pipeline produces real rendered pages, not only translated text, 
 
 The clean state reproduces on a second full sweep, with the lowest guard count and a faster wall time. Single-run latency
 varies with gateway/model load, so quote the 6-8 s range rather than one run.
+## Visual acceptance of rendered pages (round 206)
+
+Inspected the two rendered PNGs by eye (Akuyaku p0, Tsuki p0) in addition to the numeric telemetry:
+
+- Bubble text is fitted and legible on every balloon; **no overflow, clipping, or overlap** with art; font sizes vary
+  sensibly with bubble size.
+- The stylised chapter heading (`2ND NIGHT: WHAT LIES AHEAD OF THE EDGE OF THE WORLD?`) stays English because it is not
+  detected as a text region at all (neither translated nor dropped-by-filter) - a detection limitation for outlined
+  display lettering, not a guard/render defect. Japanese credits and the decorative 月 title are deliberately dropped by
+  the source-language filter (recorded in the doctor payload's `dropped` list).
+
+Quote the visual check alongside the telemetry when claiming render quality; the stylised-heading gap needs detection
+work (title/logo class), not a translation fix.

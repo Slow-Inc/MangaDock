@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 257 — visual acceptance of rendered pages; stylised-heading limitation identified (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Inspected both rendered PNGs by eye: bubble text fitted and legible everywhere, no overflow/clipping/overlap; sizes track balloon size.
+- The stylised `2ND NIGHT: ...` heading stays English because it is **not detected as a text region** (absent from both regions and the dropped-by-filter list); Japanese credits + the decorative 月 title are correctly dropped by the source-language filter. This is a detection limitation for outlined display lettering, recorded for future work (title/logo class), not a translation or render defect. No code change.
+
+---
+
 ## MIT quality loop, round 256 — batched notes: v8 in hand-off, intra-page name unify measured as unnecessary (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
