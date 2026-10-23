@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 248 — number-preservation guard evaluated and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned every v7 region with a source digit (`20`): only 3 looked like missing numbers and all were OCR garbles of words (`60NNA`=GONNA, `HUH2`=`?`, `7BYTHE`=BY THE) with correct translations.
+- A number guard would fire on OCR noise, not translation defects; recorded in the do-not-repeat backlog with the revisit condition (standalone numbers only). No code change.
+
+---
+
 ## MIT quality loop, round 247 — env example now documents the two new debug logs (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

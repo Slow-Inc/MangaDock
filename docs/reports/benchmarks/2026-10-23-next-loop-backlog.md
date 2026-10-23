@@ -76,3 +76,14 @@ So a same-box second-pass OCR would not fix it. The viable targeted design is **
 resolution for suspicious lines** (re-run detection on the page region around a low-confidence line, keep the price
 local instead of raising detection_size for the whole page). Gated behind a flag first, with the same forced-fixture +
 corpus-sweep evidence the other levers used. Line crops alone are disproven — do not rebuild that.
+### Evaluated 2026-10-23 (round 188): number-preservation guard - **rejected**
+
+Measured every v7 region whose source carries a digit count against its Thai translation (`20` regions). Only three
+looked like a missing number, and all three were **OCR garbles of words**, with correct translations:
+
+- `EH.. YOURE JUST 60NNA SIT WITH ME?` -> `เอ่อ... เธอแค่อยากนั่งกับฉันงั้นเหรอ?` (`60NNA` = GONNA)
+- `HUH2!` -> `เฮ้!` (`2` = `?`)
+- `... EQUIPPED 7BYTHE PROTAGONIST` -> `...ที่ตัวละครเอกเท่านั้นที่สวมใส่ได้` (`7BYTHE` = BY THE)
+
+A number guard would fire on OCR noise, not on translation defects. Revisit only if a future run shows a genuinely
+lost numeric fact (price, count, time) - and then scope it to standalone numbers, not digit-bearing tokens.
