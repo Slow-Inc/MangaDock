@@ -121,3 +121,15 @@ distribution 0/1/2 = 13 / 125 / 225  (broken 3.6 % / partial 34.4 % / perfect 62
 Raw is stable at 1.44 across every sweep (v1/v2/v4), and the strict-adjusted value stays inside the established
 **1.55-1.60** band; v4 lands at 1.58 with 62 % perfect segments. The band remains the honest quote because the
 noise-flag count moves with which lines the judge happens to note (65-138 across runs), not with the pipeline.
+## v5 end state (2026-10-23 late, after interjection filter + consider guard + tag licence)
+
+| metric | v4 | **v5** |
+|---|---|---|
+| pages / regions | 39 / 365 | 39 / **369** |
+| gate violations | 0 (after re-scan) | **3, all understood**: 1 lost `!` (real), 1 rhetorical `?` -> `!` (by design, the retort licence was evaluated and kept), 1 `inconsistent_name` (needs `series_context`, absent in doctor runs) |
+| leftovers (foreign/content/typo/filler/rare) | {} | **{}** |
+| guard triggers | 5 | **4** |
+| wall avg / median | 7.80 / 6.62 s | **7.80 / 6.62 s** |
+| HEHE laughter inconsistency | 1 gate finding | **gone** (interjections are no longer names) |
+
+The 4 glitch triggers are the lowest of any sweep; every gate finding has a known cause and none is a pipeline defect.

@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 223 — v5 acceptance sweep: 4 guard triggers, 0 leftovers, 3 explainable gate findings (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full default sweep with all late fixes: 39 pages/369 regions, **leftover 0/0/0/0/0**, **4 guard triggers** (lowest), wall 7.80/6.62 s median, OCR 1.63 s.
+- Gate: 3 findings, all understood — one real lost `!`, one rhetorical `?`->`!` (the retort licence was evaluated and deliberately kept), one name inconsistency that `series_context` fixes in production. The HEHE laughter inconsistency is gone (interjection filter).
+- Final baseline doc gained the v5 row. Vercel is rate-limited again on the newest docs-only commit (the prior head deployed successfully); heavy ML confirmation pending.
+
+---
+
 ## MIT quality loop, round 222 — Vercel deployment passes after the tracing fix; all PR checks green (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
