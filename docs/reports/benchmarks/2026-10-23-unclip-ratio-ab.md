@@ -30,3 +30,25 @@ without moving the page layout.
 **Default stays 2.3.** `unclip_ratio` is already an exposed config knob; page-specific OCR triage may try 2.6 locally,
 but promoting it would trade a clean layout for a wash in quality. The root fix for the class remains the planned
 **localized re-detection at higher resolution around suspicious lines**, not a global box expansion.
+## Threshold search and the 2.4 sweep
+
+To separate "box expansion" from "big global change", ran a second full sweep at **2.4** and a fine threshold search on
+the Otome page:
+
+| unclip_ratio | Otome `DEFEND` read | source strings changed (39 pages) | pages with region-count change |
+|---|---|---|---|
+| 2.3 (default) | `DEEEND` | — | — |
+| 2.4 | `DEEEND` (still broken) | **79/366 (21.6 %)** | 7 |
+| **2.45** | **`DEFEND`** | (not swept) | — |
+| 2.5 | `DEFEND` | (not swept) | — |
+| 2.6 | `DEFEND` | 119/365 (32.6 %) | 8 |
+
+Two conclusions:
+
+1. The Otome fix needs only **+0.15** (2.45); it is a real, cheap box expansion on that page.
+2. But even the *smallest* expansion that keeps the page mostly intact (2.4) already rewrites **21.6 % of all source
+   strings and 7/39 page layouts** — the detector resizes/merges boxes globally, not just on the clipped line.
+
+So a global `unclip_ratio` bump cannot be a targeted fix: the cost (layout/prompt churn across the chapter) is
+unavoidable at any setting that changes anything. This is the same shape as the earlier `detection_size` rejection and
+confirms the local re-detection design: expand the box **only around a suspicious line**, at a higher resolution.

@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 175 — unclip threshold search: the fix needs only +0.15, but any global bump churns the chapter (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fine-grained threshold search: `unclip_ratio` 2.4 still reads `DEEEND`; **2.45** already reads `DEFEND` (Otome page).
+- Full sweep at 2.4 (below the Otome fix threshold): the DEFEND case is still broken, yet **21.6 % of source strings and 7/39 page layouts already changed** — the detector merges/resizes boxes globally, so any bump that changes anything carries chapter-wide churn.
+- This rules out a global knob as a targeted fix and confirms the design: **localized re-detection around suspicious lines at higher resolution**. Default stays 2.3; no code change.
+
+---
+
 ## MIT quality loop, round 174 — unclip_ratio 2.6 A/B: fixes DEFEND locally, overall parity, default unchanged (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
