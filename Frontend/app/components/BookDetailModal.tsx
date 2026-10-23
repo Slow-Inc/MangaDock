@@ -210,7 +210,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         if (!closingRef.current) {
           closingRef.current = true;
           setVisible(false);
-          setTimeout(onClose, 300);
+          // the same wait as handleClose: the desktop exit runs 400 ms, and a 300 ms unmount cut it short (#1060)
+          setTimeout(onClose, window.innerWidth < 768 ? 300 : 400);
         }
         return true;
       },

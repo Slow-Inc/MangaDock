@@ -85,11 +85,14 @@ on a phone the bottom-sheet slide had 0 frames (it just appeared/disappeared). T
 doesn't name Tailwind v4's separate `scale` / `translate` properties — #1053's class again. The close timer was fine
 (400 / 300 ms). Same list-without-the-property in the post page's menu, `ui/Button`, `ui/Pill` (press) and
 `ui/CopyButton` (icon swap): all six lists now name `translate,scale,rotate` next to `transform`.
+From review: a browser-Back close waited a flat 300 ms, cutting the 400 ms desktop exit short (opacity 0.05 at
+unmount); it now uses `handleClose`'s 300 / 400 ms.
 
 **Validated:** production build. Modal per-frame probe — desktop open and close: scale 20 / translate 22 / opacity 22
 in-between frames (was 0 / 0 / 22); phone sheet slide 17 in / 16 out (was 0). A whole-app snap detector (16 routes,
 every element using a scale/translate/rotate utility whose transition names `transform` but not that property): 4
-snapping groups → 0. tsc clean.
+snapping groups → 0. Back-close probe: desktop reaches scale 0.9 / opacity 0 (was cut at 0.905 / 0.05), phone slides
+the full sheet. tsc clean.
 
 ---
 
