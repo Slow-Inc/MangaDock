@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 143 — textline_merge #872 hypothesis closed with measurements (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Traced panel detection: `sort_regions` (production) calls Kumiko once per page; the other call site is debug-only; the recursive call passes `img=None`, so no duplicate detection.
+- Timed Kumiko directly: 163 / 568 / 119 ms on three real pages (2 panels each) — content-dependent but far below the 8.8 s merge spike.
+- Combined with the earlier triage (spike moves between runs, size uncorrelated, `models_ttl=0`), the remaining merge time is transient host/GPU contention. No lossless fix without changing reading order; documented and #872 annotated.
+
+---
+
 ## MIT quality loop, round 142 — PR hand-off guide posted; no review feedback yet (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
