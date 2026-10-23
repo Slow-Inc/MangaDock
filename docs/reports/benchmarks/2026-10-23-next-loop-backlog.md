@@ -154,3 +154,21 @@ and on pages with SFX candidates the vision prefetch (already concurrent) adds i
 shrink further without dropping candidates (quality tradeoff), and the panel/bubble work is the layout contract that
 the render stage relies on (a downscale/disable campaign was already rejected earlier for panel-order changes). Close this
 for the current loop.
+### Re-evaluated 2026-10-23 (round 232): temperature 0.2 vs 0.5 for glitch rate - no effect
+
+The bad model windows suggest asking whether a lower sampling temperature reduces guard-trigger frequency. Paired A/B
+(same 8 pages, alternating order, `translator.temperature=0.2` vs the 0.5 default, `MIT_LOG_GLITCH` on):
+
+| arm | pages | guard triggers | avg translation stage |
+|---|---|---|---|
+| default 0.5 | 8 | **2** | 4136 ms |
+| 0.2 | 8 | **2** | 3239 ms |
+
+The trigger rate is identical; the small stage-time difference is sampling luck (same retry policy). No reason to change
+the quality-first default - temperature stays 0.5 and `MIT_TEMPERATURE` remains the opt-in knob.
+
+### Side-effect audit of the round-274 licences (round 231)
+
+v10 has only two source-`!` lines whose Thai carries no punctuation/emphasis particle: one is the licensed strong
+negation (`T THATS NOT IT!` -> `ฉ- ไม่ใช่อย่างนั้น`), the other keeps the surpresa nuance with `หรือ?`
+(`IT WONT KILL ME?!` -> `มันไม่ทำให้ฉันตายหรือ?`). The licence is narrow; no shipped defect is hidden by it.

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 278 — temperature 0.2 does not reduce guard triggers; licence side-effect audit clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Paired 8-page A/B (alternating order) of `translator.temperature=0.2` vs the 0.5 default: guard triggers **2 vs 2**, stage time 3239 vs 4136 ms (sampling luck). No evidence for a default change; `MIT_TEMPERATURE` stays the opt-in knob.
+- Audited the round-274 licences on v10: only two source-`!` lines lack emphasis punctuation/particle; one is the licensed strong negation, the other uses `หรือ?`. Nothing hidden. Recorded in the backlog. No code change.
+
+---
+
 ## MIT quality loop, round 277 — new Kaguya chapter: gate 0, second render-spill data point logged on #642 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
