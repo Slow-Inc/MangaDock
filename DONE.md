@@ -77,6 +77,23 @@
 
 ---
 
+## #1092 Post page sticky bar sits under the drawer and spans the phone width (2026-10-24)
+
+**What:** the developer reported two problems with the post page's sticky title bar on a phone.
+- **It showed through the opened community drawer.** Both were `z-50`, and the bar came later in the DOM. The bar is
+  now `z-40`: above the post's `z-30` menus, below the drawer and navbar.
+- **It stopped 16 px short of each edge,** because it sat in `main`'s `px-4`. It now uses `-mx-4 px-4` on phones,
+  cancelled at `lg`. The page wrapper's own `[overflow-x:clip]` would have cut that off, and `main` already clips, so
+  the inner clip was removed.
+
+**Validated:** production build at 390 px with the real local backend.
+- **Before:** the bar spanned 16 → 374, and showed over the open drawer.
+- **After:** it spans 0 → 390, and the drawer covers it.
+- Desktop is unchanged (the bar stays within its column), and there is no horizontal overflow at 320, 390 or 1280.
+- eslint matches main.
+
+---
+
 ## #1088 Book popup buttons show one spinner while chapters load (2026-10-24)
 
 **What:** the developer reported "( ( กำลังโหลด". The buttons already swap their icon for a spinner while loading,
