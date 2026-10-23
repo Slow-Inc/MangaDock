@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 159 — แล่ว -> แล้ว normalizer (44 stored regions fixed) + fragment guard rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mining short all-caps fragments (145 unique pairs) showed they are mostly correct elaborations; a shape guard would fire on good lines (rare bad cases like `HEHE.` -> `เข่าเข่า.`). **No fragment guard.**
+- The same mining found a **frequent unambiguous typo: `แล่ว` x45** (should be `แล้ว`). Added `normalize_common_typos()` to the final cleanup (deterministic, default on, no flag) and a `common_typo` gate rule for regressions. Validation: **44 stored output regions fixed**, no other word touched; suites 60 passed in the two files.
+- Benchmark `2026-10-23-common-thai-typo-normalizer.md`; full suite re-run green.
+
+---
+
 ## MIT quality loop, round 158 — documentation numbers made consistent everywhere (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

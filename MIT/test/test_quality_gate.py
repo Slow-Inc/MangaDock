@@ -101,3 +101,11 @@ def test_a_dropped_region_with_no_translation_is_not_a_violation_535():
     assert not v, v
     v2 = check_page([{'src': 'REAL LINE', 'dst': ''}])
     assert any(x['kind'] == 'empty_translation' for x in v2), v2
+
+def test_the_gate_flags_a_common_thai_typo_1023():
+    from manga_translator.quality_gate import check_page
+    v = check_page([{"src": "IS THAT SO", "dst": "ใช่แล่ว."}])
+    assert any(x["kind"] == "common_typo" for x in v), v
+    clean = check_page([{"src": "IS THAT SO", "dst": "ใช่แล้ว."}])
+    assert not clean, clean
+

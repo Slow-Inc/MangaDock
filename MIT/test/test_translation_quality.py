@@ -328,3 +328,12 @@ def test_a_retry_note_does_not_inflate_the_source_length_1058b():
     note = "\n\n[note: keep the question in the translation, e.g. end with ไหม.]"
     assert not content_loss("MAY THE BLESSINGS OF THE GREAT" + note, "ขอให้พรจากมหาเทพผู้ยิ่งใหญ่จงสถิตอยู่กับท่าน")
     assert content_loss("MAY THE BLESSINGS OF THE GREAT" + note, "ขอพรจากมหา")
+
+def test_common_thai_typos_are_normalized_1023():
+    from manga_translator.translation_quality import normalize_common_typos
+    assert normalize_common_typos("ฉันทราบเรื่องนี้อยู่แล่ว..") == "ฉันทราบเรื่องนี้อยู่แล้ว.."
+    assert normalize_common_typos("ใช่แล่ว.") == "ใช่แล้ว."
+    assert normalize_common_typos("แล้วก็ไป") == "แล้วก็ไป"
+    assert normalize_common_typos("เธออ่อนโยนกับสัตว์ด้วย") == "เธออ่อนโยนกับสัตว์ด้วย"
+    assert normalize_common_typos("") == ""
+

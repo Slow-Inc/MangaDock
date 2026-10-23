@@ -440,3 +440,16 @@ def content_loss(src: str, dst: str, to_lang: str = '') -> bool:
     if len(src) < 24 or not dst or not _ASCII_LETTER.search(src):
         return False
     return len(dst) / len(src) < 0.45
+
+#: Thai typos the model produces often and whose correction is unambiguous (measured 45x in the corpus:
+#: แล่ว carries mai ek where แล้ว needs mai tho; there is no Thai word spelled แล่ว).
+_COMMON_THAI_TYPOS = (('แล่ว', 'แล้ว'), ('แลว', 'แล้ว'))
+
+
+def normalize_common_typos(trans: str) -> str:
+    """Fix the few Thai misspellings that have exactly one correct form (deterministic, no ambiguity)."""
+    if not trans:
+        return trans
+    for wrong, right in _COMMON_THAI_TYPOS:
+        trans = trans.replace(wrong, right)
+    return trans

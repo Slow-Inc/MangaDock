@@ -7,7 +7,8 @@ from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
                                    runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
-                          dropped_question, untranslated_source_word, content_loss)
+                          dropped_question, untranslated_source_word, content_loss,
+                          normalize_common_typos)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -350,6 +351,7 @@ class CommonTranslator(InfererModule):
         # #889: Thai combining marks out of canonical order ('ท่ี') cannot be shaped correctly; normalise
         # every translation here so no renderer sees the broken sequence. No-op for other scripts.
         trans = normalize_thai_marks(trans)
+        trans = normalize_common_typos(trans)
 
         # Last-resort salvage (#903 follow-up): the guards re-ask a leaked script, but when the repeat budget is
         # exhausted the last answer ships. Remove leaked-script characters (never a script the source uses) so
