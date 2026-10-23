@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 176 — opt-in OCR second pass shipped: 67 misreads repaired, +1.4 s/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built `manga_translator/ocr_reread.py`: after OCR, Latin lines under confidence 0.78 are re-read with the textline box padded 30 % (same pixels); a new read replaces the old only when its confidence beats the old by >= 0.12. Flag-gated `MIT_OCR_REREAD=1`, 5 pure/integration tests, unset = byte-identical.
+- Full 39-page sweep with the flag: **67 re-reads**, 55/369 source strings changed (14.9 %), **only 2/39 layout changes** (the pass never moves a box), OCR stage 1,259 -> 2,705 ms (+1.45 s/page). Repairs real garbage (`DONOT RFHOST THIS CHAPT` -> `DO NOT REHOST THIS CHAPTER.`, `TO DEEEND` -> `TO DEFEND`, `TOKYQ` -> `TOKYO`). Judge 1.446 vs 1.436 (+0.01, noise; pages 17/13).
+- **Ships opt-in** (`MIT_OCR_REREAD=1`, documented in `MIT/.env.example`): real deterministic wins but a real +1.45 s/page tradeoff; planned tuning (threshold ~0.65, cap 4) before any default. Benchmark `2026-10-23-ocr-reread-pass.md`.
+
+---
+
 ## MIT quality loop, round 175 — unclip threshold search: the fix needs only +0.15, but any global bump churns the chapter (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

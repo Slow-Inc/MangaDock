@@ -85,6 +85,7 @@ from .translation_quality import runaway_translation, strip_noise_glyphs
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
 from .ocr import dispatch as dispatch_ocr, prepare as prepare_ocr, unload as unload_ocr
+from .ocr_reread import reread_enabled, reread_textlines
 from .textline_merge import dispatch as dispatch_textline_merge, stamp_text_raw
 from .mask_refinement import dispatch as dispatch_mask_refinement
 from .inpainting import dispatch as dispatch_inpainting, prepare as prepare_inpainting, unload as unload_inpainting
@@ -659,6 +660,9 @@ class MangaTranslator:
         # OCR debug-dir + MANGA_OCR_RESULT_DIR env dance — #187 S14: body in debug_sink
         with ocr_debug_dir_env(self.verbose, self._get_image_subfolder, self.result_sub_folder, BASE_PATH):
             textlines = await dispatch_ocr(config.ocr.ocr, ctx.img_rgb, ctx.textlines, config.ocr, self.device, self.verbose)
+        if reread_enabled():
+            await reread_textlines(ctx.img_rgb, textlines, config.ocr.ocr, config.ocr, self.device,
+                                   dispatch_ocr, self.verbose)
 
         new_textlines = []
         for textline in textlines:
