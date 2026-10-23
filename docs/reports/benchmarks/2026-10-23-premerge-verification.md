@@ -39,3 +39,28 @@ Executed a real merge in a throwaway worktree (`origin/main` + this branch head 
 
 Conclusion: once #642 lands and this PR is retargeted to `main`, only the three docs append conflicts need a union
 merge; the merged code is green.
+## Merge-day runbook (once #642 lands on main)
+
+```powershell
+cd D:/Github/worktrees/mit-quality
+git fetch origin
+# 1) retarget this PR to main (base branch integrate/render-reconcile will be deleted)
+gh pr edit 794 --base main
+# 2) merge main into the branch; conflicts should be exactly the three append-only docs files
+git checkout feat/mit-quality-loop
+git merge origin/main
+#    resolve DONE.md / docs/adr/README.md / docs/reports/system-impact-report.md by UNION (keep both sides),
+#    never by picking one side; DONE.md keeps newest entries on top
+git add DONE.md docs/adr/README.md docs/reports/system-impact-report.md
+git commit
+git push
+# 3) confirm the merge tree is green, then the PR checks
+pytest (logic gate) / heavy ML / backend must pass; Vercel must deploy (it passed on 16ff6e43)
+# 4) close the loop issues with their evidence (they were fixed in this PR)
+#    #898 #901 #903 #1039 #1052 #1056 #1057 #1058 #980 #1006 #1026 #1047 #1050(closed) #1051 #1055
+#    #1064 (docs function size) #1065 (name glossary) #1071 (guard precision licences) #1059 (breakpoint)
+# 5) after merge: mark the PR ready, then delete the branch
+```
+
+Notes: the branch is currently 0 behind `integrate/render-reconcile`; the merge simulation earlier proved the code
+auto-merges with `main` and the merged fast suite passes (944 at the time, 982 now).

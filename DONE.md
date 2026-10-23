@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 233 — merge-day runbook written; status re-checked (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a concrete merge-day runbook to `2026-10-23-premerge-verification.md`: retarget to main, merge main, resolve the three docs conflicts by union, confirmation steps, and the list of loop issues to close with evidence once merged.
+- Status: branch in sync with origin, CI running on the latest head, Vercel rate-limited externally (it passed on `16ff6e43`), #642 still an open draft (mergeable UNKNOWN). No code change.
+
+---
+
 ## MIT quality loop, round 232 — retry budget re-evaluated (keep 2) and final report bumped to v6/982 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
