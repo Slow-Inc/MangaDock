@@ -29,3 +29,9 @@
 | JPN target, English source | kana preserved |
 | THA target | kana still stripped |
 | suite | **953 passed** (4 new tests) |
+## Cost control (fast path)
+
+The extended table would run 22 per-script passes on every translation; a combined-character pre-check
+(`_ANY_LEAK_CHAR`) short-circuits both `foreign_script` and `strip_leaked_script` when the text contains no
+extended-script character at all (the common case). Re-measured over 15,668 stored segments: **0.023 ms/segment,
+0.40 ms per 17-region page** for all nine guards — unchanged from before the extension.

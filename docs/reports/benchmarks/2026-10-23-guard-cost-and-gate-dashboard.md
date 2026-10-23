@@ -9,7 +9,7 @@ Timed every guard predicate over **15,071 real stored segments** (`src`/`dst` pa
 | measure | value |
 |---|---|
 | all guards, per segment | **0.025 ms** |
-| all guards, per 17-region page | **0.43 ms** |
+| all guards, per 17-region page | **0.40-0.43 ms** (re-measured after the extended-script fast path: 0.40) |
 | share of an 9.0 s page | ~0.005 % |
 
 So the quality-first guard set costs effectively **nothing** in wall time; the retry cost (one extra gateway call)

@@ -48,6 +48,9 @@ _LEAK_SCRIPT_CHARS = {
     'armenian': re.compile(r'[\u0530-\u058F]'),
     'georgian': re.compile(r'[\u10A0-\u10FF]'),
 }
+#: Fast pre-check: any character from any extended script (the 22 per-script passes only run when this hits).
+_ANY_LEAK_CHAR = re.compile('[' + ''.join(p.pattern[1:-1] for p in _LEAK_SCRIPT_CHARS.values()) + ']')
+
 #: Scripts that are legitimate OUTPUT for a target language; the salvage must never strip them.
 _TARGET_OWN_SCRIPTS = {
     'JPN': ('cjk', 'kana'),
@@ -71,6 +74,8 @@ def foreign_script(text: str, target: str, source: str = '') -> bool:
     if _scripts(text) - set(own) - _scripts(source):
         return True
     # scripts lang_ratio does not model (Arabic is modelled, Greek/Devanagari/... are not)
+    if not _ANY_LEAK_CHAR.search(text or ''):
+        return False
     own_names = _TARGET_OWN_SCRIPTS.get(str(target).upper(), ())
     for name, pattern in _LEAK_SCRIPT_CHARS.items():
         if name in own_names:
@@ -383,6 +388,8 @@ def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
     """
     if not trans:
         return trans
+    if not _ANY_LEAK_CHAR.search(trans):
+        return trans  # fast path: no extended-script character at all
     src = query or ''
     out = trans
     own_names = _TARGET_OWN_SCRIPTS.get(str(to_lang).upper(), ())

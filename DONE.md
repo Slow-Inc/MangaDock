@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 165 — extended-script detection keeps the guard cost at 0.40 ms/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 22-script table added in round 164 would run per-script passes on every segment; added a combined-character fast path (`_ANY_LEAK_CHAR`) that short-circuits both `foreign_script` and `strip_leaked_script` when the text has no extended-script character (the common case).
+- Re-measured over **15,668 stored segments**: all nine guards **0.023 ms/segment = 0.40 ms per 17-region page** — unchanged from before the extension. Translation-quality suite 45 passed.
+- Benchmark guard-cost note updated.
+
+---
+
 ## MIT quality loop, round 164 — leak-script coverage closed: Arabic salvaged, target scripts protected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
