@@ -97,3 +97,10 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - defect คงเหลือ: model-ceiling sense/nuance ในบรรทัดที่ลื่น + ชื่อที่ `series_context` แก้ใน production
 
 เกี่ยวข้อง: [[project-art-text-handling]] · [[feedback-verify-before-claiming]] · [[feedback-root-cause-before-fix]]
+### v4 end state (2026-10-23, หลัง round 200) — gate 0 / leftover 0
+
+- 39 หน้า / **365 region**, **gate violations 0**, **leftover 0** (foreign/content/typo/filler/rare), guard ยิง 5 ครั้ง
+- wall avg **7.80s** / median **6.62s**; OCR (มี second pass) 1.63s/หน้า
+- fix เพิ่มรอบท้าย: interjection ไม่ถูกนับเป็นชื่อ (`HEHE` เคยทำให้ series memory เรียน `HEHE→เข่า`), `ไม→ไม่` กันชื่อ Mai, OCR pass fail-open/float hardening, gate+guard ใช้ tag-question licence เดียวกัน
+- ตัวเลข judge ยังคง raw **1.44** / strict-adjusted **1.55–1.60** (v4 ไม่ได้ re-judge; การเปลี่ยนกระทบเฉพาะ OCR source และ retry ที่หายาก)
+- CI เขียวทุก job (Vercel เหลือ external rate limit); PR #794 draft/mergeable, base #642 ยังไม่ merge

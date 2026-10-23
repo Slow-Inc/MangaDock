@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 201 — v4 end state propagated to PR body and team memory (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-5 section (v4 numbers: 39/365, gate 0, leftover 0, 5 guard triggers, wall 7.80 s median 6.62 s) with the Thai mirror and the two late fixes (interjection filter, Mai name guard).
+- Vault `project-translation-eval-set.md` records the same v4 state, noting the judge range is unchanged and CI/PR state.
+
+---
+
 ## MIT quality loop, round 200 — interjection filter: v4 end state has ZERO gate violations and ZERO leftovers (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
