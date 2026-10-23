@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 173 — same-crop OCR re-read tested and disproven; the fix is detector box geometry (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tried to reproduce the DEFEND read by re-running the OCR model on hand-cropped line images (tight / padded / 2x-interpolated): the crops read as junk (`TODe`, `BEA`), so the detection_size-3200 win is **not extra crop pixels** — it is the detector's textline-box geometry (the 2560 boxes clip the F edge).
+- A same-box second-pass OCR is therefore disproven; the viable targeted design is **localized re-detection at higher resolution around suspicious lines**. Backlog updated so a future session does not rebuild the crop approach. No code change.
+
+---
+
 ## MIT quality loop, round 172 — OCR misreads are resolution-bound: DEFEND/DEEEND reproduced and fixed at higher detection size (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

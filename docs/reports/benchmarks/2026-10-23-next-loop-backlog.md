@@ -62,8 +62,12 @@ So the misread is a **pixel-resolution effect**, not a translator fault: with mo
 the word correctly. Raising detection_size globally is still the wrong fix (region sets change; rejected earlier), and
 even this page needed 3200 (4096 also worked but is slower).
 
-**Proposed targeted lever (next session):** a second-pass OCR only on suspicious low-confidence textlines — re-crop
-the line at a higher zoom and accept the new read when the OCR confidence improves (`Quadrilateral.prob` is already
-carried through the pipeline; the payload does not store it yet). Gated behind an env flag first, with the same
-forced-fixture + corpus-sweep evidence the other levers used. This is the only known path to fix this class without
-moving the layout.
+**Follow-up experiment (same day):** tried to reproduce the read by re-running the OCR model on hand-cropped line
+images from the page (tight, padded and 2x-interpolated crops). The crops read as junk (`TODe`, `BEA`) instead of
+DEFEND, which means the win at detection_size 3200 is **not extra pixels in the crop** — it is the detector's
+**textline-box geometry** (the 2560 boxes clip the F edge, so the model sees `DEEEND`).
+
+So a same-box second-pass OCR would not fix it. The viable targeted design is **localized re-detection at a higher
+resolution for suspicious lines** (re-run detection on the page region around a low-confidence line, keep the price
+local instead of raising detection_size for the whole page). Gated behind a flag first, with the same forced-fixture +
+corpus-sweep evidence the other levers used. Line crops alone are disproven — do not rebuild that.
