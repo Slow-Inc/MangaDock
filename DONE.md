@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 286 — loop-by-numbers summary added to the hand-off index (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off gained a by-the-numbers block: 450 commits, 318 files (+19,212/-295; 131 MIT, 174 docs), 997 tests, 6 unseen series / 31 pages, sweeps v1-v11 and the judge band. No code change.
+
+---
+
 ## MIT quality loop, round 285 — opt-in MIT_RETRY_SUBSET_LAST added; dense A/B shows different wording (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -54,3 +54,16 @@ names the state, the knobs and the things that were already tried and rejected (
 2. Vercel build quota window (external): re-check `gh pr checks 794` after it clears; the docs-function fix is verified.
 3. Optional next campaign (needs a decision, not more tuning): the remaining zero-score segments are model-sense errors
    (`private ones` -> private days off, `killed` -> guess, `drain` -> hoard) that no deterministic guard catches today.
+## By the numbers (branch vs `integrate/render-reconcile`)
+
+| metric | value |
+|---|---|
+| commits | **450** |
+| files changed | **318** (+19,212 / -295) |
+| of which MIT | 131 files |
+| of which docs/reports | 174 files |
+| fast test suite | **997 passed**, 4 skipped |
+| unseen-page validation | 6 series / 31 pages, 30/31 gated clean |
+| sweeps recorded | v1-v11 (all with page gate `{}` after re-scan) |
+| judge runs | raw 1.38-1.44, adjusted 1.53-1.60, broken 2.2-2.4 % |
+| CI | logic gate / heavy ML / backend green; Vercel green on several heads |
