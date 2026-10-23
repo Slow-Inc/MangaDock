@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 285 — opt-in MIT_RETRY_SUBSET_LAST added; dense A/B shows different wording (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `use_segment_retry` (pure, tested) and the opt-in `MIT_RETRY_SUBSET_LAST`: retries 3+ send only the flagged segments while the first retry keeps page context. `MIT_SEGMENT_RETRY` keeps its old all-retries behaviour.
+- Dense-page forced A/B: hybrid wall 18.5/17.6 s vs whole-page 32.7/14.6 s (mixed), and the final translations differ in **4/9 regions**, so equal quality is not proven -> knob stays opt-in, no default change. Documented; env example updated. Suite local run pending green.
+
+---
+
 ## MIT quality loop, round 284 — dense-page retry hybrid queued with natural evidence (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

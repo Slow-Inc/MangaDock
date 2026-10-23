@@ -180,3 +180,16 @@ i.e. each retry re-sends the whole page (~13 s). Here a hybrid - whole-page for 
 would save roughly a third of that stage. It still needs a forced-glitch A/B **on a dense page** (the small-page result
 does not transfer); if that is quality-neutral, the hybrid could become a default for pages above a segment-count
 threshold, leaving small pages untouched.
+### Measured 2026-10-23 (round 241): `MIT_RETRY_SUBSET_LAST` added as an opt-in knob
+
+Dense-page A/B (Death Note page, forced two glitches, `MIT_RETRY_SUBSET_LAST=1` = attempt 3 sends only the flagged
+segments vs the whole page):
+
+| arm | wall (2 reps) | final translations |
+|---|---|---|
+| whole-page | 32.7 s / 14.6 s | baseline |
+| hybrid | 18.5 s / 17.6 s | **4 of 9 regions differ** |
+
+Wall time is mixed (smaller sample, gateway variance), and the answers differ in 4/9 regions, so quality is **not proven**
+equal - the knob stays opt-in (`MIT_SEGMENT_RETRY` remains the heavier opt-in that makes every retry a subset). Do not
+promote to default without a judge A/B on dense pages.

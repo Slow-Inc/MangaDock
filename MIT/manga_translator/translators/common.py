@@ -8,7 +8,7 @@ from abc import abstractmethod
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
                                    runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
                           dropped_question, untranslated_source_word, content_loss,
-                          consider_as_please, normalize_common_typos)
+                          consider_as_please, normalize_common_typos, use_segment_retry)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -186,8 +186,7 @@ class CommonTranslator(InfererModule):
 
             # Translate
             _langs = self.parse_language_codes(from_lang, to_lang, fatal=True)
-            _segment_retry = (i > 0 and str(os.environ.get('MIT_SEGMENT_RETRY', '')).strip().lower()
-                              in ('1', 'true', 'yes', 'on'))
+            _segment_retry = use_segment_retry(i, len(queries))
             if _segment_retry:
                 # #1055 (opt-in): a retry only needs the segments that are still invalid. Sending the whole page
                 # again re-translates clean lines (most of the page) for every glitch; this sends the flagged

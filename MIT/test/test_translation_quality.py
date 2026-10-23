@@ -399,3 +399,18 @@ def test_reader_site_urls_are_not_untranslated_words_1067():
     # measured on unseen Kaiju pages: the credit keeps the domain, everything else is Thai
     assert not u('READ MORE CHAPTERS AT KDTSCANS.COM', 'อ่านตอนต่อได้ที่ KDTSCANS.COM')
     assert u('DID ANYONE BRING THE RESOURCE MATERIALS?', 'มีใครเอามATERIALS มาบ้างไหม?')
+
+
+def test_segment_retry_policy_1055():
+    from manga_translator.translation_quality import use_segment_retry
+    seg_on = {'MIT_SEGMENT_RETRY': '1'}
+    subset_last = {'MIT_RETRY_SUBSET_LAST': '1'}
+    # default: every retry re-sends the page (context)
+    assert not use_segment_retry(1, 20, env={})
+    assert not use_segment_retry(2, 20, env={})
+    # MIT_SEGMENT_RETRY: every retry is a subset
+    assert use_segment_retry(1, 20, seg_on)
+    # MIT_RETRY_SUBSET_LAST: first retry keeps context, third+ uses the subset
+    assert not use_segment_retry(1, 20, env=subset_last)
+    assert use_segment_retry(2, 20, env=subset_last)
+    assert not use_segment_retry(0, 20, seg_on)

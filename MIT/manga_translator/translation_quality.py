@@ -5,6 +5,7 @@ Thai), leaves a segment untranslated, or returns it empty — measured at random
 prompt tried on 17 real pages. All three are countable, so the translator can re-ask
 (`custom_openai`) and Pipeline Doctor / the A/B harness can report them.
 """
+import os
 import re
 from typing import Optional
 
@@ -452,6 +453,26 @@ _QUESTION_STARTS = _WH_WORDS + ('DO', 'DOES', 'DID', 'ARE', 'IS', 'WAS', 'WERE',
                                   'WILL', 'WOULD', 'SHOULD', 'MAY', 'MIGHT', 'AM', 'HAVE', 'HAS', 'HAD',
                                   'ISNT', 'ARENT', 'DONT', 'DOESNT', 'DIDNT', 'CANT', 'COULDNT', 'WONT',
                                   'WOULDNT', 'SHOULDNT', 'HAVENT', 'HASNT', 'EVER')
+
+
+def use_segment_retry(attempt: int, query_count: int, env=None) -> bool:
+    """Whether a retry attempt may send only the still-invalid segments (no page context).
+
+    `attempt` is 1-based (1 = first retry). `MIT_SEGMENT_RETRY` makes every retry a subset; the opt-in
+    `MIT_RETRY_SUBSET_LAST` only makes the third and later attempts subset (the first retry keeps the page-mates as
+    context, but once the whole page has failed twice the context is clearly not the variable - on dense pages each
+    whole-page retry costs seconds).
+    """
+    env = env if env is not None else os.environ
+
+    def _on(name):
+        return str(env.get(name, '')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    if attempt <= 0 or query_count <= 0:
+        return False
+    if _on('MIT_SEGMENT_RETRY'):
+        return True
+    return attempt >= 2 and _on('MIT_RETRY_SUBSET_LAST')
 
 
 def is_retort_question(src: str) -> bool:
