@@ -28,3 +28,17 @@ This is the definitive quality number for the loop's end-state configuration: sa
 
 One of the 39 payloads had no segment with both source and translation for the judge (all-filtered page); it is not a
 failure — the page simply had nothing scorable.
+## Render/layout metrics: clean on all 39 pages
+
+Parsed the per-page render + composite telemetry from the same sweep:
+
+| metric | total over 39 pages |
+|---|---|
+| render.root / inherited | 0 / 0 |
+| render.spill / overlap | 0 / 0 |
+| render.small_font / suppressed | 0 / 0 |
+| composite.root / inherited / invisible | 0 / 0 / 0 |
+
+**No page has a layout defect** (no oversized block leaving the patch, no overlapping text, no text below the font
+floor, no invisible composite) — the render side of the end state is deterministic-clean, complementing the text
+quality numbers above.

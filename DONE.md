@@ -3,6 +3,12 @@
 
 ---
 
+## MIT quality loop, round 125 — render/layout telemetry is clean on all 39 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Parsed the per-page render + composite telemetry of the final sweep: **root/inherited/spill/overlap/small_font/suppressed/composite-invisible all 0 across all 39 pages** — no page has a layout defect (block leaving the patch, overlapping text, below-floor font, invisible composite).
+- Combined with the end-state numbers (adjusted **1.68/2**, 71 % perfect; gate covering every class; 9 guard saves with 0 leftovers), the render side is deterministic-clean. Benchmark updated (`2026-10-23-final-quality-baseline.md`).
+
 ## MIT quality loop, round 124 — definitive end-state quality baseline: adjusted 1.68/2, 71 % perfect (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
