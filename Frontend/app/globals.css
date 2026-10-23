@@ -10,8 +10,8 @@
   --surface: #ffffff;
   --ink: #131316;
   --accent: #0a62d6; /* the only hue: status, focus, selection, highlight — used sparingly */
-  --ok: #1a8a4a;
-  --danger: #c8322f; /* MangaDock addition: Strata has no error colour */
+  --ok: #125c32; /* #1062: text on its /10-/20 tints of --bg/--surface ≥ 4.5:1, measured (was #1a8a4a) */
+  --danger: #972524; /* MangaDock addition: Strata has no error colour. #1062: ≥ 4.5:1 on its tints (was #c8322f) */
   --coin: #b7791f; /* MangaDock addition: the coin/wallet gold — a currency meaning, not decoration */
 }
 

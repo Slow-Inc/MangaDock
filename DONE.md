@@ -77,6 +77,19 @@
 
 ---
 
+## #1062 Light-theme ok/danger reach AA on their tints (2026-10-24)
+
+**What:** the developer asked the agent to pick the values. The light-theme `--ok` changes from `#1a8a4a` to
+`#125c32`, and `--danger` from `#c8322f` to `#972524`. The hue stays the same; only the HSL lightness goes down.
+Both were chosen by the browser's own mixing: Tailwind v4's `/N` is `color-mix` in oklab, and a plain-sRGB
+calculation came out 0.1–0.7 too optimistic. Each value is the lightest that passes 4.5:1 for text on its `/10`,
+`/15` and `/20` tints over `--bg` and `--surface`, as plain text, and as a filled `text-bg` button. The dark theme
+is untouched.
+
+**Validated:** production CSS measured in Chromium.
+- **Light, before:** the worst case was 3.88 (ok) and 3.96 (danger).
+- **Light, after:** 20 cases, minimum 4.63.
+- **Dark:** minimum 6.57, unchanged.
 ## #863 Supabase reads give up after 8 s; auth and writes keep their client (2026-10-24)
 
 **Decision (the developer asked the agent to make it): option (b).**
