@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 142 — PR hand-off guide posted; no review feedback yet (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Verified: **no reviews and no inline review comments** on the PR yet; CI on the head is green (logic gate 1m24s, heavy ML 4m22s, backend jest 47s), only the external Vercel rate-limit fails.
+- Posted a **reviewer guide** comment: file map by area (guards, gate/dashboard, #1051 filter move, series memory, temperature opt-in, harnesses, evidence), reproduce commands (fast gate / heavy subset / dashboard), hand-off state (raw 1.44, strict-adjusted 1.55, 9 saves/0 leftovers, wall 7.65 s) and a risk-ordered review focus list.
+- No code change.
+
+---
+
 ## MIT quality loop, round 141 — temperature result propagated to PR + vault (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
