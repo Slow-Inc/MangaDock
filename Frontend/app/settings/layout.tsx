@@ -12,6 +12,7 @@ const NAV = [
   { href: "/settings/password", label: "รหัสผ่าน" },
   { href: "/settings/accounts", label: "การเชื่อมต่อ" },
   { href: "/settings/security", label: "ความปลอดภัย" },
+  { href: "/settings/content",  label: "เนื้อหา" },
   { href: "/settings/stats",    label: "สถิติการอ่าน" },
   { href: "/settings/danger",   label: "โซนอันตราย", danger: true },
 ];

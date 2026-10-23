@@ -10,7 +10,10 @@ import { getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, type HistoryBook } from "../lib/readingHistory";
 import { useCoverSrc } from "../hooks/useCoverSrc";
 import CoverPlaceholder from "../components/ui/CoverPlaceholder";
+import AdultBadge from "../components/ui/AdultBadge";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { apiFetch } from "../lib/apiFetch";
+import { levelKey, useContentLevel } from "../lib/contentLevel";
 import { inputClass } from "../components/ui/Input";
 import Pill from "../components/ui/Pill";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
@@ -85,6 +88,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
           <div className="absolute inset-0 flex items-end bg-linear-to-t from-bg/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
             <span className="text-xs font-semibold text-ink">ดูรายละเอียด</span>
           </div>
+          <AdultBadge rating={book.contentRating} className="absolute left-2 top-2 z-10" />
           {/* Expand cover button */}
           {cover.src && <button
             type="button"
@@ -224,6 +228,10 @@ function SearchResults() {
   const [source, setSource]               = useState<Source>("all");
   const [langFilter, setLangFilter]       = useState("all");
   const [statusFilter, setStatusFilter]   = useState<'ongoing' | 'completed' | 'hiatus' | 'all'>('all');
+  // 18+ (#1102): the level decides what the server returns; "เฉพาะ 18+" narrows to it (shown only above off)
+  const level = useContentLevel();
+  const [adultOnlyChoice, setAdultOnly] = useState(false);
+  const adultOnly = adultOnlyChoice && level !== 'off';
   const [yearFrom, setYearFrom]           = useState('');
   const [yearTo, setYearTo]               = useState('');
   // What is typed in the year boxes; it applies once it is a whole year (#965)
@@ -249,7 +257,7 @@ function SearchResults() {
   useEffect(() => { setInputValue(query); }, [query]);
 
   // reset page when query / lang / status / year / rating / source changes
-  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
+  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source, adultOnly]);
 
   // A year applies once it is complete (4 digits, 1900-2100), after a pause: typing "2015" searches once, not for
   // 2, 20 and 201 on the way (#965)
@@ -283,12 +291,13 @@ function SearchResults() {
     if (statusFilter !== "all") qs.set("status", statusFilter);
     if (yearFrom) qs.set("yearFrom", yearFrom);
     if (yearTo) qs.set("yearTo", yearTo);
+    if (adultOnly) qs.set("adult", "only");
 
-    const cacheKey = `search:page:${query}:${page}:${langFilter}:${statusFilter}:${yearFrom}:${yearTo}`;
+    const cacheKey = `search:page:${query}:${page}:${langFilter}:${statusFilter}:${yearFrom}:${yearTo}${levelKey(level)}${adultOnly ? ":adult" : ""}`;
     cacheOrFetch<{ items: LandingBook[]; total: number }>(
       cacheKey,
       async () => {
-        const r = await fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
+        const r = await apiFetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
         if (!r.ok) throw new Error(`search ${r.status}`); // an error body is not an empty result (and is not cached)
         return r.json();
       },
@@ -304,7 +313,7 @@ function SearchResults() {
       .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setApiFailed(true); setSearched(true); setLoading(false); } });
 
     return () => ctrl.abort();
-  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page, retry]);
+  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page, retry, level, adultOnly]);
 
   // reset category when base changes
   useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
@@ -461,6 +470,15 @@ function SearchResults() {
                   </FilterChip>
                 ))}
               </div>
+
+              {/* เรต: only when the account allows 18+ (#1102) */}
+              {level !== 'off' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="w-14 shrink-0 text-xs font-medium text-ink-3">เรต</span>
+                  <FilterChip active={!adultOnly} onClick={() => setAdultOnly(false)}>ทั้งหมด</FilterChip>
+                  <FilterChip active={adultOnly} onClick={() => setAdultOnly(true)}>เฉพาะ 18+</FilterChip>
+                </div>
+              )}
 
               {/* ปี */}
               <div className="flex flex-wrap items-center gap-2">

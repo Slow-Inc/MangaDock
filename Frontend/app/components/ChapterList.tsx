@@ -7,6 +7,7 @@ import { useChapterUnlock } from "../hooks/useChapterUnlock";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { levelKey } from "../lib/contentLevel";
 import { chapterAccess } from "../lib/chapterAccess";
 import { addToHistory } from "../lib/readingHistory";
 import { useAuth } from "../contexts/AuthContext";
@@ -196,7 +197,7 @@ export default function ChapterList({
 
     Promise.all([
       cacheOrFetch<MangaChapter[]>(
-        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}`,
+        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}${levelKey()}`,
         () =>
           apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then(async (r) => {
             if (!r.ok) throw new Error("chapters fetch failed");

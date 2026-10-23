@@ -19,6 +19,7 @@ import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
 import { useModalDialog } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
+import AdultBadge from "./ui/AdultBadge";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
@@ -423,7 +424,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
                 {/* Title */}
                 <div className="mt-3 w-full text-center">
-                  <h2 className="text-xl font-black leading-tight text-ink">{book.title}</h2>
+                  <h2 className="text-xl font-black leading-tight text-ink">
+                    {book.title}
+                    <AdultBadge rating={book.contentRating ?? detail?.contentRating} className="ml-2 align-middle" />
+                  </h2>
                   {book.subtitle && (
                     <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">{book.subtitle}</p>
                   )}
@@ -557,6 +561,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   <div>
                     <h2 className="text-2xl font-black leading-tight text-ink">
                       {book.title}
+                      <AdultBadge rating={book.contentRating ?? detail?.contentRating} className="ml-2 align-middle" />
                     </h2>
                     {book.subtitle && (
                       <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">

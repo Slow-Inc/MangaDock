@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { levelKey } from "../lib/contentLevel";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -29,7 +30,7 @@ export default function HeroDetailButton({ book }: Props) {
     const qs = forceLocal ? "?forceLocal=true" : "";
 
     cacheOrFetch<MangaChapterSummary[]>(
-      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}`,
+      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}${levelKey()}`,
       // a failed load must not be cached — it would hide อ่านเลย until the entry expires (#983)
       () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
         if (!r.ok) throw new Error(`chapters ${r.status}`);

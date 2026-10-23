@@ -7,6 +7,7 @@ import CoverLightbox from "./CoverLightbox";
 import MangaReader from "./MangaReader";
 import { getHistory } from "../lib/readingHistory";
 import { useCoverSrc } from "../hooks/useCoverSrc";
+import AdultBadge from "./ui/AdultBadge";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 
 export type GridBook = {
@@ -22,6 +23,8 @@ export type GridBook = {
   categories: string[];
   averageRating: number;
   ratingsCount: number;
+  /** MangaDex content rating (#1102): erotica/pornographic get an 18+ badge. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 interface Props {
@@ -66,6 +69,7 @@ function GridCard({ book }: { book: GridBook }) {
             <CoverPlaceholder title={book.title} />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+          <AdultBadge rating={book.contentRating} className="absolute left-2 top-2 z-10" />
           {/* Continue reading button */}
           {lastChapterId && (
             <button

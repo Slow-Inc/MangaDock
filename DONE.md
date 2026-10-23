@@ -77,6 +77,28 @@
 
 ---
 
+## #1102 Frontend: 18+ content settings tab, badges, search rating filter (PRD #1100) (2026-10-24)
+
+**What:** the client half of #1101.
+- **Settings → "เนื้อหา"** (`/settings/content`) offers three levels. Raising the level opens one dialog
+  (`useModalDialog`) asking for what is missing: the age checkbox for 18+, plus the Thai Terms ("the platform is
+  not involved") for "ทั้งหมด". Lowering saves without a dialog.
+- **`lib/contentLevel`** holds the level (`useSyncExternalStore`) and clears the API cache when it changes.
+  `ContentLevelSync` keeps it in step with the session.
+- **`apiFetch`** adds the session token to catalog reads only while the level is above `off`. Search, /new and
+  genre now use it, and their keys (plus the chapter lists') carry `levelKey()`. At `off` the requests and keys are
+  exactly as before.
+- **18+ badge** on the grid, search and popup.
+- **Search** gets a "เรต" filter ("ทั้งหมด" / "เฉพาะ 18+" → `adult=only`), shown only above `off`.
+
+**Validated:** production build. The settings and search APIs were answered locally; the server-side gate is
+covered by the backend.
+- The age dialog's confirm stays disabled until the box is checked; then `PUT {erotica, confirmAge}`.
+- "ทั้งหมด" shows only the Terms, not the age box again. Escape closes it; then `PUT {all, acceptTos}`.
+- Lowering to "ปิด" sends a `PUT` with no dialog.
+- On search: the request carries the token, the 18+ badge shows, and "เฉพาะ 18+" sends `adult=only`.
+- Signed out: no token and no rating filter.
+- Unit 507/507 and test:auth 12/12. The earlier dialog and popup probes still pass. eslint is no worse than main.
 ## #1101 Backend: opt-in 18+ content levels (PRD #1100) (2026-10-24)
 
 **What:** the developer asked for an 18+ filter: every rating may be enabled, `pornographic` behind accepting a

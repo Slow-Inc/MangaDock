@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { apiFetch } from "../lib/apiFetch";
+import { levelKey, useContentLevel } from "../lib/contentLevel";
 import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePageTitle } from "../hooks/pageTitle";
 import LoadError from "../components/ui/LoadError";
@@ -106,6 +108,7 @@ function ChipBar({ categories, active, onSelect }: {
 
 function useSectionPage(order: TabKey, tagFilter: string) {
   const [page, setPage]       = useState(1);
+  const level = useContentLevel(); // 18+ level: its own results and cache entry (#1102)
   const [data, setData]       = useState<SectionData>({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(false);
@@ -118,9 +121,9 @@ function useSectionPage(order: TabKey, tagFilter: string) {
     const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
     if (tagFilter !== "all") qs.set("tag", tagFilter);
     cacheOrFetch<NewReleasesResponse>(
-      `new-releases:${tagFilter}:${page}`,
+      `new-releases:${tagFilter}:${page}${levelKey(level)}`,
       async () => {
-        const r = await fetch(`${API_BASE}/books/new-releases?${qs}`);
+        const r = await apiFetch(`${API_BASE}/books/new-releases?${qs}`);
         if (!r.ok) throw new Error();
         return r.json();
       },
@@ -130,7 +133,7 @@ function useSectionPage(order: TabKey, tagFilter: string) {
       .catch(() => { if (!superseded) setError(true); })
       .finally(() => { if (!superseded) setLoading(false); });
     return () => { superseded = true; };
-  }, [page, order, tagFilter, retryCount]);
+  }, [page, order, tagFilter, retryCount, level]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
   const retry = () => setRetryCount((n) => n + 1);
