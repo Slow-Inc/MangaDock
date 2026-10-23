@@ -18,7 +18,7 @@ Pure logic, so it unit-tests without the ML stack.
 import re
 
 from .name_glossary import extract_glossary
-from .translation_quality import is_tag_question
+from .translation_quality import is_retort_question, is_tag_question
 from .translation_quality import (content_loss, foreign_script, normalize_common_typos, runaway_translation,
                                   untranslated_source_word)
 
@@ -33,6 +33,9 @@ _PUNCT = ('!', '?', '…')
 _OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z0-9])\?(?=[A-Za-z0-9])')
 #: Thai question markers can sit near the end rather than at the very end ('...คืออะไร', '...หรือไง'),
 _THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|เปล่า|ไหน|อะไร|ทำไม|ยังไง|เท่าไหร่|แค่ไหน)', re.UNICODE)
+#: A source `!` can be carried by a Thai emphasis particle instead of the mark (measured: all 44 corpus lines
+#: with a source `!` carry either the mark or one of these; `ไอ้เทพธิดาพวกนั้นมันแย่จริงๆ` is the flagging case).
+_THAI_EMPHASIS = re.compile(r'(นะ|สิ|เลย|จริงๆ|จริง ๆ|มาก|เหลือเกิน|เต็มที่|สุดๆ|สุด ๆ|เนี่ย|นี่นะ|ล่ะ|ซะ|จัง|โว้ย|วะ|เชียว)')
 
 
 def _thai_target(query, dst):
@@ -84,8 +87,11 @@ def check_page(regions, page='?'):
                     continue  # one interrobang covers both marks
                 if mark == '!' and '?' in dst:
                     continue  # a Thai rhetorical question keeps only the ?
-                if mark == '?' and is_tag_question(src_punct):
+                if mark == '?' and (is_tag_question(src_punct) or is_retort_question(src_punct)):
+                    continue  # discourse tag or a long rhetorical retort needs no question marker
                     continue  # discourse tag (..., y know? / right?) needs no question marker
+                if mark == '!' and _THAI_EMPHASIS.search(dst):
+                    continue  # Thai emphasis particle carries the source exclamation
                 if mark == '?' and _THAI_QUESTION.search(dst):
                     continue  # final Thai question particle carries the question
                 if mark == '…' and '...' in dst:

@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 229 — retort + Thai-emphasis licences: v5 page gate now completely clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Both remaining page-gate findings were false positives: a rhetorical retort ending in `?` (Thai carries it with `!`) kept the dropped_question guard retrying every run, and a source `!` conveyed by the Thai particle `จริงๆ` was called dropped_!.
+- Added `is_retort_question` (long >= 8-word statement, no question form; shared by guard and gate) and a gate emphasis-particle licence. The measured 6-word #1056 case stays guarded.
+- v5 dashboard after the licences: **gate_violations {}, leftover {}**; all 44 corpus lines with a source `!` verified to carry the mark or an emphasis particle. Tests added; files 67 passed. Issue #1071, benchmark `2026-10-23-guard-precision-licences.md`.
+
+---
+
 ## MIT quality loop, round 228 — team memory updated with v5 and the late fixes (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

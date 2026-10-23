@@ -371,3 +371,14 @@ def test_mai_as_a_name_is_not_rewritten_1030():
     assert normalize_common_typos("มันไมใช่!") == "มันไม่ใช่!"
     assert normalize_common_typos("ไมทำใหฉันทนตายนะ?!") == "ไม่ทำให้ฉันทนตายนะ?!"
     assert normalize_common_typos("ไม-") == "ไม่-"
+
+
+def test_rhetorical_retorts_are_not_questions_1033():
+    from manga_translator.translation_quality import dropped_question, is_retort_question
+    retort = 'FOR NO REASON? I WONT LEND TO PEOPLE WHO SAY THAT.'
+    assert is_retort_question(retort)
+    assert not dropped_question(retort, 'ไม่มีเหตุผลเลย! ฉันจะไม่ให้ยืม')
+    assert not is_retort_question('WHAT ARE YOU DOING?')
+    assert not is_retort_question('ARE YOU OK?')
+    assert not is_retort_question('DONT YOU THINK WE SHOULD GO HOME TONIGHT?')
+    assert dropped_question('IS THAT SO?', 'มันเป็นอย่างนั้นจริงๆ')

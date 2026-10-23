@@ -435,6 +435,35 @@ def is_tag_question(src: str) -> bool:
     return bool(_EN_TAG_QUESTIONS.search((src or '').strip()))
 
 
+#: A long STATEMENT ending in ?" is a rhetorical retort, not a question ("FOR NO REASON? I WONT LEND").
+#: Interrogatives and auxiliaries below mark a real question; a long statement with none is treated as a retort
+#: so Thai can carry the nuance with an exclamation instead of a question marker.
+#: An English question normally starts with a question word or an inverted auxiliary; a long statement that
+#: does neither but ends in ? is a rhetorical retort (Thai can carry it with an exclamation).
+_WH_WORDS = ('WHAT', 'WHY', 'HOW', 'WHO', 'WHERE', 'WHEN', 'WHICH', 'WHOSE')
+_QUESTION_STARTS = _WH_WORDS + ('DO', 'DOES', 'DID', 'ARE', 'IS', 'WAS', 'WERE', 'CAN', 'COULD',
+                                  'WILL', 'WOULD', 'SHOULD', 'MAY', 'MIGHT', 'AM', 'HAVE', 'HAS', 'HAD',
+                                  'ISNT', 'ARENT', 'DONT', 'DOESNT', 'DIDNT', 'CANT', 'COULDNT', 'WONT',
+                                  'WOULDNT', 'SHOULDNT', 'HAVENT', 'HASNT', 'EVER')
+
+
+def is_retort_question(src: str) -> bool:
+    """True when a long English statement ends in ? with no question form (a retort, not a question)."""
+    text = (src or "").upper().replace(chr(39), "")
+    words = [w.strip(chr(34) + "?.,!:;()") for w in text.split()]
+    words = [w for w in words if w]
+    if len(words) < 8:
+        return False
+    if words[0] in _QUESTION_STARTS:
+        return False
+    # WHAT/WHY/HOW/WHERE/WHEN anywhere still marks a question; WHO/WHICH only when asked directly (words[1]),
+    # so a relative clause ('... PEOPLE WHO SAY THAT') does not turn a retort into a question.
+    if any(w in ('WHAT', 'WHY', 'HOW', 'WHERE', 'WHEN') for w in words):
+        return False
+    if len(words) > 1 and words[1] in ('WHO', 'WHICH'):
+        return False
+    return True
+
 def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     """True when the source asks a question but the target has no question marker at all.
 
@@ -448,7 +477,7 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     standalone = re.sub(r'(?<=[A-Za-z0-9])\?+(?=[A-Za-z0-9])', '', src or '')
     if '?' not in standalone and '？' not in standalone:
         return False
-    if is_tag_question(standalone):
+    if is_tag_question(standalone) or is_retort_question(standalone):
         return False
     return _THAI_Q_MARKERS.search(dst or '') is None
 

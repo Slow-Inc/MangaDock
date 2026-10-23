@@ -115,3 +115,19 @@ def test_tag_questions_are_licensed_in_the_gate_1025():
     assert check_page([{'src': 'ITS JUST AINT FAIR, YKNOW?', 'dst': 'มันไม่แฟร์เลยนะเนี่ย!'}]) == []
     viol = check_page([{'src': 'IS THAT SO?', 'dst': 'มันเป็นอย่างนั้นจริงๆ'}])
     assert any(v['kind'] == 'dropped_?' for v in viol), viol
+
+
+def test_exclamation_carried_by_a_thai_emphasis_particle_1032():
+    from manga_translator.quality_gate import check_page
+    # measured: the source '!' is conveyed by จริงๆ; the gate must not call it dropped
+    assert check_page([{'src': 'THOSE GODDESSES ARE TRULY AWFUL!', 'dst': 'ไอ้เทพธิดาพวกนั้นมันแย่จริงๆ'}]) == []
+    viol = check_page([{'src': 'THOSE GODDESSES ARE TRULY AWFUL!', 'dst': 'ไอ้เทพธิดาพวกนั้นมันแย่'}])
+    assert any(v['kind'] == 'dropped_!' for v in viol), viol
+
+
+def test_rhetorical_retorts_are_not_flagged_for_dropped_question_1033():
+    from manga_translator.quality_gate import check_page
+    retort = {'src': 'FOR NO REASON? I WONT LEND TO PEOPLE WHO SAY THAT.', 'dst': 'ไม่มีเหตุผลเลย! ฉันจะไม่ให้ยืม'}
+    assert check_page([retort]) == []
+    real = check_page([{'src': 'IS THAT SO?', 'dst': 'มันเป็นอย่างนั้นจริงๆ'}])
+    assert any(v['kind'] == 'dropped_?' for v in real), real
