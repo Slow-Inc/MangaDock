@@ -68,7 +68,7 @@ function QrStep({
     <>
       <div className="border-b border-line px-5 py-4 flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">สแกน QR เพื่อชำระเงิน</h2>
-        <button onClick={handleCancel} className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
+        <button onClick={handleCancel} aria-label="ยกเลิกการชำระเงิน" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
         {status === "paid" ? (
@@ -183,7 +183,7 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <p className="mt-0.5 text-xs text-ink-3">1 เหรียญ = 1 บาท • PromptPay QR</p>
                 </div>
               </div>
-              <button onClick={onClose} className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
+              <button onClick={onClose} aria-label="ปิด" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
             </div>
             <div className="p-5">
               <div className="mb-3 grid grid-cols-3 gap-2">

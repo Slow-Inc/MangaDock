@@ -77,6 +77,23 @@
 
 ---
 
+## #1076 Icon-only buttons have names; hover-only delete buttons reachable (2026-10-23)
+
+**What:** six icon-only controls (`✕` or an X `svg`) had no accessible name: the post-image remove button, the
+Topup QR ✕ (it cancels the payment), the Topup ✕, the search clear in MangaPicker and in Studio search, and the Studio
+upload page delete. Each now has an `aria-label`. Two of them were hover-only, so they couldn't be seen or reached
+from the keyboard or on touch. The image-remove button used `opacity-0`, and the page delete used `hidden`, which
+kept it out of the Tab order. Both are now opacity-hidden and show on `focus-visible` and on `@media(hover:none)`.
+
+**Validated:** production-build probe, fake session, API answered locally (the image upload included).
+- **Before:** 0 named on main.
+- **After:** the Topup ✕, both search clears and "ลบรูปที่ 1" are named, and the remove button is opacity 1 on
+  keyboard focus.
+- The upload-page delete wasn't tested end-to-end, because it needs an upload session.
+- Real tsc is clean, and eslint matches main per file.
+
+---
+
 ## #1073 App modals are real dialogs; one Escape closes one layer (2026-10-23)
 
 **What:** thirteen app modals blocked the page without being dialogs. They had no role or name, no Tab trap and no
