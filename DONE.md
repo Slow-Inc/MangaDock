@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 261 — second unseen series: clean renders, but Latin proper names cost two retries (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Bocchi pages: render telemetry clean on all, gate 3 findings that are all legitimate Latin names (`KLIMTS NIGHT`, `TIKTOK`) kept intentionally; the untranslated-word guard still retried twice (10.9 s translation) and shipped the same names. A Chinese fragment in a translator note was retried to clean.
+- Queued a measured candidate: stop retrying `untranslated_word` when the identical Latin token survives the first retry (both observed cases never improved on retry), which needs per-class retry memory in custom_openai and its own tests. Recorded in the generalization report. No code change.
+
+---
+
 ## MIT quality loop, round 260 — opinion-tag licence (SEE?/UNDERSTAND?) removes 2 retries on an unseen page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
