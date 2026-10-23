@@ -47,3 +47,23 @@ with the acceptance rule for each.
 - JP rhetorical prompt (no difference on the one page), hedging-lost guard (mostly false positives),
 - exclamation-lost guard (2 candidates in 15,578 segments), clause-omission word-ratio guard,
 - segment-only retry as default (quality risk), neighbour-context retry hint (no reproducible recovery).
+## New evidence (2026-10-23): OCR errors are resolution-bound — a targeted second-pass lever
+
+The stress run's opposite-meaning error (`DEEEND` read where the artwork says DEFEND -> translated as destroy) was
+reproduced and diagnosed:
+
+| run on Otome p1 | detected source | Thai |
+|---|---|---|
+| default (detection_size 2560) | `THEY HAVE TO DEEEND ...` | `ทำลาย` (destroy) |
+| detection_size 3200 | `THEY HAVE TO DEFEND ...` | `ปกป้อง` (protect) |
+| detection_size 4096 | `THEY HAVE TO DEFEND ...` | `ปกป้อง` (protect) |
+
+So the misread is a **pixel-resolution effect**, not a translator fault: with more pixels per glyph the 48px OCR reads
+the word correctly. Raising detection_size globally is still the wrong fix (region sets change; rejected earlier), and
+even this page needed 3200 (4096 also worked but is slower).
+
+**Proposed targeted lever (next session):** a second-pass OCR only on suspicious low-confidence textlines — re-crop
+the line at a higher zoom and accept the new read when the OCR confidence improves (`Quadrilateral.prob` is already
+carried through the pipeline; the payload does not store it yet). Gated behind an env flag first, with the same
+forced-fixture + corpus-sweep evidence the other levers used. This is the only known path to fix this class without
+moving the layout.

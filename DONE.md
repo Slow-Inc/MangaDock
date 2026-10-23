@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 172 — OCR misreads are resolution-bound: DEFEND/DEEEND reproduced and fixed at higher detection size (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Reproduced the stress-run error on Otome p1 and compared detection sizes: at **2560** OCR reads `DEEEND` (translated as destroy), at **3200** and **4096** it reads `DEFEND` (translated as protect). The misread is a pixel-resolution effect, not a translator fault.
+- Global detection_size remains the wrong fix (region sets change; rejected earlier). Recorded a **targeted second-pass OCR** lever for the next session: re-OCR only suspicious low-confidence textlines at a higher zoom and accept when `Quadrilateral.prob` improves (payload does not store prob yet). Gated behind a flag with forced-fixture + sweep evidence, same as the other levers. No code change this round.
+
+---
+
 ## MIT quality loop, round 171 — deterministic OCR-noise repair measured and rejected (7 tokens total) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
