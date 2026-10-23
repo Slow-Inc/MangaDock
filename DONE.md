@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 82 — fresh 6-page judge audit + fixed LOST->หายาก (rare) intermittent swap (#1052) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Fresh audit:** 6 pages / 71 segments, gate-clean, raw judge mean 1.37/2 (most flags are the judge's typo noise — it quotes identical strings as wrong).
+- **One genuine cluster found:** `LOST ITEMS.` -> `ของหายาก` (**rare items**) twice on the Otome page — `หาย` (lost) vs `หายาก` (rare). Intermittent (audit run yes; 3 following baseline runs no). Matrix scan found only these 2 unique pairs, both real, so the pattern is precise.
+- **Fix (#1052):** `lost_as_rare(dst, query)` (Thai target; source says LOST and not RARE/SCARCE) wired into `_is_glitched` with a retry note. Unit tests both directions + a mocked gateway that re-asks `ของหายาก` -> `ของหาย`; 4 fresh guarded runs of the page: 0 lost->rare outputs.
+- Other audit flags were judge typo noise or model-ceiling nuance (MORNING->general greeting, added เลย, music->song) — no deterministic licence, so no guard.
+- Benchmark `2026-10-23-1052-lost-as-rare.md`.
+
 ## MIT quality loop, round 81 — Thai line-break audit (0 mid-word breaks) + live check of the filler guard (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -242,3 +242,17 @@ def test_spurious_filler_still_flags_broken_glued_shapes_1039c():
     assert spurious_filler("ฉันทนมันมาหลายครั้งแล้ว", "IVE BEEN KILLED BY IT SO MANY TIMES...")
     assert spurious_filler("นี่ก้อวิธีที่ฉันทนเลือดในกาย...", "THIS IS HOW I DRAIN THE BLOOD IN MY BODY..")
     assert spurious_filler("ฉันทันมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
+
+
+def test_lost_rendered_as_rare_is_flagged_1055():
+    from manga_translator.translation_quality import lost_as_rare
+    assert lost_as_rare("ของหายาก", "LOST ITEMS.")
+    assert lost_as_rare("บ้านของหนึ่งในของหายากเหล่านั้น", "THIS ISLAND IS HOME TO ONE OF THOSE LOST ITEMS.")
+
+
+def test_lost_as_rare_keeps_the_real_word_and_a_rare_source_1055():
+    from manga_translator.translation_quality import lost_as_rare
+    assert not lost_as_rare("ของหาย", "LOST ITEMS.")
+    assert not lost_as_rare("ของหายาก", "RARE ITEMS.")
+    assert not lost_as_rare("ของหายาก", "SCARCE RESOURCES.")
+    assert not lost_as_rare("อะไรก็ได้", "LOST ITEMS.")

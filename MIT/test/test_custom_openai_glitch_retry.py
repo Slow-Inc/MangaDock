@@ -147,3 +147,15 @@ def test_a_hallucinated_endurance_verb_is_reasked_1031():
     out = asyncio.run(t.translate('ENG', 'THA', ['I AM GRANTING YOU ALL THE POWER I CAN.']))
     assert out == ['ฉันจะมอบพลังทั้งหมดที่มีให้เธอ']
     assert t.client.chat.completions.create.call_count == 2
+
+
+def test_a_lost_as_rare_translation_is_reasked_1055():
+    """LOST can come back as "ของหายาก" (rare items) intermittently; the retry is told the difference."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>ของหายาก'),
+        _reply('<|1|>ของหาย'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['LOST ITEMS.']))
+    assert out == ['ของหาย']
+    assert t.client.chat.completions.create.call_count == 2

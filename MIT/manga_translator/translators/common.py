@@ -5,7 +5,7 @@ from typing import List, Tuple
 from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
-                                   runaway_translation, spurious_filler)
+                                   runaway_translation, spurious_filler, lost_as_rare)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -265,6 +265,9 @@ class CommonTranslator(InfererModule):
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #1052: LOST rendered as หายาก ("rare") — a meaning-changing near-homophone.
+        if lost_as_rare(trans, query):
+            return query + ('\n\n[note: LOST means หาย/สูญหาย. หายาก means RARE — do not use it here.]')
         # #1039: the model added an endurance verb the source never says ('I heard your conversation' ->
         # 'ฉันทนฟังบทสนทนา'). Tell the retry what to drop.
         if spurious_filler(trans, query):

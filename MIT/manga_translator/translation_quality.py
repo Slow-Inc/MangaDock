@@ -302,3 +302,22 @@ def spurious_tolerance(dst: str, query: str) -> bool:
     if any(word in src for word in _ENDURE_WORDS):
         return False
     return True
+
+
+#: Thai for "rare" — the observed wrong rendering of LOST (#1052).
+_RARE_TH = 'หายาก'
+
+
+def lost_as_rare(dst: str, query: str) -> bool:
+    """True when LOST was rendered as หายาก ("rare") — a measured, meaning-changing swap.
+
+    A judge audit of a real page caught `LOST ITEMS.` -> `ของหายาก` (rare items) and a second line
+    with the same swap, intermittently (1 of 4 runs). The licence check is exact: the English
+    source says LOST and not RARE/SCARCE, while the Thai contains หายาก. The retry gets a note.
+    """
+    if not dst or _RARE_TH not in dst:
+        return False
+    src = (query or '').upper()
+    if 'LOST' not in src:
+        return False
+    return not any(word in src for word in ('RARE', 'RARELY', 'SCARCE'))
