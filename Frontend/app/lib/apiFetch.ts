@@ -1,6 +1,5 @@
 import { getHardwareId } from "./fingerprint";
 import { getContentLevel, isCatalogUrl } from "./contentLevel";
-import { supabase } from "./supabase";
 
 /**
  * HWID-tagged fetch (zero-trust asset protection): every reader/chapter request
@@ -15,6 +14,8 @@ export async function apiFetch(url: string, init?: RequestInit): Promise<Respons
   const hwid = getHardwareId();
   const auth: Record<string, string> = {};
   if (getContentLevel() !== "off" && isCatalogUrl(url)) {
+    // loaded only here: importing the client up front made every apiFetch importer need Supabase env (tests, #1102)
+    const { supabase } = await import("./supabase");
     const { data } = await supabase.auth.getSession();
     if (data.session?.access_token) auth.Authorization = `Bearer ${data.session.access_token}`;
   }
