@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 227 — PR body/comment carry the round-7 state (v5, #1064, #1065) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-7 section (v5 numbers, deploy fix/revert of image downscaling, series-memory bug + production re-verification, suite 979) with a Thai mirror; a matching comment was posted. No code change.
+- CI was running on the latest head; Vercel shows its external build-rate limit again (it deployed successfully on `16ff6e43`).
+
+---
+
 ## MIT quality loop, round 226 — production series-memory re-verified end-to-end: 2 name fixes, consistent spelling (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
