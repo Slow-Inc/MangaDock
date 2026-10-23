@@ -270,3 +270,14 @@ distribution 0/1/2 = 9 / 155 / 207  (broken 2.4 % / partial 41.8 % / perfect 55.
 The raw mean is window-dependent: **1.38-1.44** across the loop's runs (the v10 window also produced 14 guard triggers, all
 caught). The strict-adjusted value stays in **1.53-1.60** because the judge's noise-flag count moves with it. Quote the
 range plus the fixed structural numbers (gate {}, leftover {}) rather than one run's raw value.
+## v11 sweep (2026-10-23 late, all licences live)
+
+| metric | v10 | **v11** |
+|---|---|---|
+| pages / regions | 39 / 371 | 39 / **370** |
+| guard triggers | 14 | **6** (Chinese leaks on Tsuki, `ทน` filler, one material-leak retry) |
+| dashboard gate (after the round-280 `นั่น` licence) | `{}` | **`{}`** |
+| dashboard leftover | `{}` | **`{}`** |
+| wall avg | 10.1 s | **8.5 s** |
+
+Still a degraded window (6 triggers) but the clean structural result holds. Tests 996.

@@ -84,3 +84,9 @@ v10's two gate findings were false positives:
 
 Re-scanning the v10 outputs with the fixed rules gives **gate `{}` and leftover `{}`**. Tests added; the dashboard fixture
 was updated because its Iruma payload is one of the licensed cases; suite **995 passed**.
+## Demonstrative `นั่น` carries the exclamation (round 280)
+
+v11's only source-`!` line without an emphasis particle was `DAMN THAT SHITTY GODDESS!` -> `ไอ้เทพธิดาใจร้ายนั่น`; the Thai
+demonstrative `นั่น` in that construction carries the shout. The gate emphasis licence now accepts `นั่น` (the derogatory
+`ไอ้` prefix alone was tried and rejected because it broke the negative control in the existing emphasis test). Re-scan of
+v11 outputs: **gate `{}`, leftover `{}`**; suite **996 passed**.

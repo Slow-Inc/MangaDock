@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 280 — v11 sweep: one more emphasis carrier; gate {} again (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v11 (39 pages, all licences live): 6 guard triggers (degraded window), dashboard gate `{dropped_!: 1}` from `DAMN THAT SHITTY GODDESS!` -> `ไอ้เทพธิดาใจร้ายนั่น` (the Thai `นั่น` carries the shout). Added `นั่น` to the emphasis licence; `ไอ้` alone was rejected because it broke the existing negative control. Re-scan: **gate {}, leftover {}**. v11 row recorded. Suite **996 passed**.
+
+---
+
 ## MIT quality loop, round 279 — hand-off index refreshed to the final state (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

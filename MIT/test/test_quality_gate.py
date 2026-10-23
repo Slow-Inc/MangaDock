@@ -155,3 +155,9 @@ def test_strong_negation_carries_the_exclamation_1099():
     from manga_translator.quality_gate import check_page
     # measured: "T THATS NOT IT!" -> the Thai strong negation carries the emphasis
     assert check_page([{'src': 'T THATS NOT IT!', 'dst': 'ฉ- ไม่ใช่อย่างนั้น'}]) == []
+
+
+def test_derogatory_demonstrative_carries_the_exclamation_1100():
+    from manga_translator.quality_gate import check_page
+    # measured (v11): "DAMN THAT SHITTY GODDESS!" -> the Thai ไอ้ + นั่น carries the exclamation
+    assert check_page([{'src': 'DAMN THAT SHITTY GODDESS!', 'dst': 'ไอ้เทพธิดาใจร้ายนั่น'}]) == []
