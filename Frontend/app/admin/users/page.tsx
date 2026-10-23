@@ -227,7 +227,7 @@ export default function AdminUsersPage() {
                     <button onClick={() => openDetail(u.uid)} className="text-xs text-ink-2 hover:text-ink transition-colors smooth-hover-fast">Detail</button>
                     {u.role < 8 && (
                       <>
-                        <select aria-label={`Role of ${u.displayName || u.email}`} defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
+                        <select aria-label={`Role of ${u.displayName || u.email}`} value={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
                           className="bg-fill border border-line rounded px-2 py-1 text-xs text-ink-2">
                           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
