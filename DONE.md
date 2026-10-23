@@ -3,6 +3,12 @@
 
 ---
 
+## MIT quality loop, round 115 — detection_size 2048 rejected: changes detections for ~0.1-0.3 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A/B on 6 pages (`--set detector.detection_size`): 2048 made the detection stage ~0.1-0.3 s faster (wall differences up to 3 s on some pages were translation sampling variance), but the **region sets changed** (Boku 12->11, Maou 11->10, Mieruko 11->12; OCR text differs in 1-6 segments per page).
+- That is a recall change, not a free speed knob: **keep 2560** (same decision class as the earlier 3200 rejection) unless a corpus-wide recall proof exists. No code change; benchmark `2026-10-23-detection-size-ab.md`.
+
 ## MIT quality loop, round 114 — JP rhetorical-prompt A/B: no measurable difference, rule not shipped (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
