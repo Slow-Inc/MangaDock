@@ -1614,7 +1614,8 @@ class MangaTranslator:
         try:
             from .series_glossary_memory import remember_and_apply, series_memory_enabled
             if series_memory_enabled():
-                _fixed = remember_and_apply(ctx.text_regions, getattr(config.translator, 'series_context', None))
+                _fixed = remember_and_apply(ctx.text_regions, getattr(config.translator, 'series_context', None),
+                                            getattr(config.translator, 'target_lang', '') or '')
                 if _fixed:
                     print(f'[series-glossary] applied {_fixed} name fix(es)', flush=True)
         except Exception:

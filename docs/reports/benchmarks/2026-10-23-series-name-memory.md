@@ -30,3 +30,16 @@ poison it). The next page of the same series applies the remembered spellings de
 It changes rendered output and can freeze an imperfect spelling across the series (same consistency-vs-correctness
 tradeoff as the batch glossary). Once the Backend sends `series_context` for all series (it only sends it when
 catalog metadata exists), a corpus replay + judge comparison can justify defaulting it on.
+## Promoted to default (#980 follow-up)
+
+After the opt-in results above, the memory became **default ON** (`MIT_SERIES_GLOSSARY=0` disables; `MIT_NAME_GLOSSARY=0`
+disables it with the base glossary). Reasons and checks:
+
+- The memory is keyed by `(target language, series_context)`; a series translated to two languages keeps separate
+  memories, and without a series context the path is a strict no-op.
+- **First page cannot change:** with a series context supplied on a single replay, the rendered PNG is
+  **byte-identical** to the run without context (the first page only learns).
+- Live two-page run with no env override: `[series-glossary] applied 2 name fix(es)`, both pages `สึกุโยมิ` — the
+  same consistency the batch path already ships by default (its glossary), now on the production path.
+- The consistency-vs-correctness tradeoff is unchanged from the batch glossary: a spelling can be frozen, but a
+  chapter will not show two spellings of one name. `MIT_SERIES_GLOSSARY=0` is the escape hatch.

@@ -1,12 +1,12 @@
 """#980 follow-up: series-scoped character-name memory for the single-page production path.
 
 Production translates one page per request, so a character name can be spelled differently on every page. The
-Backend already sends a stable `translator.series_context` string (#157) — enough to key a small in-process LRU:
-after a page is translated its name spellings are remembered for the series, and the next page of the same series
-has them applied deterministically before rendering.
+Backend sends a stable `translator.series_context` string (#157) — enough to key a small in-process LRU: after a page
+is translated its name spellings are remembered for the (series, target language) pair, and the next page has them
+applied deterministically before rendering.
 
-Opt-in (`MIT_SERIES_GLOSSARY=1`) because it changes output and can freeze an imperfect spelling for the whole
-series — the same consistency-vs-correctness tradeoff the batch glossary carries.
+Default ON (same consistency tradeoff the batch glossary already carries): set `MIT_SERIES_GLOSSARY=0` to disable,
+and `MIT_NAME_GLOSSARY=0` disables it together with the base glossary. No series context -> no-op.
 """
 import hashlib
 import os
@@ -19,15 +19,16 @@ _memory = OrderedDict()
 
 
 def series_memory_enabled(env=None) -> bool:
-    """True when MIT_SERIES_GLOSSARY is explicitly on (and the base glossary feature is enabled)."""
+    """Default ON; MIT_SERIES_GLOSSARY=0/false/off disables (and so does MIT_NAME_GLOSSARY=0)."""
     value = str((env or os.environ).get('MIT_SERIES_GLOSSARY', '')).strip().lower()
-    if not value or value in ('0', 'false', 'no', 'off'):
+    if value in ('0', 'false', 'no', 'off'):
         return False
     return glossary_enabled(env)
 
 
-def _key(series_context) -> str:
-    return hashlib.sha1(str(series_context).encode('utf-8')).hexdigest()[:16]
+def _key(series_context, to_lang) -> str:
+    # Spellings are target-language specific: the same series translated to THA and ENG must not share memory.
+    return hashlib.sha1(f'{to_lang}|{series_context}'.encode('utf-8')).hexdigest()[:16]
 
 
 def reset_memory() -> None:
@@ -71,11 +72,11 @@ def _learn(regions, existing) -> dict:
     return glossary
 
 
-def remember_and_apply(regions, series_context) -> int:
+def remember_and_apply(regions, series_context, to_lang='') -> int:
     """Apply the series' remembered spellings to this page, then learn from it; returns fixes applied."""
     if not regions or not series_context:
         return 0
-    key = _key(series_context)
+    key = _key(series_context, to_lang)
     stored = _memory.get(key) or {}
     fixed = apply_glossary(regions, stored) if stored else 0
     merged = _learn(regions, stored)

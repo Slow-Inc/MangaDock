@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 103 — series name memory promoted to default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Keyed the memory by **`(target language, series_context)`** so a series translated to THA and ENG never shares spellings, and confirmed the first page is a strict learn-only no-op: a single-page replay with a series context is **byte-identical** to the run without it.
+- **Live two-page run with no env override:** `applied 2 name fix(es)`, both pages `สึกุโยมิ` — the same cross-page consistency the batch path already ships by default, now also on the production single-page path.
+- **Default ON** (`MIT_SERIES_GLOSSARY=0` disables; `MIT_NAME_GLOSSARY=0` disables both). The consistency-vs-correctness tradeoff is unchanged from the batch glossary, and there is no effect at all without a series context. Suite 920+ green; benchmark updated; #980 updated.
+
 ## MIT quality loop, round 102 — series-scoped name memory for the single-page production path (#980 follow-up) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
