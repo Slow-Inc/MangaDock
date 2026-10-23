@@ -51,3 +51,13 @@ Mining adjacent identical Thai tokens (length >= 2) over the stored corpus found
 
 A de-duplication pass would corrupt laughter and legitimate grammar for ~1 % gain, so **no duplicate-token guard**.
 Only the unambiguous missing-mark tokens from the previous section are normalised.
+## Live validation (6 fresh pages, current pipeline)
+
+Ran six real pages through the normal pipeline with the new normalizer active:
+
+- **0 occurrences** of `แล่ว` / `แลว` / `ไมใช่` / `ทำให` / `ขอให` in the fresh outputs (previously present across the
+  corpus).
+- Gate: **0 violations** on all six pages.
+- One guard trigger (a `dropped_question` true positive) — unrelated to this fix.
+
+So the typo normalizer is wired into the live cleanup path, not just the unit tests.

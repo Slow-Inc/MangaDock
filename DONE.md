@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 162 — live validation: typo normalizer active, 0 typo tokens, gate clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Six fresh real pages with the normalizer active: **0** occurrences of the previously frequent typos (`แล่ว/แลว/ไมใช่/ทำให/ขอให`) in the outputs, **gate 0 violations**, one unrelated `dropped_question` guard trigger.
+- Confirms the typo normalizer runs in the live cleanup path (not only in unit tests). Benchmark updated.
+
+---
+
 ## MIT quality loop, round 161 — duplicate-token cleaning measured and rejected (96% intentional) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
