@@ -29,7 +29,8 @@ with the acceptance rule for each.
 5. **Fragment completion** (`SOR` -> `ขอโทษ`, `RIGHT..` -> `ใจแล้ว`): no deterministic licence found; a possible angle
    is a source-side cut detector + a shape-preserving retry note. Acceptance: forced-injection proof, then a corpus
    sweep with 0 false triggers on ordinary lines.
-6. **Interjection/lexical sense errors** (`MAN..` as a greeting, `cute` -> `ตัวเล็ก`) — model ceiling; would need a
+6. **Omission verifier precision at scale:** the two-pass probe is 2 agreed / 0 false-positive-agreed on 33 pages, but 2 disagreements were borderline real (tense nuance, dropped number). A wider sample (or 3-pass majority) would settle whether to trust it as an automatic retry trigger.
+7. **Interjection/lexical sense errors** (`MAN..` as a greeting, `cute` -> `ตัวเล็ก`) — model ceiling; would need a
    different model or a verifier. Do not attempt with a predicate.
 
 ## P2 — operations / maintenance

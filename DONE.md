@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 155 — omission-verifier pipeline integration deferred with a concrete design note (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Decided **not** to wire the verifier into the pipeline yet: it would need a whole-page re-ask that preserves page context (the same constraint that keeps segment retry opt-in), a forced-injection proof, and acceptance of ~2 verifier calls on the ~5 % of pages with long lines and an agreed flag.
+- Updated the next-loop backlog: P1 entry now records the working report-only tool, the two-pass precision evidence (2 agreed TPs, 0 agreed FPs, 2 borderline disagreements) and the three requirements for integration behind `MIT_OMISSION_VERIFY=1`; added a separate P1 item for a wider precision sample / 3-pass majority.
+- No code change.
+
+---
+
 ## MIT quality loop, round 154 — omission verifier two-pass agreement keeps 2 clear TPs, drops 2 borderline (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
