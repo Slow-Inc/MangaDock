@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 187 — dropped_question tag-question licence clears the only leftover (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The tuned-default sweep left one `dropped_question` leftover that two re-asks could not fix: `ITS JUST AINT FAIR, YKNOW?` -> `มันไม่แฟร์เลยนะเนี่ย!`. The `?` is a discourse tag, and `นะเนี่ย` is the idiomatic rendering — a guard false positive.
+- Added a tag-question licence (`YKNOW | YOU KNOW | RIGHT | EH | HUH | OK | OKAY | HMM` at the source end); real questions still fire. Dashboard on the same outputs: **leftover `{}`** (was 1). Tests added; suite 962 passed.
+- Benchmark `2026-10-23-tag-question-licence.md`.
+
+---
+
 ## MIT quality loop, round 186 — OCR pass threshold tuned to 0.75: +8 net better lines for +69 ms/page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

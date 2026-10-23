@@ -352,3 +352,13 @@ def test_salvage_never_strips_the_targets_own_script_1059c():
     from manga_translator.translation_quality import strip_leaked_script
     assert strip_leaked_script("ドン! ลาก่อน", "HELLO", "JPN") == "ドン! ลาก่อน"
     assert strip_leaked_script("ドン! ลาก่อน", "HELLO", "THA") != "ドン! ลาก่อน"
+
+
+def test_tag_questions_are_licensed_1024():
+    from manga_translator.translation_quality import dropped_question
+    # measured false positive: a discourse tag rendered with a Thai particle, not a question marker
+    assert not dropped_question('ITS JUST AINT FAIR, YKNOW?', 'มันไม่แฟร์เลยนะเนี่ย!')
+    assert not dropped_question('THATS FINE, RIGHT?', 'ก็ดีแล้ว')
+    assert not dropped_question('YOU DID IT, EH?', 'เธอทำได้แล้ว')
+    # real questions still fire
+    assert dropped_question('IS THAT SO?', 'มันเป็นอย่างนั้นจริงๆ')

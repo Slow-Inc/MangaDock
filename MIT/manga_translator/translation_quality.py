@@ -405,6 +405,11 @@ def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
     return cleaned or trans
 
 
+#: English tag-question endings: the '?' is a discourse particle ('..., y know?'), and Thai renders it with a particle
+#: or exclamation without a question marker. Measured: `ITS JUST AINT FAIR, YKNOW?` came back as
+#: `มันไม่แฟร์เลยนะเนี่ย!` and survived two re-asks, so the class is licensed.
+_EN_TAG_QUESTIONS = re.compile(r"\b(?:YKNOW|YOU\s+KNOW|RIGHT|EH|HUH|OK|OKAY|HMM)\s*[?.!]*\s*$", re.I)
+
 #: Thai question markers: explicit '?' or a question particle/word.
 _THAI_Q_MARKERS = re.compile(
     r'\?|หรือ(?:เปล่า|ไม่|ไง)|ไหม|มั้ย|เหรอ|หรอ|หรือ|อะไร|ทำไม|ยังไง|อย่างไร|เท่าไหร่|แค่ไหน|ที่ไหน|ใคร|เมื่อไหร่')
@@ -422,6 +427,8 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
     # style, never a question; only a standalone '?' counts (gate has the same licence).
     standalone = re.sub(r'(?<=[A-Za-z0-9])\?+(?=[A-Za-z0-9])', '', src or '')
     if '?' not in standalone and '？' not in standalone:
+        return False
+    if _EN_TAG_QUESTIONS.search(standalone.strip()):
         return False
     return _THAI_Q_MARKERS.search(dst or '') is None
 
