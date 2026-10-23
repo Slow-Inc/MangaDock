@@ -35,3 +35,19 @@ the fix runs at **token level** (with `keep_whitespace=True`), real words that c
 - Cost: **0.04 ms/segment** (tokenizer is already loaded for Thai wrapping).
 - Tests cover the new mappings and the untouched real words; the gate's `common_typo` rule uses the same normalizer,
   so a regression is reported deterministically.
+## Adjacent duplicate tokens: measured, rejected
+
+Mining adjacent identical Thai tokens (length >= 2) over the stored corpus found 18 types / 412 occurrences, but
+**96 % are intentional**:
+
+| token | count | context | verdict |
+|---|---|---|---|
+| `ฮ่า` | 274 | laughter | intentional |
+| `เธอ` | 44 | `...ของเธอ เธอจึง...` (grammar: her ... she therefore ...) | intentional |
+| `ลิ`, `ไอ` | 30 | inside names/letter spellings (`ลิลิธ`, `ซีไอไอ`) — tokenizer artefact | not a duplicate |
+| `ฮิ`, `ฮึ`, `เหอะ`, `คิก`, `ฟุ`, `ก๊าก`, `หึ`, `เฮ` | ~50 | SFX / laughter | intentional |
+| `ไม่`, `อ้าง` | 3 | deliberate stutter in dialogue | intentional |
+| `ที่` | 1 | `ณ ที่ที่เจ้าแสวงหา` — legit `ที่ ที่...` | intentional |
+
+A de-duplication pass would corrupt laughter and legitimate grammar for ~1 % gain, so **no duplicate-token guard**.
+Only the unambiguous missing-mark tokens from the previous section are normalised.

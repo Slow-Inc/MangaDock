@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 161 — duplicate-token cleaning measured and rejected (96% intentional) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined adjacent identical Thai tokens: 18 types / 412 occurrences, of which **96 % are intentional** — laughter (`ฮ่า` 274, `ฮิ/ฮึ/คิก/ก๊าก` ~50), legitimate grammar (`เธอ เธอจึง` 44), deliberate stutter (`ไม่ ไม่ใช่` 2), and tokenizer artefacts inside names (`ลิลิธ`, `ซีไอไอ`).
+- A de-dup pass would corrupt those for about a 1 % gain -> **no duplicate-token guard**; documented in the typo-normalizer benchmark. Only the unambiguous missing-mark tokens stay normalised.
+
+---
+
 ## MIT quality loop, round 160 — missing-mark tokens fixed too: 219 stored regions corrected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
