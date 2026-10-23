@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 133 — series-memory edge cases covered (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the two missing tests for the new series name memory: the 32-series **LRU bound** (oldest evicted, newest kept) and **dict-shaped regions** (`{"src", "dst"}` as the batch/gate paths pass them) being learned and enforced exactly like TextBlock objects. 7 tests in the module, all pure Python.
+- No behaviour change.
+
+---
+
 ## MIT quality loop, round 132 — final pre-merge verification battery (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

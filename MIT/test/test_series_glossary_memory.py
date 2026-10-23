@@ -49,3 +49,27 @@ def test_the_memory_is_on_by_default_and_can_be_switched_off():
     assert not series_memory_enabled({'MIT_SERIES_GLOSSARY': '0'})
     assert not series_memory_enabled({'MIT_SERIES_GLOSSARY': 'off'})
     assert not series_memory_enabled({'MIT_NAME_GLOSSARY': '0'})
+
+
+def test_the_memory_is_bounded_to_the_32_series_lru():
+    from manga_translator import series_glossary_memory as mem
+    mem.reset_memory()
+    for i in range(40):
+        regions = [_region("TSUKUYOMI.", "สึกุโยมิ" + ("x" * (i % 5)))]
+        mem.remember_and_apply(regions, f"series: {i}", "THA")
+    assert len(mem._memory) == mem._MAX_SERIES == 32
+    # the oldest series was evicted, the newest survives
+    import hashlib
+    def key(ctx):
+        return hashlib.sha1(f'THA|{ctx}'.encode('utf-8')).hexdigest()[:16]
+    assert key('series: 0') not in mem._memory
+    assert key('series: 39') in mem._memory
+
+
+def test_dict_shaped_regions_are_supported():
+    reset_memory()
+    page1 = [{"src": "TSUKUYOMI.", "dst": "สึกุโยมิ"}]
+    assert remember_and_apply(page1, "series: dict", "THA") == 0
+    page2 = [{"src": "TSUKUYOMI!", "dst": "ทสึคึโยมิ!"}]
+    assert remember_and_apply(page2, "series: dict", "THA") == 1
+    assert page2[0]["dst"] == "สึกุโยมิ!"
