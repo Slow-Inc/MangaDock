@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 216 — omission pass added to PR body/comment with TP+FP evidence (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-6 section (flow, the three fixed bugs, replay TP proof, 10-page/19-candidate FP sample, cost, opt-in status) with a Thai mirror; a PR comment carries the same summary.
+- No code change.
+
+---
+
 ## MIT quality loop, round 215 — omission pass clean-page sample: 19 candidates, 0 false flags (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
