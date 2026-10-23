@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 219 — Vercel re-rate-limited; size shrank ahead of its next retry (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- After the real 253 MB `docs` function failure was diagnosed and the 34 evidence images shrank 17.4 → 10.5 MB (round 218), Vercel went back to its **external rate limit** (retry in 24 h), so the size fix cannot be verified until that window clears.
+- All GitHub CI jobs pass on the new head (logic gate 1m48s, backend 1m19s; heavy ML was still running when checked). No code change.
+
+---
+
 ## MIT quality loop, round 218 — Vercel docs-function size fixed by downscaling the branch's benchmark images (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
