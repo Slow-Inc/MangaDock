@@ -1,8 +1,9 @@
 "use client";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { errMessage } from "@/lib/errMessage";
 import Loader from "./ui/Loader";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 interface ReauthModalProps {
   isOpen: boolean;
@@ -22,6 +23,14 @@ export default function ReauthModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"password" | "google" | "facebook" | null>(null);
   const resolvedRef = useRef(false);
+  const cancel = useCallback(() => {
+    onClose();
+    setPassword("");
+    setError(null);
+  }, [onClose]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape cancels, focus goes back to the opener
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, cancel, isOpen);
 
   const hasPassword = user?.providerData.some((p) => p.providerId === "password");
   const hasGoogle = user?.providerData.some((p) => p.providerId === "google.com");
@@ -75,7 +84,8 @@ export default function ReauthModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="ยืนยันตัวตน"
+      className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm outline-none">
       <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl">
         <p className="text-sm font-semibold text-ink">ยืนยันตัวตน</p>
         <p className="mt-1 text-xs text-ink-2">
@@ -159,11 +169,7 @@ export default function ReauthModal({
           )}
 
           <button
-            onClick={() => {
-              onClose();
-              setPassword("");
-              setError(null);
-            }}
+            onClick={cancel}
             className="w-full rounded-xl border border-line py-2 text-xs text-ink-3 transition hover:bg-fill hover:text-ink-2"
           >
             ยกเลิก

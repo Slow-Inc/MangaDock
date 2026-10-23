@@ -6,6 +6,7 @@ import { ROLE } from "../../lib/types/user";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
+import { useModalDialog } from "../../hooks/useDialogFocus";
 import { useToast } from "../../contexts/ToastContext";
 import {
   getWalletBalance,
@@ -95,10 +96,13 @@ function WalletSummaryModal({
   spendingTransactionsCount: number;
   monthLabel: string;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, open);
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-scrim/75 p-4" onClick={onClose}>
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="สรุปธุรกรรมทั้งหมด"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-scrim/75 p-4 outline-none" onClick={onClose}>
       <div
         className="w-full max-w-md rounded-[1.75rem] border border-line bg-surface p-5 shadow-[0_50px_90px_-50px_rgb(0_0_0/.45)]"
         onClick={(e) => e.stopPropagation()}

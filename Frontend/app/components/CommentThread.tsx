@@ -15,6 +15,7 @@ import LimitCounter from "./ui/LimitCounter";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import type { ForumComment } from "../lib/types";
 
 function CommentThreadImpl({
@@ -93,6 +94,8 @@ function CommentThreadImpl({
   };
 
   const closeSheet = () => setSheetOpen(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useModalDialog(sheetRef, closeSheet, contextMenuOpen);
 
   const handleEditStart = () => {
     setEditContent(displayContent);
@@ -305,7 +308,7 @@ function CommentThreadImpl({
 
       {/* Mobile long-press bottom sheet — portalled to body, sm:hidden */}
       {contextMenuOpen && typeof window !== "undefined" && createPortal(
-        <div className="sm:hidden">
+        <div ref={sheetRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="ตัวเลือกความคิดเห็น" className="sm:hidden outline-none">
           {/* Backdrop */}
           <div
             className={`fixed inset-0 z-50 bg-scrim/60 transition-opacity duration-300 ${sheetVisible ? "opacity-100" : "opacity-0"}`}

@@ -60,6 +60,28 @@ export function hasLayerAbove(
   return siblings.some((n, i) => n !== el && isLayer(n) && (zIndex(n) > mine || (zIndex(n) === mine && i > at)));
 }
 
+/**
+ * The control to give focus back to on close (#1073). Usually what held focus when the dialog appeared; but an
+ * `autoFocus` field inside it takes focus during the commit, before the dialog's effect runs — then it is the element
+ * focused just before that.
+ */
+export function pickOpener<T>(root: { contains(n: T): boolean } | null, active: T | null, before: T | null): T | null {
+  return active && root?.contains(active) ? before : active;
+}
+
+// What held focus before the current element: read by pickOpener when an autoFocus field already took focus
+let focusedBefore: HTMLElement | null = null;
+if (typeof document !== "undefined") {
+  let now: EventTarget | null = document.activeElement;
+  document.addEventListener("focusin", (e) => {
+    focusedBefore = now instanceof HTMLElement && now !== document.body ? now : focusedBefore;
+    now = e.target;
+  }, true);
+}
+
+/** The innermost aria-modal dialog holding `el` — the one whose keyboard it is (#1073). */
+const innermostModal = (el: Element | null) => el?.closest('[aria-modal="true"]') ?? null;
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -71,12 +93,16 @@ const FOCUSABLE =
 export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => boolean, active = true) {
   useEffect(() => {
     if (!active) return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const root = ref.current;
+    const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const opener = pickOpener<HTMLElement>(root, focused, focusedBefore);
     if (root && !root.contains(document.activeElement)) root.focus({ preventScroll: true });
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !isTop() || !ref.current) return;
+      // a dialog opened inside this one (a report form in the reader) runs its own Tab cycle (#1073)
+      const inner = innermostModal(document.activeElement);
+      if (inner && inner !== ref.current && ref.current.contains(inner)) return;
       // visible (offsetParent is null for fixed elements) and not inside an inert part (a collapsed group, a closed menu):
       // the browser skips those, and the toast cycle below moves focus itself, so it must skip them too
       const own = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
@@ -109,4 +135,33 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
     // Runs when the dialog appears/disappears: isTop reads live state, ref is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+}
+
+/**
+ * Whether the keyboard is this dialog's to act on (#1073): focus is lost to <body>, or the innermost aria-modal dialog
+ * holding focus is this one. A dialog opened inside it (a report form in the reader) owns Tab and Escape while it holds
+ * focus; so does a layer opened over it elsewhere (a login prompt).
+ */
+export function ownsKeyboard<T>(dialog: T, active: T | null, body: T, innermost: T | null): boolean {
+  return active === null || active === body || innermost === dialog;
+}
+
+/**
+ * An aria-modal dialog's keyboard (#1073): `useDialogFocus` plus Escape calling `onClose` while the dialog owns the
+ * keyboard. Listened in the capture phase and stopped, so a dialog or reader underneath (which listens on window)
+ * does not close too. `active` = the dialog is open (a dialog that animates out stays mounted after it closes).
+ */
+export function useModalDialog(ref: RefObject<HTMLElement | null>, onClose: () => void, active = true) {
+  useDialogFocus(ref, () => true, active);
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      if (e.key !== "Escape" || !ref.current || !ownsKeyboard<Element>(ref.current, el, document.body, innermostModal(el))) return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [ref, onClose, active]);
 }

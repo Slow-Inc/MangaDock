@@ -12,6 +12,7 @@ import { useToast } from "../../../contexts/ToastContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import { useIsMobile } from "../../../hooks/useIsMobile";
+import { useModalDialog } from "../../../hooks/useDialogFocus";
 import type { ForumPost, ForumCategory } from "../../../lib/types";
 import { availableCategories, isRestrictedCategory } from "../../../lib/forumCategories";
 import { FORUM_LIMITS, clipToLimit } from "../../../lib/forumLimits";
@@ -49,6 +50,13 @@ export default function MangaCommunityPage() {
 
   const modalScrollRef = useRef<HTMLDivElement>(null);
   useLocalLenis(modalScrollRef, "vertical", showCreateModal);
+  const closeCreate = useCallback(() => {
+    setShowCreateModal(false);
+    setPostImages([]);
+    setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+  }, []);
+  const createDialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(createDialogRef, closeCreate, showCreateModal);
 
   const fetchMangaMeta = useCallback(async () => {
     try {
@@ -272,7 +280,8 @@ export default function MangaCommunityPage() {
 
       {/* ── Create Post Modal ── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-scrim/80">
+        <div ref={createDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="สร้างโพสต์"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-scrim/80 outline-none">
           <div className="bg-surface border border-line rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <header className="p-6 border-b border-line flex items-center justify-between">
               <div>
@@ -282,11 +291,8 @@ export default function MangaCommunityPage() {
                 )}
               </div>
               <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setPostImages([]);
-                  setNewPost({ title: "", content: "", category: "general" as ForumCategory });
-                }}
+                onClick={closeCreate}
+                aria-label="ปิด"
                 className="text-ink-2 hover:text-ink"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

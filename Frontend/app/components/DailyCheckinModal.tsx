@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { PRIMARY_FILL } from "./ui/Button";
@@ -10,6 +10,7 @@ import Mascot from "./mascot/Mascot";
 import { checkinErrorMessage, utcDayKey } from "../lib/dailyCheckin";
 import { getWalletBalance } from "../lib/studioApi";
 import type { CoinBalanceUpdate } from "../lib/coinBalanceEvent";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -111,10 +112,15 @@ export default function DailyCheckinModal() {
     localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
   }
 
+  // Escape does what the visible close does: before the claim there is no close, only the claim button
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, () => { if (claimed) handleClose(); }, open && !!status);
+
   if (!open || !status) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="เช็คอินประจำวัน"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4 outline-none">
       <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
         {/* Header */}
         <div className="relative px-6 pb-4 pt-8 text-center">
