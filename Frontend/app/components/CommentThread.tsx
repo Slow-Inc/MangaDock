@@ -227,6 +227,18 @@ function CommentThreadImpl({
               ตอบกลับ
             </button>
 
+            {/* Phone: the edit/delete sheet also opens from a button, not only a long-press (#1083) */}
+            {isOwnComment && (
+              <button
+                type="button"
+                onClick={() => { setConfirmDelete(false); setSheetOpen(true); }}
+                aria-label="ตัวเลือกความคิดเห็น"
+                className="sm:hidden -my-1 px-1 text-base leading-none text-ink-3 hover:text-ink transition-colors"
+              >
+                <span aria-hidden="true">⋯</span>
+              </button>
+            )}
+
             {/* Desktop-only inline edit/delete */}
             {isOwnComment && !isEditing && (
               <div className="hidden sm:flex items-center gap-3">

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { getProfile, uploadProfileBanner, updateBannerPosition, listPostsByUser } from "../../../lib/communityApi";
+import { bannerPositionForKey } from "../../../lib/bannerPosition";
 import PostCard from "../../../components/PostCard";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
@@ -109,6 +110,9 @@ export default function PublicProfilePage() {
   }, [uid, viewingOwn]);
 
   const openReposition = () => { setRepositioning(true);  setRepoAnim("entering"); };
+  // the drag surface is a slider too: focus moves to it, the button that opened it is gone (#1083)
+  const repositionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (repositioning) repositionRef.current?.focus(); }, [repositioning]);
   const closeReposition = () => { setRepositioning(false); setRepoAnim("exiting"); };
 
   useEffect(() => {
@@ -311,6 +315,21 @@ export default function PublicProfilePage() {
               {repositioning ? (
                 /* ── Reposition drag surface ── */
                 <div
+                  // a slider too, so the position can be set without dragging (#1083)
+                  role="slider"
+                  ref={repositionRef}
+                  tabIndex={0}
+                  aria-label="ตำแหน่ง Banner"
+                  aria-orientation="vertical"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(bannerYPos)}
+                  onKeyDown={(e) => {
+                    const next = bannerPositionForKey(e.key, bannerYPos);
+                    if (next === null) return;
+                    e.preventDefault();
+                    setBannerYPos(next);
+                  }}
                   className={`absolute inset-0 flex items-center justify-center select-none ${
                     isDragging ? "cursor-grabbing" : "cursor-grab"
                   }`}
