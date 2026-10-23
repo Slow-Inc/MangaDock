@@ -79,7 +79,7 @@ legitimate Latin names.
 - wall 11.2-19.3 s; `textline_merge` 0.2-0.5 s on plain pages and 5.3-7.9 s on the two SFX-heavy pages (the concurrent
   vision wait) - the batching fix keeps the worst case at ~8 s instead of the pre-fix 25-37 s.
 
-## Aggregate on unseen data (5 series, 20 pages)
+## Aggregate on unseen data (5 series, 23 pages)
 
 | series | pages | gate | render | guard notes |
 |---|---|---|---|---|
@@ -87,7 +87,12 @@ legitimate Latin names.
 | Bocchi the Rock! | 4 | 3 (legitimate Latin names) | clean | retry churn on `KLIMTS NIGHT`/`TIKTOK` (queued) |
 | Yotsuba to! | 4 | 0 | clean | one content-loss retry on a credits strip |
 | Oshi no Ko | 4 | 0 | clean | rare dropped-question sample caught; OCR-truncated line retried |
-| Kaiju No. 8 | 4 | 0 | clean | none |
+| Kaiju No. 8 | 7 | 0 | clean | none (after the round-271 credit/URL licence) |
 
-**19/20 unseen pages gated clean**; the three Bocchi findings are legitimate Latin proper names. Translation/gut coverage
+**22/23 unseen pages gated clean**; the three Bocchi findings are legitimate Latin proper names. Translation/gut coverage
 looks solid on unseen series, and the SFX batching bounds the worst merge time.
+### Kaiju No. 8, pages 8-11 (round 224)
+
+- **3/3 pages: gate 0**, render telemetry clean, no guard triggers; wall 1.8-26.6 s (one dialogue page, one SFX page, one
+  near-blank credits page at 1.8 s).
+- The reader-site credit licence from round 271 holds: no untranslated-word retries appear on these pages.

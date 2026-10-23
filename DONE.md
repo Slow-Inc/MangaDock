@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 272 — Kaiju pages 8-11: gate 0, licence holds; unseen aggregate 23 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Three more unseen Kaiju pages: gate 0, render telemetry clean, no guard triggers; wall 1.8-26.6 s (dialogue/SFX/near-blank). The round-271 credit licence holds (no untranslated-word retries).
+- Unseen aggregate updated to 5 series / 23 pages, 22/23 gated clean (the exception remains legitimate Latin names on Bocchi). No code change.
+
+---
+
 ## MIT quality loop, round 271 — reader-site credits + rhetorical exclamations licensed; retries and gate FPs gone (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
