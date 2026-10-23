@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 170 — stress-run quality judged: -0.06 inside the noise band; one OCR-garble error explained (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the seven stress-affected pages: weighted **1.453 vs 1.509** in the earlier sweep — a **-0.057 delta inside the judge-noise band**, so the bad batch did not degrade final quality after the guards.
+- One zero-score segment: source OCR read `DEEEND` (DEFEND) and the Thai shipped `ทำลาย` (destroy) — an opposite-meaning error caused by the OCR garble; fluent output, so no translation predicate can see it. Judge typo notes on it are the known noise class (code-point check shows correct marks).
+- Recorded OCR-garble→plausible-wrong as a future detection/OCR item (not a translation-guard one). Benchmark updated.
+
+---
+
 ## MIT quality loop, round 169 — retry depth analysed in the stress run: no segment exhausted the budget (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
