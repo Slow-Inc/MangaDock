@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 205 — CI green on the consider-guard head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- CI on head `f131cc1a` (run 39952900369): logic gate, heavy ML and backend all **pass**; Vercel remains the external 24 h rate limit. Branch mergeable, still draft, base #642 still open/conflicting.
+
+---
+
 ## MIT quality loop, round 204 — consider guard FP scan: 2 hits / 19,327 regions, inventory updated (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
