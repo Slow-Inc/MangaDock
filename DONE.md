@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 167 — master-plan critical item re-checked: readable-floor does not reproduce at HEAD (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the plan's critical readable-floor defect (#1/#2, was 5/10 pages with 3-4 px unreadable fallbacks) from the final sweep telemetry: **368 regions, minimum final font 15 px, zero below 14 px**, `small_font` telemetry 0 on all 39 pages — the defect does not reproduce at HEAD (resolved by the current clean-layout/floor logic; same class as #899).
+- Also tabulated the other carried-over translation plan items: rolling context partially addressed by series name memory (full context still opt-in by design), gate delivered, remaining accuracy classes are model-ceiling sense/nuance. Benchmark `2026-10-23-master-plan-critical-verification.md`.
+
+---
+
 ## MIT quality loop, round 166 — mark-only typo mining: no new safe mappings (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
