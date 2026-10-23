@@ -43,3 +43,19 @@ page2 Tsuki c2_p1 -> สึกุโยมิ!              (consistent with pag
   and `TUNED` carries no `translator` key, so a custom script must set `translator='custom_openai'` explicitly.
 - This run also exercised the #1065 token-level glossary fix: the page-2 variant (`ทสึคุโยมิ`-style) is now corrected
   instead of skipped.
+## Re-verification of the production path after all licences (round 237)
+
+Two series x two pages through `translate_patches` with a stable `series_context` and the current default config:
+
+| series/page | translated regions | gate (translated only) | names |
+|---|---|---|---|
+| Tsuki p0 | 14 / 16 | **0 violations** | `สึกุโยมิ` |
+| Tsuki p1 | 19 / 21 | **0 violations** | `สึกุโยมิ` (after `[series-glossary] applied 2 name fix(es)`) |
+| Akuyaku p0 | 11 / 12 | **0 violations** | `อลิเซีย` |
+| Akuyaku p1 | 9 / 20 | **0 violations** | - (page is mostly art/SFX) |
+
+- The series memory applied **2 name fixes** on Tsuki p1 and the shipped spelling matches p0 - the production
+  single-page path is consistent.
+- Tooling note: run the page gate on **translated** regions only. Raw `translate_patches` payloads also carry untouched
+  regions (Japanese credits, art text, SFX) whose empty translation is expected; gating the raw list reports
+  `empty_translation` noise (and the doctor path already exposes those as `dropped`/filtered).

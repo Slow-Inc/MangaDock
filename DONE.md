@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 282 — production path re-verified after all licences: gate 0, names consistent (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two series x two pages via `translate_patches` with `series_context`: gate 0 on every page's translated regions; the series memory applied 2 name fixes on Tsuki p1 and both pages ship the same spelling.
+- Tooling note recorded: gate the translated regions only, because raw payloads carry untouched regions (credits/art/SFX) whose empty translation is expected. No code change.
+
+---
+
 ## MIT quality loop, round 281 — SFX upload A/B: 768 JPEG is quality-neutral (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
