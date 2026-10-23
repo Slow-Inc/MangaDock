@@ -159,6 +159,8 @@ async def main():
     ap.add_argument('--tag', default='', help='suffix for output files (A/B runs)')
     ap.add_argument('--gate-only', action='store_true',
                     help='like --gate but exit nonzero only for gate violations (the doctor page flags still print)')
+    ap.add_argument('--no-png', action='store_true',
+                    help='skip writing the .rendered.png / .doctor.png diagnostics (JSON is still written; saves disk on sweeps)')
     ap.add_argument('--gate', action='store_true',
                     help='after the pages, run the deterministic chapter quality gate; the command exits 1 if the gate finds violations (or the doctor flags a page)')
     ap.add_argument('--replay', nargs='+', metavar='DOCTOR_JSON',
@@ -218,8 +220,9 @@ async def main():
         run, flags = diagnose(page)
 
         stem = os.path.join(args.out, f'{os.path.splitext(os.path.basename(path))[0]}_{args.target}{args.tag}')
-        rendered.save(stem + '.rendered.png')
-        _overlay(source, rendered, page, flags).save(stem + '.doctor.png')
+        if not args.no_png:
+            rendered.save(stem + '.rendered.png')
+            _overlay(source, rendered, page, flags).save(stem + '.doctor.png')
         report = {**run.to_json(), 'page': path, 'flags': {str(k): v for k, v in flags.items()},
                   'regions': [{'index': r.index, 'xyxy': r.xyxy, 'src': r.text, 'dst': r.translation,
                                'container': r.bubble_idx, 'container_box': r.bubble_box,

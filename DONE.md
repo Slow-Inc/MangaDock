@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 86 — p1-page audit: 1.58/2 judge mean, second live guard catch, disk-safe doctor flag (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited 8 more never-audited pages (p1 set + Iruma p0): **67 segments, judge mean 1.58/2** (39 perfect / 28 minor / **0 broken**) — the best fresh-set mean so far; flags are judge typo noise plus one fragment case (`IOO` -> `ฉัน`), the known model limitation.
+- **Second live guard true positive:** a Chinese leak (`觊觎`) was caught by the foreign-script guard, re-asked, and the shipped line is clean (`จอมเวทอื่นที่เล็งตำแหน่งนี้เช่นกัน`).
+- **Guard aggregate over 26 live pages** (rounds 21-23): 2 `spurious_filler` + 2 `foreign_script` triggers, **all true positives, 0 false positives** — the guards fire on ~1 in 6 pages and always on a real defect.
+- Gate clean on all 8 pages (question-marker fix holds). Added `doctor_page.py --no-png` (JSON/gate/timings kept, render PNGs skipped) after last round's disk-full incident; verified live. Benchmark `2026-10-23-fresh8-p1-audit.md`.
+
 ## MIT quality loop, round 85 — fresh 8-page audit: guard caught a live CJK leak, gate question rule widened, fragment class recorded (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
