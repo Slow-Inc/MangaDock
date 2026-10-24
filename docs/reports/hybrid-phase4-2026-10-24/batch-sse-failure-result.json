@@ -1,0 +1,43 @@
+{
+  "chapterId": "phase4-qa-batch-1792854135356",
+  "firstStatus": 201,
+  "firstConnection": {
+    "events": [
+      {
+        "at": 1121,
+        "comment": "connected"
+      },
+      {
+        "at": 1434,
+        "pageIndex": -1,
+        "patches": 0,
+        "error": "Translation failed",
+        "urls": [],
+        "coordinatesValid": true
+      }
+    ],
+    "cancelled": false
+  },
+  "secondStatus": 201,
+  "secondConnection": {
+    "events": [
+      {
+        "at": 1094,
+        "comment": "connected"
+      },
+      {
+        "at": 1116,
+        "pageIndex": -1,
+        "patches": 0,
+        "error": "Translation failed",
+        "urls": [],
+        "coordinatesValid": true
+      }
+    ],
+    "cancelled": false
+  },
+  "completedPages": [
+    -1
+  ],
+  "images": []
+}

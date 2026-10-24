@@ -1,0 +1,77 @@
+{
+  "boundary": "Physical Z Flip4 WebView -> deployed Next proxy -> deployed Backend, existing authenticated account; read requests only, no purchases, follows or notification state changed.",
+  "results": [
+    {
+      "path": "books/landing",
+      "status": 200
+    },
+    {
+      "path": "books/search",
+      "status": 200
+    },
+    {
+      "path": "books/models",
+      "status": 200
+    },
+    {
+      "path": "books/translate/mit-health",
+      "status": 200
+    },
+    {
+      "path": "forum/posts",
+      "status": 200
+    },
+    {
+      "path": "forum/trending-manga",
+      "status": 200
+    },
+    {
+      "path": "users/me",
+      "status": 200
+    },
+    {
+      "path": "users/me/favorites",
+      "status": 200
+    },
+    {
+      "path": "users/me/history",
+      "status": 200
+    },
+    {
+      "path": "users/me/follows",
+      "status": 200
+    },
+    {
+      "path": "users/me/liked",
+      "status": 200
+    },
+    {
+      "path": "notifications",
+      "status": 200
+    },
+    {
+      "path": "notifications/unread-count",
+      "status": 200
+    },
+    {
+      "path": "wallet/balance",
+      "status": 200
+    },
+    {
+      "path": "wallet/transactions",
+      "status": 200
+    },
+    {
+      "path": "wallet/earnings",
+      "status": 200
+    },
+    {
+      "path": "versions/me/versions",
+      "status": 200
+    },
+    {
+      "path": "studio/stats",
+      "status": 200
+    }
+  ]
+}

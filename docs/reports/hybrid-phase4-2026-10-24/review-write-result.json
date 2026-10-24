@@ -1,0 +1,31 @@
+{
+  "boundary": "Owner-approved reversible review through the physical hybrid shell; deleted afterwards.",
+  "book": "878634d2-ea39-4001-a4bf-31458020d16a",
+  "steps": [
+    {
+      "step": "own review before",
+      "status": 200,
+      "text": ""
+    },
+    {
+      "step": "submit review via UI",
+      "status": 201,
+      "shownInPopup": true
+    },
+    {
+      "step": "own review on server",
+      "status": 200,
+      "hasQaText": true,
+      "rating4": true
+    },
+    {
+      "step": "delete review",
+      "status": 200
+    },
+    {
+      "step": "own review after delete",
+      "status": 200,
+      "empty": true
+    }
+  ]
+}

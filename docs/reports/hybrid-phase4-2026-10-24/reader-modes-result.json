@@ -1,0 +1,145 @@
+{
+  "boundary": "Physical Z Flip4 hybrid shell; adb touch/keys/rotation; public chapter; no writes.",
+  "settingsBefore": {
+    "accelerometer": "1",
+    "rotation": "0"
+  },
+  "settingsRestored": {
+    "accelerometer": "1",
+    "rotation": "0"
+  },
+  "steps": [
+    {
+      "step": "opened",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "single-page mode",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "swipe left (real touch, web Reader has no swipe handler)",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "tap right zone (real touch)",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 2",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "zoom in twice",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 2",
+      "zoom": "150%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "continuous mode, zoom restored",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "scroll down (real touch)",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 0 / 7",
+      "visiblePage": "หน้า 3",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "next chapter",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 1 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "landscape",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 1 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        800,
+        330
+      ]
+    },
+    {
+      "step": "portrait restored",
+      "readerOpen": true,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "chapter": "ตอน 1 / 7",
+      "visiblePage": "หน้า 1",
+      "zoom": "100%",
+      "viewport": [
+        360,
+        800
+      ]
+    },
+    {
+      "step": "hardware Back 1 (expect Reader closed, book popup kept)",
+      "readerOpen": false,
+      "path": "/book/878634d2-ea39-4001-a4bf-31458020d16a",
+      "bookPopupOpen": true
+    },
+    {
+      "step": "hardware Back 2 (expect book popup closed)",
+      "readerOpen": false,
+      "path": "/",
+      "bookPopupOpen": false
+    }
+  ]
+}

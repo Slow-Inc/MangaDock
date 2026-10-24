@@ -1,0 +1,42 @@
+{
+  "boundary": "Owner-approved reversible writes on the signed-in reader account through the physical hybrid UI; every toggle restored.",
+  "book": "878634d2-ea39-4001-a4bf-31458020d16a",
+  "results": [
+    {
+      "control": "เพิ่มในรายการ",
+      "serverBefore": false,
+      "serverAfterOn": true,
+      "titleWhenOn": "อยู่ในรายการแล้ว",
+      "serverAfterOff": false,
+      "titleWhenOff": "เพิ่มในรายการ",
+      "writes": [
+        "POST /users/me/favorites 201",
+        "DELETE /users/me/favorites/878634d2-ea39-4001-a4bf-31458020d16a 200"
+      ]
+    },
+    {
+      "control": "ติดตาม series นี้",
+      "serverBefore": false,
+      "serverAfterOn": true,
+      "titleWhenOn": "กำลังติดตามอยู่ — คลิกเพื่อเลิกติดตาม",
+      "serverAfterOff": false,
+      "titleWhenOff": "ติดตาม series นี้",
+      "writes": [
+        "POST /users/me/follows 201",
+        "DELETE /users/me/follows/878634d2-ea39-4001-a4bf-31458020d16a 200"
+      ]
+    },
+    {
+      "control": "ถูกใจ",
+      "serverBefore": false,
+      "serverAfterOn": true,
+      "titleWhenOn": "เอาออก",
+      "serverAfterOff": false,
+      "titleWhenOff": "ถูกใจ",
+      "writes": [
+        "POST /users/me/liked/878634d2-ea39-4001-a4bf-31458020d16a 201",
+        "DELETE /users/me/liked/878634d2-ea39-4001-a4bf-31458020d16a 200"
+      ]
+    }
+  ]
+}

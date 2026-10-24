@@ -25,6 +25,7 @@ import { cacheInvalidate } from "../../../lib/apiCache";
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
+import { appendComment } from "../../../lib/commentList";
 import Loader from "../../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 import { usePageTitle } from "../../../hooks/pageTitle";
@@ -118,10 +119,7 @@ export default function PostDetailPage() {
           ));
           break;
         case "comment":
-          setComments(prev => {
-            if (prev.some(c => c.id === event.comment.id)) return prev;
-            return [...prev, event.comment];
-          });
+          setComments(prev => appendComment(prev, event.comment));
           setPost(prev => prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev);
           break;
         case "post_edited":
@@ -271,7 +269,7 @@ export default function PostDetailPage() {
     try {
       const created = await createComment({ postId: post.id, content });
       if (!mountedRef.current) return;
-      setComments(prev => [...prev, created]);
+      setComments(prev => appendComment(prev, created));
     } catch {
       if (mountedRef.current) {
         setNewComment(content);
