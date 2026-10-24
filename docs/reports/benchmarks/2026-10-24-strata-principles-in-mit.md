@@ -11,7 +11,7 @@ pipeline; this note records which ones transfer, what was measured, and what is 
 | **Two-card split (cards work on different conversations)** | one worker per GPU, both registered to the same front (`--report http://127.0.0.1:<front>`) | **measured, opt-in** |
 | **CPU and GPU overlap** | with two workers, one page's CPU stages (merge/mask/render) run while the other page is in remote translation | falls out of multi-worker |
 | **Prompt / message-boundary cache** | repeated static system prompt + chat samples per page; a local engine with prefix cache (Strata) or provider-side prompt caching would make prefill nearly free | **candidate**: only worth it when MIT calls a local Strata endpoint |
-| **MTP speculative decode / prompt cache** | apply to a local LLM engine; MIT translates through a remote gateway today | **available if MIT points at Strata** - its server exposes OpenAI `/v1/chat/completions` (plus Anthropic `/v1/messages` and the Responses API), so `custom_openai` can call it directly |
+| **MTP speculative decode / prompt cache** | apply to a local LLM engine; MIT translates through OpenCode Go (remote) | **not pursued** - MIT stays on OpenCode Go (2026-10-25); a local engine needs both cards + ~24 GB RAM alongside MIT's ~5 GB |
 | **KV streaming / expert-cache adaptation** | no KV cache on the vision models; panel detection (Kumiko) has no cache to reuse | n/a |
 | **Latency-oriented telemetry** | MIT already logs per-stage `elapsed_ms` (and the doctor/dashboard aggregate them) | in use |
 
@@ -47,20 +47,9 @@ D:/Github/MangaDock/MIT/.venv/Scripts/python.exe -m manga_translator shared --ho
 When to use it: chapter/batch workloads with concurrent page requests. Leave it off for single-page use (one worker keeps
 VRAM free for the display/other apps).
 
-## Where Strata itself would help MIT most
+## Not pursued: wiring MIT to Strata itself
 
-MIT's translation stage is 14-16 s/page through OpenCode Go (remote) and dominates the pipeline (~4-5 s is everything
-else). Strata is the engine that can remove that: its `serve/server.py` exposes **OpenAI Chat Completions**
-(`/v1/chat/completions`), so MIT's existing `custom_openai` can point at it:
-
-```env
-CUSTOM_OPENAI_API_BASE=http://127.0.0.1:<strata-port>/v1
-CUSTOM_OPENAI_MODEL=<model id in Strata's config>
-CUSTOM_OPENAI_API_KEY=<anything - local>
-```
-
-Then its MTP draft/verify and prompt-cache machinery applies to every MIT translation request, and the 10-16 s network
-round trip disappears. The open problem is memory, not protocol: Strata's 125B model wants both cards and ~24 GB RAM, while
-MIT's vision worker holds ~5 GB VRAM. The test to run next (needs a free GPU window): stop the extra MIT worker, start
-Strata with its elastic/low-VRAM mode, point a test MIT at it, and compare a 2-page chapter A/B (latency, Thai quality)
-against the OpenCode Go numbers above. Strata is not running right now (`:8091` free; only its web dev servers are up).
+MIT's translation stays on **OpenCode Go** (remote, 10-16 s/page; everything else in the pipeline is ~3-5 s).
+MIT is not wired to a local Strata engine: that would need both cards and ~24 GB RAM for the 125B model alongside MIT's
+~5 GB of vision models, and it is a product decision to keep the gateway path. This note is kept as the record of which
+Strata principles did transfer (hot-model preload, batch-slot workers) and the measurements behind them.
