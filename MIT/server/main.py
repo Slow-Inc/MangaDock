@@ -24,7 +24,7 @@ _initialize_env()
 
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.responses import Response, StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -293,9 +293,7 @@ async def image(req: Request, data: TranslateRequest) -> StreamingResponse:
     ctx = await get_ctx(req, data.config, data.image)
     img_byte_arr = io.BytesIO()
     ctx.result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    return Response(content=img_byte_arr.getvalue(), media_type="image/png")
 
 @app.post("/translate/json/stream", response_class=StreamingResponse,tags=["api", "json"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_json(req: Request, data: TranslateRequest) -> StreamingResponse:
@@ -330,9 +328,7 @@ async def image_form(req: Request, image: UploadFile = File(...), config: str = 
     ctx = await get_ctx(req, conf, img)
     img_byte_arr = io.BytesIO()
     ctx.result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    return Response(content=img_byte_arr.getvalue(), media_type="image/png")
 
 
 @app.post("/translate/with-form/patches", response_description="JSON with per-region patch data", tags=["api", "form"])
