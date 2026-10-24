@@ -77,6 +77,34 @@
 
 ---
 
+## #1114 Chapter lists follow the content level once it loads (2026-10-24)
+
+**Why:** a friend raised their level, then opened Tanaka-kun wa Mite Iru. (MangaDex `suggestive`: 7 chapters with
+`suggestive` in the rating list, 0 at `safe` only) from home and saw no chapters. The same title from search had
+them.
+- On a page load the client level is `off` until `ContentLevelSync` resolves.
+- `ChapterList` and `HeroDetailButton` fetched once on mount (`[book.id]`), so a popup that mounted earlier sent no
+  token, got the `off` scope, and never re-fetched.
+- The backend log shows the empty chapters request (14:51:10.229) before that page's content-settings read
+  (14:51:10.367).
+
+**What:**
+- Both fetches subscribe to `useContentLevel()` and depend on it. They key on `levelKey(level)` and re-fetch when
+  the level arrives or changes.
+- A cancelled flag stops a slower answer for the previous level from overwriting the new one.
+
+**Validated:**
+- Production build, signed-in fake session at "ชวนคิด", the level answered 1.5 s late. The chapters endpoint answers
+  like the server: chapters only with a token.
+- Before the fix: one tokenless request, and the popup stays on "ไม่มีตอนให้อ่าน".
+- After the fix: two requests, the second carrying the token, and the popup shows "อ่านตอนที่ 1".
+- The level-switch probe still opens home titles with their chapters.
+- Frontend unit tests 511/511, tsc and eslint clean.
+- Note: a clean `next build` panics on the `../docs/**` `outputFileTracingExcludes` (#1064). That is tracked
+  separately in #1115. This verification build ran with that block removed locally; the change was not committed.
+
+---
+
 ## #1112 Home page no longer offers titles with nothing to read (2026-10-24)
 
 **Why:** a friend opened the home hero, Sousou no Frieren (`b0b721ff`), and saw "ไม่มีตอนให้อ่าน", while search
