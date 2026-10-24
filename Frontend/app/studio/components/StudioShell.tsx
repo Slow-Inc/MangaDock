@@ -1,0 +1,183 @@
+"use client";
+
+/**
+ * Studio shell (Epic C #788), built in-house after the "Dashboard Shell" docs the dev supplied:
+ * a resizable sidebar (drag the edge, arrow keys on the handle, double-click resets; the width is remembered) with
+ * grouped navigation and one active pill that slides to the chosen item. Under 768 px (md) the Navbar's Studio
+ * bottom bar is the navigation — a drawer there only repeated it, and a 672 px switch showed both.
+ * Beside it, a header with the page title and a status pill (the account's Studio role), then the page,
+ * which scrolls on its own. Pages add their tabs and actions with `StudioToolbar`.
+ * Reduced motion: the pill and the resize do not animate (globals.css).
+ */
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import Navbar from "../../components/Navbar";
+import Badge from "../../components/ui/Badge";
+import Mascot from "../../components/mascot/Mascot";
+import { useAuth } from "../../contexts/AuthContext";
+import { getActiveStudioTab, STUDIO_TABS } from "./studioTabs";
+import { SIDEBAR, clampSidebarWidth, studioPageTitle, studioRoleLabel } from "../lib/shellMath";
+import { usePageTitle } from "../../hooks/pageTitle";
+
+const WIDTH_KEY = "md-studio-sidebar";
+const ITEM_H = 40; // px per nav row — the active pill moves in these steps
+
+function readWidth(): number {
+  try {
+    return clampSidebarWidth(Number(localStorage.getItem(WIDTH_KEY) ?? SIDEBAR.initial));
+  } catch {
+    return SIDEBAR.initial;
+  }
+}
+
+/** The grouped sidebar navigation. */
+function StudioNav({ pathname }: { pathname: string }) {
+  const active = getActiveStudioTab(pathname);
+  const activeIndex = Math.max(0, STUDIO_TABS.findIndex((t) => t.key === active));
+  return (
+    <nav aria-label="เมนูสตูดิโอ" className="relative px-3">
+      <span
+        aria-hidden
+        className="absolute inset-x-3 top-0 rounded-[var(--r2)] bg-fill transition-transform duration-[var(--t2)] ease-[var(--ease)]"
+        style={{ height: ITEM_H - 4, transform: `translateY(${activeIndex * ITEM_H}px)` }}
+      />
+      <ul className="relative">
+        {STUDIO_TABS.map((tab) => {
+          const isActive = tab.key === active;
+          return (
+            <li key={tab.key} style={{ height: ITEM_H }}>
+              <Link
+                href={tab.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex h-9 items-center gap-3 rounded-[var(--r2)] px-3 text-sm transition-colors duration-[var(--t1)] ${
+                  isActive ? "text-ink" : "text-ink-2 hover:text-ink"
+                }`}
+              >
+                {tab.icon("h-4 w-4 shrink-0")}
+                <span className="truncate">{tab.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+const EYEBROW = "font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-3";
+
+export default function StudioShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const pageTitle = studioPageTitle(pathname);
+  usePageTitle(pageTitle === "สตูดิโอ" ? pageTitle : `${pageTitle} · สตูดิโอ`);
+  const { userRole } = useAuth();
+  const role = studioRoleLabel(userRole);
+  const [width, setWidth] = useState<number>(SIDEBAR.initial);
+  const dragging = useRef(false);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // Restore the remembered width after mount (localStorage is not available during SSR).
+  useEffect(() => {
+    const w = readWidth();
+    if (w !== SIDEBAR.initial) requestAnimationFrame(() => setWidth(w));
+  }, []);
+
+  // The content scrolls in its own box, so the app-wide reset to the top on navigation does not reach it.
+  useEffect(() => {
+    scroller.current?.scrollTo(0, 0);
+  }, [pathname]);
+
+  const commit = useCallback((w: number) => {
+    const next = clampSidebarWidth(w);
+    setWidth(next);
+    try {
+      localStorage.setItem(WIDTH_KEY, String(next));
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    dragging.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (dragging.current) setWidth(clampSidebarWidth(e.clientX));
+  };
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    commit(e.clientX);
+  };
+  // A cancelled pointer (touch scroll takeover, window blur) must end the drag, or a later hover resizes.
+  const onPointerCancel = () => {
+    dragging.current = false;
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "ArrowLeft") commit(width - SIDEBAR.step);
+    else if (e.key === "ArrowRight") commit(width + SIDEBAR.step);
+    else if (e.key === "Home") commit(SIDEBAR.min);
+    else if (e.key === "End") commit(SIDEBAR.max);
+    else if (e.key === "Enter") commit(SIDEBAR.initial); // the double-click reset, from the keyboard (#1083)
+    else return;
+    e.preventDefault();
+  };
+
+  return (
+    <div
+      style={{ "--studio-sidebar": `${width}px` } as CSSProperties}
+      className="flex h-dvh flex-col pb-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))] pt-16 md:pb-0"
+    >
+      <Navbar />
+
+      <aside
+        className="fixed bottom-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))] left-0 top-16 z-30 hidden w-[var(--studio-sidebar)] flex-col border-r border-line bg-bg md:flex md:bottom-0"
+      >
+        <div className="px-5 pb-3 pt-6">
+          <p className={EYEBROW}>Studio</p>
+        </div>
+
+        <StudioNav pathname={pathname} />
+
+        <div className="mt-auto flex items-center gap-3 border-t border-line px-5 py-4">
+          <Mascot area="studio" size={36} interactive={false} paused label="มาสคอตสตูดิโอ" />
+          <Link href="/studio/upload" className="text-sm text-ink-2 transition-colors hover:text-ink">
+            อัปโหลดงานใหม่ →
+          </Link>
+        </div>
+
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="ปรับความกว้างเมนู"
+          aria-valuemin={SIDEBAR.min}
+          aria-valuemax={SIDEBAR.max}
+          aria-valuenow={width}
+          tabIndex={0}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          onLostPointerCapture={onPointerCancel}
+          onKeyDown={onKeyDown}
+          onDoubleClick={() => commit(SIDEBAR.initial)}
+          className="absolute -right-1 top-0 h-full w-2 cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ink-3 focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-accent"
+        />
+      </aside>
+
+      {/* <main>: the page's main landmark, so the title header inside is not a second banner (#846). */}
+      <main id="main" className="flex min-h-0 flex-1 flex-col md:pl-[var(--studio-sidebar)]">
+        <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-6">
+          <h1 className="min-w-0 truncate text-lg font-semibold text-ink">{studioPageTitle(pathname)}</h1>
+          {role ? <Badge tone="accent">{role}</Badge> : null}
+        </header>
+
+        <div ref={scroller} data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
+      </main>
+
+    </div>
+  );
+}

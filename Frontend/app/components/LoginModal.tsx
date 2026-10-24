@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getDisposableEmailError, normalizeEmail } from "../lib/emailValidation";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
+import Loader from "./ui/Loader";
 
 type Mode = "login" | "register" | "forgot-password";
 
@@ -61,11 +63,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    if (isOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, close]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes, focus goes back to the opener
+  useModalDialog(overlayRef, close, mounted);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -174,16 +173,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setMode("forgot-password");
   };
 
-  const inputCls = "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30";
-  const submitCls = "w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
+  const inputCls = "w-full rounded-xl border border-line bg-fill px-4 py-3 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30";
+  const submitCls = "w-full rounded-xl bg-ink py-3 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
 
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <div
       ref={overlayRef}
+      tabIndex={-1} role="dialog" aria-modal="true" aria-label={mode === "register" ? "สมัครสมาชิก" : mode === "forgot-password" ? "ลืมรหัสผ่าน" : "เข้าสู่ระบบ"}
       onClick={(e) => { if (e.target === overlayRef.current) close(); }}
-      className={`fixed inset-0 z-[300] flex items-end md:items-center justify-center md:p-4 bg-black/70 md:bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[300] outline-none flex items-end md:items-center justify-center md:p-4 bg-scrim/70 md:bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -195,10 +195,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }`}
       >
         {/* ── OAuth Loading Overlay ── */}
-        <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300 rounded-t-[28px] md:rounded-3xl pointer-events-none ${
+        <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-scrim/80 backdrop-blur-md transition-opacity duration-300 rounded-t-[28px] md:rounded-3xl pointer-events-none ${
           socialLoading ? "opacity-100" : "opacity-0"
         }`}>
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-xl">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-line bg-raised shadow-xl">
             {socialLoading === "google" ? (
               <svg viewBox="0 0 24 24" className="h-8 w-8" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -212,20 +212,18 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </svg>
             ) : null}
           </div>
-          <svg className="mb-4 h-7 w-7 animate-spin text-white/50" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-          </svg>
+          {/* on the scrim (black in both themes): fixed light text */}
+          <Loader context="section" className="mb-4 text-white/70" />
           <p className="text-sm font-semibold text-white">
             {socialLoading === "google" ? "กำลังรอการยืนยันจาก Google" : "กำลังรอการยืนยันจาก Facebook"}
           </p>
-          <p className="mt-1.5 text-xs text-white/40">โปรดดำเนินการในหน้าต่างที่เปิดขึ้น</p>
+          <p className="mt-1.5 text-xs text-white/60">โปรดดำเนินการในหน้าต่างที่เปิดขึ้น</p>
         </div>
 
         {/* ── Close button ── */}
         <button
           onClick={close}
-          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-ink-2 transition hover:bg-raised hover:text-ink"
           aria-label="ปิด"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
@@ -239,11 +237,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             social panel order swaps to TOP on mobile
         ════════════════════════════════════════ */}
         <div
-          className="flex flex-col md:flex-row bg-[#111116] md:bg-white/5 md:backdrop-blur-2xl rounded-t-[28px] md:rounded-3xl border border-white/10 border-b-0 md:border-b overflow-y-auto overflow-x-hidden md:overflow-hidden max-h-[92dvh] shadow-2xl no-scrollbar"
+          className="flex flex-col md:flex-row bg-surface rounded-t-[28px] md:rounded-3xl border border-line border-b-0 md:border-b overflow-y-auto overflow-x-hidden md:overflow-hidden max-h-[92dvh] shadow-2xl no-scrollbar"
         >
           {/* Drag handle — mobile only, sticky so it stays visible while scrolling */}
-          <div className="md:hidden flex justify-center pt-3 pb-1 sticky top-0 z-10 bg-[#111116]">
-            <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="md:hidden flex justify-center pt-3 pb-1 sticky top-0 z-10 bg-surface">
+            <div className="w-10 h-1 rounded-full bg-ink-3" />
           </div>
 
           {/* ════════════════
@@ -251,27 +249,27 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               mobile: order-1 (TOP)
               desktop: order-2 (RIGHT)
           ════════════════ */}
-          <div className="order-1 md:order-2 md:w-1/2 shrink-0 flex flex-col gap-3 px-6 pt-5 pb-4 md:px-10 md:py-12 md:bg-white/5 md:border-l md:border-white/10 md:justify-center">
+          <div className="order-1 md:order-2 md:w-1/2 shrink-0 flex flex-col gap-3 px-6 pt-5 pb-4 md:px-10 md:py-12 md:bg-fill md:border-l md:border-line md:justify-center">
 
             {/* Header — mobile only */}
             <div className="md:hidden mb-1">
-              <p className="text-lg font-black text-white tracking-tight">
+              <p className="text-lg font-black text-ink tracking-tight">
                 {mode === "register" ? "สร้างบัญชีใหม่" : mode === "forgot-password" ? "ลืมรหัสผ่าน" : "ยินดีต้อนรับ"}
               </p>
-              <p className="text-xs text-white/40 mt-0.5">เข้าถึงฟีเจอร์ทั้งหมดของ MangaDock</p>
+              <p className="text-xs text-ink-3 mt-0.5">เข้าถึงฟีเจอร์ทั้งหมดของ MangaDock</p>
             </div>
 
-            <p className="hidden md:block text-sm font-semibold text-white/50 mb-1 text-center">เข้าสู่ระบบด้วย</p>
+            <p className="hidden md:block text-sm font-semibold text-ink-2 mb-1 text-center">เข้าสู่ระบบด้วย</p>
 
             {authError && (
-              <p className="rounded-xl bg-red-500/20 px-4 py-2.5 text-center text-xs text-red-300 leading-relaxed">{authError}</p>
+              <p className="rounded-xl bg-danger/20 px-4 py-2.5 text-center text-xs text-danger leading-relaxed">{authError}</p>
             )}
 
             {/* Google */}
             <button
               onClick={signInWithPopupGuard("google", signInWithGoogle)}
               disabled={!!socialLoading || authLoading}
-              className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-fill px-5 py-3.5 text-sm font-medium text-ink transition hover:bg-raised active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -281,7 +279,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </svg>
               {socialLoading === "google" ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                  <Loader context="inline" className="text-current!" />
                   กำลังเข้าสู่ระบบ…
                 </span>
               ) : <span>เข้าสู่ระบบด้วย Google</span>}
@@ -291,14 +289,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             <button
               onClick={signInWithPopupGuard("facebook", signInWithFacebook)}
               disabled={!!socialLoading || authLoading}
-              className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#1877F2]/20 px-5 py-3.5 text-sm font-medium text-white transition hover:bg-[#1877F2]/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-[#1877F2]/20 px-5 py-3.5 text-sm font-medium text-ink transition hover:bg-[#1877F2]/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="#1877F2" xmlns="http://www.w3.org/2000/svg">
                 <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
               </svg>
               {socialLoading === "facebook" ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                  <Loader context="inline" className="text-current!" />
                   กำลังเข้าสู่ระบบ…
                 </span>
               ) : <span>เข้าสู่ระบบด้วย Facebook</span>}
@@ -306,17 +304,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             {/* OR divider — mobile only (between social top and form bottom) */}
             <div className="md:hidden flex items-center gap-3 pt-1">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] font-bold text-white/25 tracking-widest uppercase">หรือใช้อีเมล</span>
-              <div className="flex-1 h-px bg-white/10" />
+              <div className="flex-1 h-px bg-line" />
+              <span className="text-[10px] font-bold text-ink-3 tracking-widest uppercase">หรือใช้อีเมล</span>
+              <div className="flex-1 h-px bg-line" />
             </div>
 
             {/* Terms — desktop only (mobile Terms is in form panel bottom) */}
-            <p className="hidden md:block mt-4 text-center text-[11px] text-white/25 leading-relaxed">
+            <p className="hidden md:block mt-4 text-center text-[11px] text-ink-3 leading-relaxed">
               การเข้าสู่ระบบถือว่าคุณยอมรับ{" "}
-              <span className="underline underline-offset-2 cursor-pointer hover:text-white/50">ข้อกำหนดการใช้งาน</span>
+              <span className="underline underline-offset-2 cursor-pointer hover:text-ink-2">ข้อกำหนดการใช้งาน</span>
               {" "}และ{" "}
-              <span className="underline underline-offset-2 cursor-pointer hover:text-white/50">นโยบายความเป็นส่วนตัว</span>
+              <span className="underline underline-offset-2 cursor-pointer hover:text-ink-2">นโยบายความเป็นส่วนตัว</span>
             </p>
           </div>
 
@@ -327,9 +325,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           ════════════════ */}
           <div className="order-2 md:order-1 md:w-1/2 flex flex-col px-6 pt-2 pb-4 md:p-10 md:overflow-hidden">
             {/* Tab switcher — sliding pill indicator */}
-            <div className="relative mb-5 flex rounded-xl border border-white/10 bg-white/5 p-1 md:mb-8 shrink-0">
+            <div className="relative mb-5 flex rounded-xl border border-line bg-fill p-1 md:mb-8 shrink-0">
               <div
-                className={`absolute top-1 bottom-1 rounded-lg bg-white/15 shadow transition-all duration-300 ease-in-out ${
+                className={`absolute top-1 bottom-1 rounded-lg bg-surface shadow transition-all duration-300 ease-in-out ${
                   mode === "register" ? "left-[calc(50%+2px)] right-1" : "left-1 right-[calc(50%+2px)]"
                 }`}
               />
@@ -339,8 +337,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   onClick={() => setMode(m)}
                   className={`relative z-10 flex-1 rounded-lg py-2 text-sm font-semibold transition-colors duration-300 ${
                     (m === "login" ? mode === "login" || mode === "forgot-password" : mode === m)
-                      ? "text-white"
-                      : "text-white/50 hover:text-white/80"
+                      ? "text-ink"
+                      : "text-ink-2 hover:text-ink"
                   }`}
                 >
                   {m === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
@@ -357,6 +355,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Login */}
               <form
                 ref={loginRef}
+                inert={mode !== "login"} // the hidden panels stay laid out for the slide: keep them out of Tab (#1079)
                 onSubmit={handleLoginSubmit}
                 className={`transition-all duration-500 ${
                   mode === "login"
@@ -364,18 +363,18 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     : "-translate-x-full opacity-0 absolute inset-0 pointer-events-none"
                 }`}
               >
-                <p className="mb-4 text-xl font-bold text-white hidden md:block md:mb-6 md:text-2xl">ยินดีต้อนรับกลับ</p>
+                <p className="mb-4 text-xl font-bold text-ink hidden md:block md:mb-6 md:text-2xl">ยินดีต้อนรับกลับ</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">อีเมล</label>
-                    <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
+                    <input aria-label="อีเมล" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">รหัสผ่าน</label>
-                    <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required minLength={6} placeholder="••••••••" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">รหัสผ่าน</label>
+                    <input aria-label="รหัสผ่าน" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required minLength={6} placeholder="••••••••" className={inputCls} />
                   </div>
                   <div className="flex justify-end">
-                    <button type="button" onClick={openForgotPassword} disabled={authLoading || !!socialLoading} className="text-xs text-white/40 transition hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50">
+                    <button type="button" onClick={openForgotPassword} disabled={authLoading || !!socialLoading} className="text-xs text-ink-3 transition hover:text-ink-2 disabled:cursor-not-allowed disabled:opacity-50">
                       ลืมรหัสผ่าน?
                     </button>
                   </div>
@@ -388,6 +387,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Forgot password */}
               <form
                 ref={forgotPasswordRef}
+                inert={mode !== "forgot-password"}
                 onSubmit={handleForgotPasswordSubmit}
                 className={`transition-all duration-500 ${
                   mode === "forgot-password"
@@ -398,12 +398,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 }`}
               >
                 <div className="mb-6">
-                  <p className="text-xl font-bold text-white md:text-2xl">ลืมรหัสผ่าน</p>
+                  <p className="text-xl font-bold text-ink md:text-2xl">ลืมรหัสผ่าน</p>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">อีเมล</label>
-                    <input type="email" value={forgotPasswordEmail} onChange={(e) => setForgotPasswordEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
+                    <input aria-label="อีเมล" type="email" value={forgotPasswordEmail} onChange={(e) => setForgotPasswordEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <button type="submit" disabled={authLoading || !!socialLoading} className={submitCls}>
                     {authLoading ? "กำลังส่งลิงก์รีเซ็ต..." : "รีเซ็ตรหัสผ่าน"}
@@ -414,6 +414,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Register */}
               <form
                 ref={registerRef}
+                inert={mode !== "register"}
                 onSubmit={handleRegisterSubmit}
                 className={`transition-all duration-500 ${
                   mode === "register"
@@ -421,23 +422,23 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     : "translate-x-full opacity-0 absolute inset-0 pointer-events-none"
                 }`}
               >
-                <p className="mb-4 text-xl font-bold text-white hidden md:block md:mb-6 md:text-2xl">สร้างบัญชีใหม่</p>
+                <p className="mb-4 text-xl font-bold text-ink hidden md:block md:mb-6 md:text-2xl">สร้างบัญชีใหม่</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">ชื่อผู้ใช้</label>
-                    <input type="text" value={registerName} onChange={(e) => setRegisterName(e.target.value)} required placeholder="ชื่อของคุณ" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">ชื่อผู้ใช้</label>
+                    <input aria-label="ชื่อผู้ใช้" type="text" value={registerName} onChange={(e) => setRegisterName(e.target.value)} required placeholder="ชื่อของคุณ" className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">อีเมล</label>
-                    <input type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
+                    <input aria-label="อีเมล" type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">รหัสผ่าน</label>
-                    <input type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required minLength={6} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">รหัสผ่าน</label>
+                    <input aria-label="รหัสผ่าน" type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required minLength={6} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-white/60">ยืนยันรหัสผ่าน</label>
-                    <input type="password" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} required minLength={6} placeholder="กรอกรหัสผ่านอีกครั้ง" className={inputCls} />
+                    <label className="mb-1.5 block text-xs font-medium text-ink-2">ยืนยันรหัสผ่าน</label>
+                    <input aria-label="ยืนยันรหัสผ่าน" type="password" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} required minLength={6} placeholder="กรอกรหัสผ่านอีกครั้ง" className={inputCls} />
                   </div>
                   <button type="submit" disabled={authLoading || !!socialLoading} className={submitCls}>
                     {authLoading ? "กำลังสมัคร..." : "สมัครสมาชิก"}
@@ -448,11 +449,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </div>
 
             {/* Terms — mobile only, pinned at bottom of form panel */}
-            <p className="md:hidden mt-3 mb-1 text-center text-[11px] text-white/25 leading-relaxed">
+            <p className="md:hidden mt-3 mb-1 text-center text-[11px] text-ink-3 leading-relaxed">
               การเข้าสู่ระบบถือว่าคุณยอมรับ{" "}
-              <span className="underline underline-offset-2 cursor-pointer hover:text-white/50">ข้อกำหนดการใช้งาน</span>
+              <span className="underline underline-offset-2 cursor-pointer hover:text-ink-2">ข้อกำหนดการใช้งาน</span>
               {" "}และ{" "}
-              <span className="underline underline-offset-2 cursor-pointer hover:text-white/50">นโยบายความเป็นส่วนตัว</span>
+              <span className="underline underline-offset-2 cursor-pointer hover:text-ink-2">นโยบายความเป็นส่วนตัว</span>
             </p>
 
             {/* iOS safe area */}

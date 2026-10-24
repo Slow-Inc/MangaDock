@@ -12,6 +12,7 @@ import {
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import { TranslationFeedbackService } from './translation-feedback.service';
+import { SubmitFeedbackDto } from './translation-feedback.dto';
 
 @Controller('translation-feedback')
 export class TranslationFeedbackController {
@@ -33,14 +34,19 @@ export class TranslationFeedbackController {
     @Query('chapterId') chapterId: string,
     @Query('page') page: string,
   ) {
-    return this.svc.getMyVote(req[USER_KEY].uid, mangaId, chapterId, Number(page));
+    return this.svc.getMyVote(
+      req[USER_KEY].uid,
+      mangaId,
+      chapterId,
+      Number(page),
+    );
   }
 
   @Post()
   @UseGuards(AuthGuard)
   submitVote(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { mangaId: string; chapterId: string; pageNumber: number; vote: 1 | -1 },
+    @Body() body: SubmitFeedbackDto,
   ) {
     return this.svc.submitVote(
       req[USER_KEY].uid,
@@ -59,6 +65,11 @@ export class TranslationFeedbackController {
     @Query('chapterId') chapterId: string,
     @Query('page') page: string,
   ) {
-    return this.svc.deleteVote(req[USER_KEY].uid, mangaId, chapterId, Number(page));
+    return this.svc.deleteVote(
+      req[USER_KEY].uid,
+      mangaId,
+      chapterId,
+      Number(page),
+    );
   }
 }

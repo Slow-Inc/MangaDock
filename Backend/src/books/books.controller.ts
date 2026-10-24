@@ -17,6 +17,7 @@ import {
 import { fetchProxiedImage, MAX_PROXY_BYTES } from './img-proxy.helper';
 import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
+import { TranslateThrottleGuard } from './translate-throttle.guard';
 import { StatsIncrementService } from '../cache/stats-increment.service';
 import {
   TurnstileGuard,
@@ -24,6 +25,11 @@ import {
 } from '../auth/turnstile.guard';
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
 import { verifyTurnstileToken } from '../auth/turnstile.verify';
+import { queryInt } from '../common/query-int';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
+import type { MaybeAuthenticatedRequest } from '../auth/authenticated-request';
+import { ContentLevelService } from '../content/content-level.service';
+import { ratingScope, type RatingScope } from '../common/content-rating';
 
 @Controller('books')
 export class BooksController {
@@ -32,7 +38,19 @@ export class BooksController {
   constructor(
     private readonly booksService: BooksService,
     private readonly statsIncrement: StatsIncrementService,
+    private readonly contentLevels: ContentLevelService,
   ) {}
+
+  /**
+   * Which MangaDex ratings this caller may see (#1101): from their stored 18+ level, never from the request;
+   * anonymous callers are `off`. `adultOnly` is the search page's "เฉพาะ 18+" filter.
+   */
+  private async scopeOf(
+    req: MaybeAuthenticatedRequest,
+    adultOnly = false,
+  ): Promise<RatingScope> {
+    return ratingScope(await this.contentLevels.getLevel(req.uid), adultOnly);
+  }
 
   @Post('verify-captcha')
   async verifyCaptcha(
@@ -80,28 +98,34 @@ export class BooksController {
   }
 
   @Get('new-releases')
-  getNewReleases(
+  @UseGuards(OptionalAuthGuard)
+  async getNewReleases(
+    @Req() req: MaybeAuthenticatedRequest,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('tag') tag?: string,
   ) {
     return this.booksService.getNewReleases(
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 35,
+      queryInt(page, 1, { min: 1 }),
+      queryInt(limit, 35, { min: 1, max: 100 }),
       tag,
+      await this.scopeOf(req),
     );
   }
 
   @Get('genre/:slug')
-  getGenreManga(
+  @UseGuards(OptionalAuthGuard)
+  async getGenreManga(
+    @Req() req: MaybeAuthenticatedRequest,
     @Param('slug') slug: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.booksService.getGenreManga(
       slug,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 28,
+      queryInt(page, 1, { min: 1 }),
+      queryInt(limit, 28, { min: 1, max: 100 }),
+      await this.scopeOf(req),
     );
   }
 
@@ -114,8 +138,12 @@ export class BooksController {
   }
 
   @Get('manga/:id/preview')
-  getMangaPreview(@Param('id') id: string) {
-    return this.booksService.getMangaPreview(id);
+  @UseGuards(OptionalAuthGuard)
+  async getMangaPreview(
+    @Req() req: MaybeAuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.booksService.getMangaPreview(id, await this.scopeOf(req));
   }
 
   @Get('manga/:id/cover')
@@ -134,11 +162,17 @@ export class BooksController {
   }
 
   @Get('manga/:id/chapters')
-  getMangaChapters(
+  @UseGuards(OptionalAuthGuard)
+  async getMangaChapters(
+    @Req() req: MaybeAuthenticatedRequest,
     @Param('id') id: string,
     @Query('forceLocal') forceLocal?: string,
   ) {
-    return this.booksService.getMangaChapters(id, forceLocal === 'true');
+    return this.booksService.getMangaChapters(
+      id,
+      forceLocal === 'true',
+      await this.scopeOf(req),
+    );
   }
 
   @UseGuards(TurnstileGuard)
@@ -165,6 +199,8 @@ export class BooksController {
     return result;
   }
 
+  // Public, and may spend a paid provider key: rate-limited per client + globally (#801).
+  @UseGuards(TranslateThrottleGuard)
   @Get('translate')
   translateDescription(@Query('text') text: string) {
     return this.booksService.translateDescription(text ?? '');
@@ -358,7 +394,9 @@ export class BooksController {
   }
 
   @Get('search')
-  searchBooks(
+  @UseGuards(OptionalAuthGuard)
+  async searchBooks(
+    @Req() req: MaybeAuthenticatedRequest,
     @Query('q') query: string,
     @Query('lang') lang?: string,
     @Query('limit') limit?: string,
@@ -366,24 +404,47 @@ export class BooksController {
     @Query('status') status?: 'ongoing' | 'completed' | 'hiatus',
     @Query('yearFrom') yearFrom?: string,
     @Query('yearTo') yearTo?: string,
+    @Query('adult') adult?: string,
   ) {
     return this.booksService.searchBooks(
       query ?? '',
       lang,
-      limit ? Math.min(parseInt(limit, 10), 100) : 100,
-      offset ? parseInt(offset, 10) : 0,
+      queryInt(limit, 100, { min: 1, max: 100 }),
+      queryInt(offset, 0, { min: 0 }),
       status,
-      yearFrom ? parseInt(yearFrom, 10) : undefined,
-      yearTo ? parseInt(yearTo, 10) : undefined,
+      queryInt(yearFrom, 0, { min: 0 }) || undefined,
+      queryInt(yearTo, 0, { min: 0 }) || undefined,
+      await this.scopeOf(req, adult === 'only'),
     );
   }
 
+  /**
+   * Content ratings of up to 100 titles by id (#1105): reading-history lists hide 18+ titles at the `off` level.
+   * Ids that are not MangaDex UUIDs are dropped.
+   */
+  @Get('ratings')
+  getContentRatings(@Query('ids') ids?: string) {
+    const list = [
+      ...new Set(
+        (ids ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              s,
+            ),
+          ),
+      ),
+    ].slice(0, 100);
+    return this.booksService.getContentRatings(list);
+  }
+
   @Get(':id/related')
-  getRelated(
-    @Param('id') id: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.booksService.getRelated(id, limit ? Math.min(parseInt(limit, 10), 50) : 10);
+  getRelated(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.booksService.getRelated(
+      id,
+      queryInt(limit, 10, { min: 1, max: 50 }),
+    );
   }
 
   /** Proxy external images (e.g. MangaDex CDN) to avoid hotlink blocking. */

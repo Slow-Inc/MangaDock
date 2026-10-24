@@ -30,6 +30,7 @@ import {
   UserProfileEarnings,
   UserProfileResponse,
 } from './forum.types';
+import { isInvalidId, lookupFailure } from '../common/assert-found';
 
 type ForumPostRow = {
   id: string;
@@ -128,10 +129,12 @@ export class ForumService {
       offset + limit - 1,
     );
 
-    if (error)
+    if (error) {
+      if (isInvalidId(error)) return { items: [], total: 0 }; // an author id that is not a uuid has no posts (#963)
       throw new InternalServerErrorException(
         `Failed to list posts: ${error.message}`,
       );
+    }
 
     const userVotes = await this.getUserVotes(
       userUid,
@@ -178,7 +181,7 @@ export class ForumService {
       .is('comments.deleted_at', null)
       .single();
 
-    if (error || !data) throw new NotFoundException('Post not found');
+    if (error || !data) lookupFailure(error, 'Post not found'); // 404 only for a missing row (#915)
 
     const userVotes = await this.getUserVotes(userUid, 'post', [id]);
 
@@ -327,7 +330,7 @@ export class ForumService {
       ]);
 
     if (profileRes.error || !profileRes.data)
-      throw new NotFoundException('Profile not found');
+      lookupFailure(profileRes.error, 'Profile not found'); // 404 only for a missing row (#915)
 
     // Secondary sections degrade gracefully to empty on error, but a silently
     // empty section is indistinguishable from a real "no data" state. Log each
@@ -501,14 +504,31 @@ export class ForumService {
     };
   }
 
+  /** 404 unless a comment's post exists and is not deleted: deletePost does not cascade deleted_at to comments (#1020, #1023). */
+  private async assertCommentPostLive(postId: string | null): Promise<void> {
+    const { data: post, error } = await this.db
+      .from('forum_posts')
+      .select('id')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) {
+      throw new InternalServerErrorException(
+        `Failed to validate post: ${error.message}`,
+      );
+    }
+    if (!post) throw new NotFoundException('Comment not found');
+  }
+
   async deletePost(uid: string, id: string): Promise<void> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this post');
 
@@ -532,11 +552,13 @@ export class ForumService {
       .from('forum_comments')
       .select('author_uid, post_id')
       .eq('id', id)
-      .single();
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
+      .single<{ author_uid: string; post_id: string }>();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this comment');
+    await this.assertCommentPostLive(existing.post_id);
 
     const { error } = await this.db
       .from('forum_comments')
@@ -566,9 +588,10 @@ export class ForumService {
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this post');
 
@@ -607,13 +630,15 @@ export class ForumService {
   ): Promise<ForumComment> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_comments')
-      .select('author_uid')
+      .select('author_uid, post_id')
       .eq('id', id)
-      .single();
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
+      .single<{ author_uid: string; post_id: string }>();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this comment');
+    await this.assertCommentPostLive(existing.post_id);
 
     const { data, error } = await this.db
       .from('forum_comments')
@@ -767,38 +792,50 @@ export class ForumService {
   }
 
   async getTrendingManga(limit = 5): Promise<TrendingManga[]> {
-    try {
-      // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
-      // tallied it, which undercounted / mis-ranked once a manga's within-window posts
-      // spilled past the sample. The RPC reproduces the same filter semantics
-      // (non-null id, non-empty title, created within the last 7 days) but counts and
-      // orders across the full table (FR-16).
-      const { data, error } = await this.db.rpc('get_trending_manga', {
-        p_limit: limit,
-      });
+    // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
+    // tallied it, which undercounted / mis-ranked once a manga's within-window posts
+    // spilled past the sample. The RPC reproduces the same filter semantics
+    // (non-null id, non-empty title, created within the last 7 days) but counts and
+    // orders across the full table (FR-16).
+    const { data, error } = await this.db.rpc('get_trending_manga', {
+      p_limit: limit,
+    });
 
-      if (error) {
-        this.logger.error(`Supabase error fetching trending: ${error.message}`);
-        return []; // Fallback to empty list instead of crashing
-      }
+    // Not an empty list: that read as "nothing is trending" and hid the page's load-error state (#978). An Error
+    // naming Supabase is the database-down signal (AllExceptionsFilter → 503 SUPABASE_OFFLINE).
+    if (error)
+      throw new Error(
+        `Supabase error fetching trending (${error.code || 'no code'}): ${error.message}`,
+      );
 
-      // post_count arrives as a bigint string over PostgREST — coerce to number.
-      return ((data ?? []) as any[]).map((row) => ({
-        mangaId: row.manga_id,
-        mangaTitle: row.manga_title || 'Unknown',
-        mangaCover: row.manga_cover,
-        postCount: Number(row.post_count),
-      }));
-    } catch (err) {
-      this.logger.error(`Unexpected error in getTrendingManga: ${String(err)}`);
-      return [];
-    }
+    // post_count arrives as a bigint string over PostgREST — coerce to number.
+    return ((data ?? []) as any[]).map((row) => ({
+      mangaId: row.manga_id,
+      mangaTitle: row.manga_title || 'Unknown',
+      mangaCover: row.manga_cover,
+      postCount: Number(row.post_count),
+    }));
   }
 
   async createComment(
     uid: string,
     dto: CreateCommentDto,
   ): Promise<ForumComment> {
+    // The post must exist and not be deleted: a missing one hit the foreign key (500), a deleted one took the
+    // comment (#1019)
+    const { data: post, error: postError } = await this.db
+      .from('forum_posts')
+      .select('id')
+      .eq('id', dto.postId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (postError) {
+      throw new InternalServerErrorException(
+        `Failed to validate post: ${postError.message}`,
+      );
+    }
+    if (!post) throw new NotFoundException('Post not found');
+
     if (dto.parentId) {
       const { data: parentComment, error: parentError } = await this.db
         .from('forum_comments')
@@ -862,6 +899,28 @@ export class ForumService {
     uid: string,
     dto: VoteDto,
   ): Promise<{ upvotes: number; downvotes: number }> {
+    // The target must exist and not be deleted: forum_votes has no foreign key, so a vote on a missing or deleted
+    // target was stored as an orphan row (#1019). The comment lookup also gives the post for the broadcast.
+    const { data: target, error: targetError } = await this.db
+      .from(dto.targetType === 'post' ? 'forum_posts' : 'forum_comments')
+      .select(dto.targetType === 'post' ? 'id' : 'post_id')
+      .eq('id', dto.targetId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id?: string; post_id?: string }>();
+    if (targetError) {
+      throw new InternalServerErrorException(
+        `Failed to validate vote target: ${targetError.message}`,
+      );
+    }
+    if (!target) {
+      throw new NotFoundException(
+        dto.targetType === 'post' ? 'Post not found' : 'Comment not found',
+      );
+    }
+    const postId =
+      dto.targetType === 'post' ? dto.targetId : (target.post_id ?? null);
+    if (dto.targetType === 'comment') await this.assertCommentPostLive(postId);
+
     // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
     // select-then-write, which let concurrent votes 500 on the PK or interleave
     // delete/update/insert into an inconsistent state (FR-9).
@@ -880,19 +939,6 @@ export class ForumService {
       upvotes: Number(row?.upvotes ?? 0),
       downvotes: Number(row?.downvotes ?? 0),
     };
-
-    // Resolve postId for the broadcast (comment votes need a lookup)
-    let postId: string | null = null;
-    if (dto.targetType === 'post') {
-      postId = dto.targetId;
-    } else {
-      const { data: commentRow } = await this.db
-        .from('forum_comments')
-        .select('post_id')
-        .eq('id', dto.targetId)
-        .single();
-      postId = commentRow?.post_id ?? null;
-    }
 
     if (postId) {
       this.forumEvents

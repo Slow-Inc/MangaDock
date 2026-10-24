@@ -16,10 +16,10 @@ export default function FollowSeriesButton({ book, variant = "icon-rounded" }: P
     : "flex h-9 w-9 items-center justify-center rounded-full border transition";
 
   const active = following
-    ? "border-indigo-400 bg-indigo-500/20 text-indigo-300"
+    ? "border-accent/40 bg-accent/10 text-accent"
     : isSquare
-      ? "border-white/25 text-white/80 hover:border-white/50"
-      : "border-white/40 text-white hover:border-white";
+      ? "border-ink-3 text-ink hover:border-ink"
+      : "border-ink-3 text-ink hover:border-ink";
 
   return (
     <button

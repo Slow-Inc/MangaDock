@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Navbar from "../../components/Navbar";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
@@ -13,18 +12,16 @@ import {
 } from "../../lib/studioApi";
 import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
-import StudioNav from "../components/StudioNav";
 import { StudioWorksSkeleton } from "../components/StudioSkeleton";
-import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";
-import {
-  StudioMobileHeader,
-  StudioMobileHero,
-  StudioMobileSection,
-} from "../components/StudioMobileShell";
+import StudioLoadError from "../components/StudioLoadError";
+import { studioLoadState } from "../lib/studioLoadState";
+import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
+import { StudioToolbar } from "../components/StudioToolbar";
 import { StudioSelect } from "../components/StudioSelect";
 import { formatCurrency, getOverviewStats } from "../lib/dashboardAnalytics";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import { CoverImage } from "../components/CoverImage";
+import { PRIMARY_FILL } from "../../components/ui/Button";
+import Mascot from "../../components/mascot/Mascot";
 
 type MangaGroup = {
   titleId: string;
@@ -34,7 +31,6 @@ type MangaGroup = {
 };
 
 type ViewMode = "list" | "card";
-type WorksMobileView = "browse" | "filters";
 
 const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
   { value: "", label: "ทั้งหมด" },
@@ -46,13 +42,13 @@ const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/15 py-16">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600/20 text-3xl">📚</div>
+    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-line py-16">
+      <Mascot area="studio" size={72} />
       <div className="text-center">
-        <p className="text-sm font-semibold text-white">ยังไม่มีงานแปล</p>
-        <p className="mt-1 text-xs text-white/40">เริ่มต้นด้วยการอัปโหลดงานแปลชิ้นแรกของคุณ</p>
+        <p className="text-sm font-semibold text-ink">ยังไม่มีงานแปล</p>
+        <p className="mt-1 text-xs text-ink-3">เริ่มต้นด้วยการอัปโหลดงานแปลชิ้นแรกของคุณ</p>
       </div>
-      <Link href="/studio/upload" className="mt-1 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
+      <Link href="/studio/upload" className={`mt-1 rounded-xl ${PRIMARY_FILL} px-5 py-2.5 text-sm font-semibold transition active:scale-95`}>
         อัปโหลดงานแปลใหม่
       </Link>
     </div>
@@ -63,8 +59,8 @@ function StatusDots({ versions }: { versions: ChapterVersion[] }) {
   const counts = versions.reduce((acc, v) => { acc[v.status] = (acc[v.status] ?? 0) + 1; return acc; }, {} as Record<string, number>);
   return (
     <div className="flex flex-wrap gap-1.5">
-      {counts.published > 0 && <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-300">เผยแพร่แล้ว {counts.published}</span>}
-      {counts.draft > 0 && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/40">แบบร่าง {counts.draft}</span>}
+      {counts.published > 0 && <span className="rounded-full bg-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ok">เผยแพร่แล้ว {counts.published}</span>}
+      {counts.draft > 0 && <span className="rounded-full bg-fill px-2 py-0.5 text-[10px] font-semibold text-ink-3">แบบร่าง {counts.draft}</span>}
     </div>
   );
 }
@@ -73,17 +69,17 @@ function MangaListCard({ group }: { group: MangaGroup }) {
   return (
     <Link
       href={`/studio/manga/${encodeURIComponent(group.titleId)}?titleName=${encodeURIComponent(group.titleName)}`}
-      className="group flex gap-4 rounded-2xl border border-white/10 bg-white/3 p-4 transition hover:border-white/20 hover:bg-white/5 active:scale-[0.99]"
+      className="group flex gap-4 rounded-2xl border border-line bg-fill p-4 transition hover:border-ink-3 hover:bg-raised active:scale-[0.99]"
     >
-      <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-white/8">
+      <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-fill">
         <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover" fallbackSize={24} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-indigo-300">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
-        <p className="mt-0.5 text-xs text-white/40">{group.versions.length} ตอน</p>
+        <p className="truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
+        <p className="mt-0.5 text-xs text-ink-3">{group.versions.length} ตอน</p>
         <div className="mt-2"><StatusDots versions={group.versions} /></div>
       </div>
-      <div className="flex shrink-0 items-center text-white/20 transition-colors group-hover:text-white/50">
+      <div className="flex shrink-0 items-center text-ink-3 transition-colors group-hover:text-ink-2">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
       </div>
     </Link>
@@ -93,15 +89,15 @@ function MangaListCard({ group }: { group: MangaGroup }) {
 function MangaThumbnailCard({ group }: { group: MangaGroup }) {
   return (
     <Link href={`/studio/manga/${encodeURIComponent(group.titleId)}?titleName=${encodeURIComponent(group.titleName)}`} className="group cursor-pointer">
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all duration-300 group-hover:scale-[1.03] group-hover:border-white/25 group-hover:shadow-xl group-hover:shadow-black/50">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-line bg-fill transition-all duration-300 group-hover:scale-[1.03] group-hover:border-ink-3">
         <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105" fallbackSize={36} />
-        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-scrim/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <StatusDots versions={group.versions} />
         </div>
       </div>
       <div className="mt-2 space-y-0.5 px-0.5">
-        <p className="line-clamp-2 text-xs font-semibold leading-snug text-white/90 transition-colors duration-200 group-hover:text-white">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
-        <p className="text-[11px] text-white/40">{group.versions.length} ตอน</p>
+        <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
+        <p className="text-[11px] text-ink-3">{group.versions.length} ตอน</p>
       </div>
     </Link>
   );
@@ -109,11 +105,11 @@ function MangaThumbnailCard({ group }: { group: MangaGroup }) {
 
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   return (
-    <div className="flex rounded-xl border border-white/10 bg-white/5 p-0.5">
-      <button onClick={() => onChange("list")} className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${mode === "list" ? "bg-white/15 text-white" : "text-white/30 hover:text-white/60"}`} title="แสดงแบบรายการ">
+    <div className="flex rounded-xl border border-line bg-fill p-0.5">
+      <button onClick={() => onChange("list")} className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${mode === "list" ? "bg-raised text-ink" : "text-ink-2 hover:text-ink"}`} title="แสดงแบบรายการ">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
-      <button onClick={() => onChange("card")} className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${mode === "card" ? "bg-white/15 text-white" : "text-white/30 hover:text-white/60"}`} title="แสดงแบบ Card">
+      <button onClick={() => onChange("card")} className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${mode === "card" ? "bg-raised text-ink" : "text-ink-2 hover:text-ink"}`} title="แสดงแบบ Card">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
       </button>
     </div>
@@ -125,15 +121,14 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 export default function WorksPage() {
   const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
-  const isMobile = useIsMobile();
 
   const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
   const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
   const [langFilter, setLangFilter] = useState("");
-  const [mobileView, setMobileView] = useState<WorksMobileView>("browse");
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -145,17 +140,22 @@ export default function WorksPage() {
 
   const fetchVersions = useCallback(async () => {
     if (!user) return;
+    setLoadFailed(false);
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setVersions(data);
       setCache("studio:versions", data);
-    } catch { showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 }); }
+    } catch {
+      setLoadFailed(true);
+      showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 });
+    }
     finally { setLoadingVersions(false); }
   }, [user, getIdToken, showToast]);
 
   useEffect(() => { if (user && !hasFetched.current) { hasFetched.current = true; fetchVersions(); } }, [user, fetchVersions]);
+  const view = studioLoadState({ loading: loadingVersions, failed: loadFailed, hasData: versions.length > 0 });
 
   // Compute available languages from data
   const availableLanguages = useMemo(() => {
@@ -192,162 +192,23 @@ export default function WorksPage() {
 
   if (loading) return <LoadingScreen />;
 
-  if (isMobile) {
-    const renderMobileResults = () => {
-      if (loadingVersions && mangaGroups.length === 0) {
-        return <StudioWorksSkeleton viewMode={viewMode} />;
-      }
-      if (!loadingVersions && mangaGroups.length === 0 && !hasFilters) return <EmptyState />;
-      if (mangaGroups.length === 0) {
-        return (
-          <div className="py-12 text-center">
-            <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-            <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400">ล้างตัวกรอง</button>
-          </div>
-        );
-      }
-      if (viewMode === "list") {
-        return <div className="space-y-3">{mangaGroups.map((group) => <MangaListCard key={group.titleId} group={group} />)}</div>;
-      }
-      return (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-5">
-          {mangaGroups.map((group) => <MangaThumbnailCard key={group.titleId} group={group} />)}
-        </div>
-      );
-    };
-
-    return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-white">
-        <Navbar />
-        <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
-          {mobileView === "filters" ? (
-            <div className="space-y-4 px-4 py-4">
-              <StudioMobileHeader
-                title="ตัวกรองผลงาน"
-                subtitle="แยกส่วนจัดการตัวกรองออกจากรายการหลักบนมือถือ"
-                onBack={() => setMobileView("browse")}
-              />
-              <StudioMobileSection title="ค้นหาและกรอง">
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="ชื่อเรื่อง..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
-                  />
-                  <StudioSelect
-                    value={statusFilter}
-                    onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
-                    options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-                  />
-                  <StudioSelect
-                    value={langFilter}
-                    onChange={setLangFilter}
-                    options={[
-                      { value: "", label: "ทุกภาษา" },
-                      ...availableLanguages.map((lang) => ({ value: lang, label: LANG_LABELS[lang] ?? lang })),
-                    ]}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
-                    >
-                      แบบรายการ
-                    </button>
-                    <button
-                      onClick={() => setViewMode("card")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
-                    >
-                      แบบการ์ด
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/60"
-                    >
-                      ล้างค่า
-                    </button>
-                    <button
-                      onClick={() => setMobileView("browse")}
-                      className="rounded-2xl bg-indigo-600 px-3 py-3 text-sm font-semibold text-white"
-                    >
-                      ดูผลลัพธ์
-                    </button>
-                  </div>
-                </div>
-              </StudioMobileSection>
-            </div>
-          ) : (
-            <div className="space-y-4 px-4 py-4">
-              <StudioAnnouncement />
-              <StudioMobileHero
-                eyebrow="Works Manager"
-                title="ผลงานของฉัน"
-                description="จัดการงานแปลและบทของคุณทั้งหมดในที่เดียว"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="title ที่มีเวอร์ชัน" tone="indigo" />
-                <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`${overviewStats.totalPages} หน้า`} tone="violet" />
-                <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`ร่าง ${overviewStats.draft}`} tone="emerald" />
-                <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`เฉลี่ย ${formatCurrency(overviewStats.avgPrice)}`} tone="amber" />
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="ค้นหาชื่อเรื่อง..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
-                />
-                <button
-                  onClick={() => setMobileView("filters")}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80"
-                >
-                  กรอง
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-white/35">แสดง {mangaGroups.length} เรื่อง</p>
-                <Link href="/studio/upload" className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">
-                  + อัปโหลด
-                </Link>
-              </div>
-              {renderMobileResults()}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-white md:pb-0">
-      <Navbar />
-      <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
-        <div className="space-y-5">
-          <StudioAnnouncement />
+    <div className="text-ink">
+      <StudioToolbar>
+        <p className="text-sm text-ink-3">แสดง {mangaGroups.length} เรื่อง</p>
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
+          <Link href="/studio/upload" className={`rounded-xl ${PRIMARY_FILL} px-4 py-2 text-sm font-semibold transition active:scale-95`}>
+            + อัปโหลดใหม่
+          </Link>
+        </div>
+      </StudioToolbar>
 
-          <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.16),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)]">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-white/35">Works Manager</p>
-                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">ผลงานของฉัน</h1>
-                <p className="mt-2 text-sm text-white/45">จัดการ chapter/version ทั้งหมด พร้อมตัวกรองและภาพรวมแบบใกล้ dashboard นักเขียน</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
-                <Link href="/studio/upload" className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
-                  + อัปโหลดใหม่
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <StudioNav />
-
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        {view === "error" && (
+          <StudioLoadError what="ผลงาน" onRetry={() => { setLoadingVersions(true); return fetchVersions(); }} />
+        )}
+        <div className={view === "error" ? "hidden" : "space-y-5"}>
           <StudioSection title="ภาพรวมผลงาน" subtitle="สรุปจำนวนเรื่อง ตอน ภาษา และสถานะหลักก่อนลงไปจัดการรายละเอียด">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่มีเวอร์ชัน" tone="indigo" />
@@ -364,15 +225,17 @@ export default function WorksPage() {
                 {/* Title search */}
                 <input
                   type="text"
+                  aria-label="กรองตามชื่อเรื่อง"
                   placeholder="ชื่อเรื่อง..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-500"
+                  className="flex-1 rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent"
                 />
                 {/* Status filter */}
                 <div className="flex gap-2">
                   <div className="min-w-[10rem]">
                     <StudioSelect
+                      label="สถานะ"
                       value={statusFilter}
                       onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
                       options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
@@ -380,6 +243,7 @@ export default function WorksPage() {
                   </div>
                   <div className="min-w-[10rem]">
                     <StudioSelect
+                      label="ภาษา"
                       value={langFilter}
                       onChange={setLangFilter}
                       options={[
@@ -392,7 +256,7 @@ export default function WorksPage() {
                   {hasFilters && (
                     <button
                       onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
-                      className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50 transition hover:bg-white/10 hover:text-white"
+                      className="shrink-0 rounded-xl border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised hover:text-ink"
                     >
                       ล้างค่า
                     </button>
@@ -400,7 +264,6 @@ export default function WorksPage() {
                 </div>
               </div>
 
-              <p className="text-xs text-white/30">แสดง {mangaGroups.length} เรื่อง</p>
             </div>
           </StudioSection>
 
@@ -412,8 +275,8 @@ export default function WorksPage() {
               <EmptyState />
             ) : mangaGroups.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-                <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400 transition hover:text-indigo-300">ล้างตัวกรอง</button>
+                <p className="text-sm text-ink-3">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
+                <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-accent transition hover:text-accent/80">ล้างตัวกรอง</button>
               </div>
             ) : viewMode === "list" ? (
               <div className="space-y-3">

@@ -6,7 +6,9 @@ import BookDetailModal from "./BookDetailModal";
 import CoverLightbox from "./CoverLightbox";
 import MangaReader from "./MangaReader";
 import { getHistory } from "../lib/readingHistory";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import AdultBadge from "./ui/AdultBadge";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 
 export type GridBook = {
   id: string;
@@ -21,25 +23,19 @@ export type GridBook = {
   categories: string[];
   averageRating: number;
   ratingsCount: number;
+  /** MangaDex content rating (#1102): erotica/pornographic get an 18+ badge. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 interface Props {
   books: GridBook[];
 }
 
-function cdnFallback(book: GridBook): string {
-  if (!book.thumbnail) return "";
-  return book.thumbnail.includes("mangadex.org")
-    ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
-    : book.thumbnail;
-}
-
 function GridCard({ book }: { book: GridBook }) {
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
   const [showReader, setShowReader] = useState(false);
-  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
-  const [thumbFellBack, setThumbFellBack] = useState(false);
+  const cover = useCoverSrc(book);
 
   // Same source as BookDetailModal — read from history directly, no extra props needed
   const historyEntry = getHistory().find((h) => h.id === book.id);
@@ -53,29 +49,32 @@ function GridCard({ book }: { book: GridBook }) {
         onClick={() => setShowModal(true)}
       >
         {/* Cover */}
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 smooth-hover group-hover:scale-[1.05] group-hover:border-white/25 group-hover:shadow-xl group-hover:shadow-black/50">
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line bg-fill smooth-hover group-hover:scale-[1.05] group-hover:border-ink-3">
           {book.thumbnailCached === false ? (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-white/5 text-white/20">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-fill text-ink-3">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-7 w-7">
                 <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
               </svg>
             </div>
-          ) : (
+          ) : cover.src ? (
             <Image
-              src={thumbSrc}
+              src={cover.src}
               alt={book.title}
               fill
               className="object-cover transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 45vw, (max-width: 1024px) 20vw, 14vw"
-              onError={() => { if (!thumbFellBack) { setThumbFellBack(true); setThumbSrc(cdnFallback(book)); } }}
+              onError={cover.onError}
             />
+          ) : (
+            <CoverPlaceholder title={book.title} />
           )}
-          <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+          <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+          <AdultBadge rating={book.contentRating} className="absolute left-2 top-2 z-10" />
           {/* Continue reading button */}
           {lastChapterId && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowReader(true); }}
-              className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-1.5 rounded-b-xl bg-black/75 py-1.5 text-[11px] font-medium text-white/90 backdrop-blur-[2px] transition-colors hover:bg-black/90 active:bg-black"
+              className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-1.5 rounded-b-xl bg-bg/75 py-1.5 text-[11px] font-medium text-ink transition-colors hover:bg-bg/90 active:bg-bg"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0">
                 <path d="M8 5v14l11-7z" />
@@ -84,29 +83,36 @@ function GridCard({ book }: { book: GridBook }) {
             </button>
           )}
           {/* Expand cover button */}
-          <button
+          {cover.src && <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
-            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-black/80 hover:text-white"
+            aria-label={`ดูหน้าปกขนาดใหญ่: ${book.title}`}
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink focus-visible:opacity-100"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
             </svg>
-          </button>
+          </button>}
         </div>
 
         {/* Info */}
         <div className="mt-2 space-y-0.5 px-0.5">
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-white/90 transition-colors duration-200 group-hover:text-white">
-            {book.title}
-          </p>
+          {/* The card's keyboard/screen-reader entry point (#838): the article's click is mouse-only. */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
+            className="block w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink"
+          >
+            <span className="line-clamp-2">{book.title}</span>
+          </button>
           {book.authors?.length > 0 && (
-            <p className="line-clamp-1 text-[10px] text-white/40">
+            <p className="line-clamp-1 text-[10px] text-ink-3">
               {book.authors[0]}
             </p>
           )}
           {lastChapterNumber && (
-            <p className="text-[10px] text-blue-400/70">
+            <p className="text-[10px] text-accent">
               ตอนที่ {lastChapterNumber}
             </p>
           )}
@@ -116,8 +122,8 @@ function GridCard({ book }: { book: GridBook }) {
       {showModal && (
         <BookDetailModal book={book} onClose={() => setShowModal(false)} />
       )}
-      {showCover && (
-        <CoverLightbox src={thumbSrc} alt={book.title} onClose={() => setShowCover(false)} />
+      {showCover && cover.src && (
+        <CoverLightbox src={cover.src} alt={book.title} onClose={() => setShowCover(false)} />
       )}
       {showReader && lastChapterId && (
         <MangaReader
@@ -136,7 +142,7 @@ function GridCard({ book }: { book: GridBook }) {
 export default function MangaGrid({ books }: Props) {
   if (books.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-white/40">ไม่พบข้อมูล</p>
+      <p className="py-16 text-center text-sm text-ink-3">ไม่พบข้อมูล</p>
     );
   }
 

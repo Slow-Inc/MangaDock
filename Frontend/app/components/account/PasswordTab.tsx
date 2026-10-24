@@ -4,14 +4,15 @@ import { useState } from "react";
 import { errMessage } from "@/lib/errMessage";
 import { useAuth } from "../../contexts/AuthContext";
 import type { FormState, FormAction } from "./formReducer";
+import { PRIMARY_FILL } from "../ui/Button";
 
 interface PasswordTabProps {
   formState: FormState;
   dispatch: React.Dispatch<FormAction>;
 }
 
-const inputClass = "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30";
-const labelClass = "block text-xs font-medium text-white/50 mb-1.5";
+const inputClass = "w-full rounded-xl border border-line bg-fill px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/40";
+const labelClass = "block text-xs font-medium text-ink-2 mb-1.5";
 
 export default function PasswordTab({ formState, dispatch }: PasswordTabProps) {
   const { user, updateUserPassword, addEmailPassword } = useAuth();
@@ -83,12 +84,12 @@ export default function PasswordTab({ formState, dispatch }: PasswordTabProps) {
   return (
     <>
       {successMessage && (
-        <div className="mb-4 rounded-xl bg-green-500/20 border border-green-500/30 px-4 py-2.5 text-sm text-green-300">
+        <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
           {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 px-4 py-2.5 text-sm text-red-300">
+        <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
           {errorMessage}
         </div>
       )}
@@ -96,41 +97,41 @@ export default function PasswordTab({ formState, dispatch }: PasswordTabProps) {
         <div className="space-y-4">
           <div>
             <label className={labelClass}>รหัสผ่านปัจจุบัน</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="รหัสผ่านปัจจุบัน" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>รหัสผ่านใหม่</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
+            <input aria-label="รหัสผ่านใหม่" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>ยืนยันรหัสผ่านใหม่</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="ยืนยันรหัสผ่านใหม่" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <button
             onClick={handleUpdatePassword}
             disabled={loading || !currentPassword || !newPassword || !confirmPassword}
-            className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full rounded-xl ${PRIMARY_FILL} py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {loading ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
           </button>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
-            <p className="text-xs text-blue-300">ℹ️ เพิ่มรหัสผ่านเพื่อให้สามารถ login ด้วย Email <strong>{user?.email}</strong> ได้โดยไม่ต้องใช้ Google</p>
+          <div className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-3">
+            <p className="text-xs text-accent">ℹ️ เพิ่มรหัสผ่านเพื่อให้สามารถ login ด้วย Email <strong>{user?.email}</strong> ได้โดยไม่ต้องใช้ Google</p>
           </div>
           <div>
             <label className={labelClass}>รหัสผ่านใหม่</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
+            <input aria-label="รหัสผ่านใหม่" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>ยืนยันรหัสผ่าน</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="ยืนยันรหัสผ่าน" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <button
             onClick={handleAddEmailPassword}
             disabled={loading || !newPassword || !confirmPassword}
-            className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full rounded-xl ${PRIMARY_FILL} py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {loading ? "กำลังเพิ่มรหัสผ่าน..." : "เพิ่มรหัสผ่าน"}
           </button>

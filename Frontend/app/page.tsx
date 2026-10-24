@@ -6,6 +6,7 @@ import HomeStatusLine from "./components/HomeStatusLine";
 import Navbar from "./components/Navbar";
 import TopTenRow from "./components/TopTenRow";
 import type { LandingBook, LandingPayload as LandingResponse } from "./lib/types";
+import { SERVER_FETCH_TIMEOUT_MS } from "./lib/serverFetch";
 
 type LandingFetchResult = {
   data: LandingResponse | null;
@@ -19,6 +20,7 @@ const getLandingData = async (forceLocal = false): Promise<LandingFetchResult> =
     const url = `${API_BASE}/books/landing${forceLocal ? "?forceLocal=true" : ""}`;
     const response = await fetch(url, {
       next: { revalidate: forceLocal ? 0 : 1800 },
+      signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS), // a hung backend lands in the cached-landing fallback (#858)
     });
 
     if (!response.ok) {
@@ -50,12 +52,23 @@ export default async function Home({
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
+      {/* One <main> for the whole page so the hero is inside a landmark too (#835). */}
+      <main id="main">
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
-      <main className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
-        <HomeStatusLine serverUnavailable={backendUnavailable} staleTimestamp={staleTimestamp} />
+      {/* The hero owns the top offset; without one (no landing data) the content would start under the fixed
+          Navbar and hide the status line (#909) — take the page-shell-nav offset instead. */}
+      <div className={`relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12 ${topRankedBooks.length > 0 ? "" : "pt-22 md:pt-28"}`}>
+        {/* Keyed on the server's verdict: router.refresh() keeps it mounted, and its initial state is read once —
+            without the key a successful retry left the old "backend down" line under the restored hero (#909). */}
+        <HomeStatusLine
+          key={backendUnavailable ? "down" : staleTimestamp ?? "ok"}
+          serverUnavailable={backendUnavailable}
+          staleTimestamp={staleTimestamp}
+        />
 
-        {backendUnavailable && <HomeCachedLanding />}
+        {/* Down, or up but with nothing to show: cached books or the empty state, never a blank page (#909) */}
+        {(backendUnavailable || !hasData) && <HomeCachedLanding />}
 
         <ContinueReadingRow />
 
@@ -72,6 +85,7 @@ export default async function Home({
             seeMoreHref={`/new?tab=${row.id}`}
           />
         ))}
+      </div>
       </main>
     </div>
   );

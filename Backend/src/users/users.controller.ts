@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
   UseGuards,
@@ -19,9 +20,18 @@ import { isValidHardwareId } from '../common/middleware/hardware-id.middleware';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import * as path from 'path';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
+import { MascotDto } from './mascot.dto';
+import { ContentSettingsDto } from './content-settings.dto';
+import { ContentLevelService } from '../content/content-level.service';
+import {
+  PhotoHistoryDto,
+  TranslatorProfileDto,
+  UpdateProfileDto,
+} from './profile.dto';
+import { detectAllowedImage } from '../common/storage/detect-image';
+import { ALLOWED_IMAGE_MIME } from '../common/storage/image-mime';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import {
   STORAGE_PROVIDER,
@@ -34,6 +44,7 @@ export class UsersController {
   constructor(
     private readonly users: UsersService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+    private readonly contentLevels: ContentLevelService,
   ) {}
 
   /** Called after login — creates/updates user doc (never overwrites displayName/photoURL) */
@@ -52,9 +63,40 @@ export class UsersController {
   @Patch('me')
   async updateMyProfile(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { displayName?: string; photoURL?: string },
+    @Body() body: UpdateProfileDto,
   ) {
     await this.users.updateUserProfile(req[USER_KEY].uid, body);
+    return { ok: true };
+  }
+
+  /** The caller's 18+ content level and when they confirmed their age / accepted the Terms (#1101). */
+  @Get('me/content-settings')
+  getMyContentSettings(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return this.contentLevels.getSettings(req[USER_KEY].uid);
+  }
+
+  /** Change the level. Raising it is gated server-side (age for erotica, age + Terms for all) — 400 otherwise. */
+  @Put('me/content-settings')
+  setMyContentSettings(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Body() body: ContentSettingsDto,
+  ) {
+    return this.contentLevels.setLevel(req[USER_KEY].uid, body);
+  }
+
+  /** The caller's mascot (Epic D); null when they never dressed one. */
+  @Get('me/mascot')
+  async getMyMascot(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return { mascot: await this.users.getMascot(req[USER_KEY].uid) };
+  }
+
+  /** Save the caller's mascot. MascotDto allow-lists every field (global ValidationPipe, whitelist). */
+  @Put('me/mascot')
+  async setMyMascot(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Body() body: MascotDto,
+  ) {
+    await this.users.setMascot(req[USER_KEY].uid, body);
     return { ok: true };
   }
 
@@ -107,9 +149,13 @@ export class UsersController {
     @Body() body: { filename: string },
   ) {
     const uid = req[USER_KEY].uid;
-    const filename = body?.filename ?? '';
-    // Safety: filename must start with the user's uid to prevent deleting other users' files
-    if (!filename || !filename.startsWith(`${uid}_`)) {
+    const filename = typeof body?.filename === 'string' ? body.filename : '';
+    // Only the shape uploadAvatar generates (`<uid>_<Date.now()><ext>`): the user's own file, and never a path that
+    // could leave uploads/avatars (#1007)
+    const stamp = filename.startsWith(`${uid}_`)
+      ? filename.slice(uid.length + 1)
+      : '';
+    if (!/^\d+\.[a-z0-9]{2,5}$/i.test(stamp)) {
       throw new BadRequestException('Invalid filename');
     }
     const key = `uploads/avatars/${filename}`;
@@ -121,10 +167,11 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      // A cheap first gate on the client's Content-Type; the real check is the magic bytes below.
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (!ALLOWED_IMAGE_MIME.has(file.mimetype)) {
           return cb(
-            new BadRequestException('Only image files are allowed'),
+            new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'),
             false,
           );
         }
@@ -139,12 +186,18 @@ export class UsersController {
   ) {
     if (!file) throw new BadRequestException('No file provided');
 
+    // Type, extension and Content-Type all come from the bytes: the client's Content-Type and file
+    // name are attacker-controlled (an SVG or "x.html" would otherwise be stored and served as such).
+    const image = await detectAllowedImage(file.buffer);
+    if (!image) {
+      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
+    }
+
     const uid = req[USER_KEY].uid;
-    const ext = path.extname(file.originalname) || '.jpg';
-    const filename = `${uid}_${Date.now()}${ext}`;
+    const filename = `${uid}_${Date.now()}${image.ext}`;
     const key = `uploads/avatars/${filename}`;
 
-    await this.storage.put(key, file.buffer, { contentType: file.mimetype });
+    await this.storage.put(key, file.buffer, { contentType: image.mime });
 
     return { url: `/${key}` };
   }
@@ -259,10 +312,8 @@ export class UsersController {
   @Post('me/photo-history')
   updatePhotoHistory(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { photos: string[] },
+    @Body() body: PhotoHistoryDto,
   ) {
-    if (!Array.isArray(body?.photos))
-      throw new BadRequestException('photos must be an array');
     return this.users.updatePhotoHistory(req[USER_KEY].uid, body.photos);
   }
 
@@ -272,9 +323,9 @@ export class UsersController {
   @Post('me/become-translator')
   async becomeTranslator(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { bio?: string; translatorLanguages?: string[] },
+    @Body() body: TranslatorProfileDto,
   ) {
-    await this.users.becomeTranslator(req[USER_KEY].uid, body ?? {});
+    await this.users.becomeTranslator(req[USER_KEY].uid, body);
     return { ok: true };
   }
 
@@ -282,15 +333,9 @@ export class UsersController {
   @Patch('me/translator-profile')
   async updateTranslatorProfile(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body()
-    body: {
-      bio?: string;
-      translatorLanguages?: string[];
-      country?: string;
-      preferredLanguage?: string;
-    },
+    @Body() body: TranslatorProfileDto,
   ) {
-    await this.users.updateTranslatorProfile(req[USER_KEY].uid, body ?? {});
+    await this.users.updateTranslatorProfile(req[USER_KEY].uid, body);
     return { ok: true };
   }
 

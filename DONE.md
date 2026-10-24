@@ -1,8 +1,2285 @@
 <!-- lang:en -->
+
+## Native main integration validation — 2026-10-22
+
+- Combined main `cb1f7d9` and native Phase 4 `ef301fb`; resolved five conflicts while preserving main history and joined-profile normalization. Mobile 235/235, Backend 98 suites/1,014 tests/build/focused lint, tooling 58/58 and types/env pass; vendor hashes 10/10. [Integration record and outstanding acceptance](Mobile/docs/2026-10-22-main-integration.md). Draft #860 and six unrelated local operational docs excluded; no new APK or physical/live-service acceptance claimed. Landing status belongs to the integration PR.
+- ภาษาไทย: รวม main กับ native ตาม SHA ด้านบน แก้ conflict ห้าไฟล์ เก็บประวัติ main และการแปลง profiles ครบ ตรวจ Mobile 235/235 Backend 98 suites/1,014 tests/build/lint tooling 58/58 types/env และ hash vendor 10/10 ผ่าน แยก draft #860 และเอกสาร local ค้างหกไฟล์ ยังไม่อ้าง APK/เครื่องจริง/บริการจริงรอบใหม่ สถานะ merge ให้ดู PR รวม
+
 # DONE — Claude Code Session Log
+
+## PR #782 scrutiny follow-up — 2026-10-20
+
+- Final combined-head checks: clean npm ci, Mobile **235/235**, types/env/format, tooling **58/58**, Android Hermes export **773 modules/11 assets** pass; corrected bundle contains the new helper and excludes checked private values. No replacement APK or new physical-device acceptance.
+- ภาษาไทย: ตรวจ head รวมสุดท้าย npm ci ใหม่ Mobile **235/235** types/env/format tooling **58/58** และ Hermes export **773 modules/11 assets** ผ่าน bundle มี helper ใหม่และไม่พบค่าลับที่ตรวจ ยังไม่สร้าง APK ทดแทนหรือรับผลเครื่องจริงเพิ่ม
+
+- Fixed required empty JSON responses silently publishing null and crashing review rendering: strict `json` plus explicit `nullableJson` for the absent own-review contract. Component regression observed RED TypeError → GREEN retryable Thai error for summary/list, while optional empty responses remain supported.
+- Rebased active pinch geometry after finger lift/rejoin without clearing the gesture-wide page-turn guard. Component regression observed RED zoom1 instead of2 → GREEN stable2, subsequent3/back2; covers move and touch lifecycle events. Preserved concurrent chapter-list commit `72af504` and both sides of its test insertion conflict. Earlier APK/device evidence remains historical; no new phone pass claimed. [Report and resume point](Mobile/docs/2026-10-20-review-fixes.md).
+- ภาษาไทย: แก้ body JSON ที่จำเป็นแต่ว่างไม่ให้ publish null จน render รีวิวล้ม โดยแยก `json` แบบเข้มงวดกับ `nullableJson` สำหรับรีวิวตัวเองที่อาจไม่มี มี RED TypeError → GREEN แสดง error ภาษาไทย/ลองใหม่ทั้ง summary และ list คง optional body ว่าง ส่วน pinch ตั้ง baseline ใหม่เมื่อยก/วางนิ้ว โดยคงตัวกันเปลี่ยนหน้า มี RED zoom1 แทน2 → GREEN คง2/ขยับ3/คืน2 ผ่านทั้ง move และ touch lifecycle เก็บ commit รายการตอนและ tests ทั้งสองฝั่ง ไม่อ้างทดสอบมือถือใหม่จาก APK ก่อนหน้า
+
+## Native chapter list web alignment — 2026-10-20
+
+- Follow-up approved after a cancellation made before any source edits: bounded320dp/half-window chapter viewport, compact language/source/page-count-or-price rows, busy/empty/accessibility behavior. Studio count uses existing version pages; no new HTTP/server/dependency. Existing Reader access gates retained.
+- Mobile234/234, TypeScript/format and Android build/vital lint pass. Reviewer found no actionable issues. Galaxy Z Flip4 verified nested scrolling without moving review heading, all83 entries reachable, last chapter68.5 through CAPTCHA into Reader1/15, and150% font layout; restored font1.0. [Report and screenshots](Mobile/docs/2026-10-20-native-chapter-list-parity.md).
+- ARM64 QA APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-native-chapter-list-arm64.apk`, SHA256 `db33b7c15aef8b33d1d461b38f7f872fe1d215c2d1c047e9f09b2571ed6bc441`; installed hash matches. Existing debug/LAN configuration and account session retained. Does not close broader release acceptance or add web language filters/grouping.
+- ภาษาไทย: ปรับรายการตอนตามเว็บหลังผู้ใช้สั่งต่อ จำกัด320dp/ครึ่งจอ แถวข้อมูลกระชับ เปิดอ่านผ่าน gates เดิม tests234/types/format/buildผ่าน เครื่องจริงเลื่อนภายใน83ตอนได้โดยรีวิวยังอยู่ที่เดิม เปิดตอนสุดท้าย68.5หน้า1/15และฟอนต์150%ผ่าน คืนฟอนต์1.0 APK/hashตามด้านบน ไม่อ้างปิด release gates หรือเพิ่มตัวกรอง/จัดกลุ่มเวอร์ชันของเว็บ
+
+## Native Phase4 review fixes B1–B6 — 2026-10-20
+
+- Implemented in `C:/Users/woral/md4`, branch `fix/native-phase4-review-20261020` from `443dc80`: empty-body API handling, shared Reader layout geometry, nested book Back history, directional page swipes/pinch separation, visible wrapping page controls, picker Back, modal safe areas and requested-page translation counters. No runtime dependency or server/provider change.
+- Verification: Mobile **230/230**, typecheck/env pass; final Android assemble/vital lint passes. Independent review found three gesture boundary defects, all corrected and regression-verified. Galaxy Z Flip4/Android16 final APK: LTR/RTL slow swipes pass; history resumes page40 and page20; picker Back retains Reader; comments and notifications clear system navigation; failed page/batch translations show pending0. Intermediate build also verified signed-in review form and related-book Back.
+- Final ARM64 APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-phase4-review-fixes-arm64.apk`, SHA256 `d4b36ecdbe2e8514ab62bf97534d6044f8daf1065ecd0b969db2d385c00a4a2e`. Installed base.apk matches; existing debug certificate and account session retained. LAN-only internal QA; version0.1.0/code1.
+- [Fix report and resume point](Mobile/docs/2026-10-20-review-fixes.md), [ADR031](docs/adr/031-mobile-reader-geometry-and-review-recovery.md). Evidence `qa/review-fixes/`; baseline artifacts retained. The user subsequently authorized commit/push and a PR into `feat/mobile-native-phase4`; fresh precommit checks230 Mobile/58 tooling/types/env/lockfile pass. Successful MIT, money/account mutations, fold/offline/long sessions and broader redesign/filter requests remain outside this pass.
+- ภาษาไทย: แก้ B1–B6 ใน branch/worktree ด้านบน ไม่เพิ่ม dependency หรือเปลี่ยน server/provider Tests **230/230** types/env/build ผ่าน แก้ gesture สามกรณีที่ reviewer พบและทดสอบ regression แล้ว เครื่องจริงปัดตามทิศทางได้ อ่านต่อ40/20ตรงหน้า Back ปิด picker ก่อน และแผงไม่ทับ navigation ตัวนับแปลไม่ค้าง pending ส่วนรีวิว/Back เรื่องเกี่ยวข้องตรวจบน build ระหว่างทางที่ใช้ logic เดียวกัน APK สุดท้าย hash ตรงที่ติดตั้ง เก็บ session เดิม ผู้ใช้อนุญาต commit/push/PR ภายหลัง ตรวจใหม่ผ่าน Mobile230/tooling58/types/env/lockfile ไม่อ้างผล MIT/payment/offline/จอพับ/sessionยาว หรือปิดงานออกแบบส่วนอื่น
+
+## Public HTTPS API and test APK — 2026-10-20
+
+- Recovered `api.hayateotsu.space` from Cloudflare 530/1033 with a dedicated remotely managed healthy tunnel; updated only the existing API CNAME target and added a new download hostname. Preserved shared tunnel configuration version 7. Verified official portable cloudflared digest and restricted token-file ACL; private files stay outside delivery.
+- Rebuilt unchanged Mobile source with a process-only HTTPS origin override. ARM64 APK 27,760,053 bytes; native build/vital lint, signature, embedded values/private-token absence pass. Public Reader returns 30 pages after development CAPTCHA; image JPEG 200. Complete HTTPS APK download SHA-256 matches. Actual phone/browser/provider/payment/MIT/production acceptance remains open. Backend, dedicated connector and download server left running; no new commit/push or issue closure on 2026-10-20. [Artifact, runtime and rollback](Mobile/docs/2026-10-20-public-https-apk.md).
+- ภาษาไทย: กู้ API สาธารณะจาก 530/1033 ด้วย tunnel แยก เปลี่ยนเฉพาะ target CNAME API และเพิ่มโดเมนดาวน์โหลด คง tunnel ร่วม version 7 ตรวจ hash cloudflared ทางการและสิทธิ์ token แยก private ออกจากการส่ง สร้าง APK ARM64 source เดิมโดย override API HTTPS เฉพาะ build ได้ 27,760,053 bytes ตรวจ build/vital lint/ลายเซ็น/ค่าฝัง/ไม่มี token ส่วนตัวที่ตรวจผ่าน Reader ได้ 30 หน้าด้วย CAPTCHA ทดสอบและ JPEG 200 ดาวน์โหลด HTTPS ครบ/hash ตรง ยังไม่รับมือถือ/browser/provider/payment/MIT/production เปิด Backend connector และ download server ค้างไว้ ยังไม่ commit/push หรือปิด issue ในวันนั้น
+
+## Native commit validation — 2026-10-20
+
+- At the user's subsequent commit/push request, validated the pending native implementation and separate Backend profile-join fix: Mobile **220/220**, typecheck/env and lockfile dry-run; Backend build, full CI Jest **90 suites/960 tests**, focused lint; repository tooling **58/58**. Existing same-day ARM64 APK build/artifact checks remain applicable to unchanged Mobile source.
+- Fixed lint only in the six Backend files being committed: consistent formatting, explicit Promise-returning typed HTTP test boundaries, proper Request URL handling and removal of an unused import. Profile behavior and API contracts remain unchanged. Private-env/artifact exclusions and secret scan checked before staging; the only matched literal was a documented public Cloudflare test key already present in historical documentation.
+- Git packaging revealed LF normalization changed all ten vendored QR source digests in the index (working copies matched 10/10, index 0/10). Added a narrow `.gitattributes` `-text` rule; re-staged index now matches **10/10**, QR behavior tests **2/2**. Upstream whitespace is intentionally retained; whitespace checks pass outside immutable vendor JavaScript.
+- ภาษาไทย: ตามคำขอ commit/push ที่ตามมา ตรวจงาน native และ Backend profile-join แยกส่วน Mobile **220/220** typecheck/env/lockfile dry-run ผ่าน Backend build/CI Jest **90 suites/960 tests**/lint เฉพาะไฟล์ผ่าน tooling **58/58** หลักฐาน build APK ARM64 วันนี้ยังใช้กับ Mobile source ที่ไม่เปลี่ยน แก้เฉพาะ lint ของ Backend หกไฟล์ ได้แก่ format/types/Promise และ Request URL ใน fixtures พร้อมลบ import ไม่ใช้ คง behavior/API ตรวจ exclusions และ secrets ก่อน stage พบเพียง public Cloudflare test key ในเอกสารเก่า
+- ภาษาไทย: พบ Git normalize LF ทำให้ digests vendor QR ใน index ผิดทั้งสิบไฟล์ (working copies ตรง 10/10 แต่ index 0/10) เพิ่ม `.gitattributes` `-text` เฉพาะ vendor แล้ว index ตรง **10/10** tests QR **2/2** คง whitespace upstream ตามต้นฉบับ และตรวจ whitespace ส่วนอื่นผ่าน
+
+## Downloadable native Android test APK — 2026-10-20
+
+- Built `MangaDock-0.1.0-arm64-test.apk`, 27,760,069 bytes, embedded Hermes, existing Android Debug signing, for the current Wi-Fi LAN Backend. Native assemble/vital lint passes; Mobile 220/220, typecheck/env pass. Verified certificate/ABI/SDK, embedded public values, absence of checked private token, and matching streamed HTTP download hash. [Artifact/download/install evidence](Mobile/docs/2026-10-20-test-apk.md).
+- Existing public API returned 530, so this is explicitly LAN-only. No physical device connected; install/interaction/MIT/production acceptance remain open. Initial PowerShell argument failure corrected without source changes. No Frontend/Backend/MIT source or private env changes, website button, production keys, Git/tracker mutation. Backend and a directory-only LAN download server left running.
+- ภาษาไทย: สร้าง APK ARM64 ใหม่ 27,760,069 bytes ฝัง Hermes เซ็น Android Debug เดิมและใช้ Backend ใน Wi-Fi ปัจจุบัน Native build/vital lint และ Mobile 220/220 typecheck/env ผ่าน ตรวจ certificate/ABI/SDK/public values/ไม่มี token ส่วนตัวที่ตรวจ และ hash ดาวน์โหลดตรงไฟล์ API สาธารณะเดิม 530 จึงระบุ LAN-only ยังไม่มีมือถือจริง ไม่รับ install/interaction/MIT/production แก้รูปแบบ argument PowerShell ไม่แก้ source Frontend/Backend/MIT หรือ private env ไม่เพิ่มปุ่มเว็บ/production keys/commit/tracker เปิด Backend และ download server เฉพาะโฟลเดอร์ค้างไว้
+## Native acceptance execution — 2026-10-16
+
+- Restored existing Supabase to ACTIVE_HEALTHY; DNS/Auth HTTP 200 and seven diagnostic destinations accepted. Started Backend/Metro; verified current public Android bundle. MIT runtime/models and Redis remain unavailable. Task 0 matrix covers all 29 slices; later device/roles/payment/release gates stay open.
+- Fixed empty MangaDex/Studio page responses publishing a ready Reader with two observed RED → GREEN regressions. Mobile **220/220**, typecheck/env and fresh Android export pass. Live controller obtains 30 pages with a simulated browser/development CAPTCHA; one image JPEG HTTP 200. Actual login/browser/device/production protection not accepted. Existing APK verifies with Android Debug certificate, x86_64 only. [Evidence and next inputs](Mobile/docs/2026-10-16-native-acceptance-progress.md). No Frontend/Backend/MIT source change for this fix; no commit or issue closure.
+- ภาษาไทย: กู้ Supabase เดิมเป็น ACTIVE_HEALTHY ตรวจ DNS/Auth/redirect เจ็ดกรณี เปิด Backend/Metro และตรวจ bundle ใหม่ จัด matrix 29 slices ครบ แต่ขาด MIT/Redis และยังค้าง device/roles/payment/release แก้ตอนว่าง MangaDex/Studio ด้วย RED → GREEN สอง tests ผ่าน **220/220** typecheck/env/export Controller ได้ 30 หน้าโดยจำลอง browser/test CAPTCHA ภาพแรก JPEG 200 ไม่อ้าง login/device/protection จริง APK เดิมเซ็น debug และเป็น x86_64 ไม่แก้ source Frontend/Backend/MIT รอบนี้ ไม่ commit/ปิด issue
+
+## Native Mobile status audit — 2026-10-16
+
+- Cross-checked current native entry/view/controller/test wiring against the approved feature mapping and queried all 30 migration issues: all remain open. Fresh Mobile tests **218/218**, typecheck, env validation and Android Hermes export **772 modules/~3 MB/11 assets** pass; Backend build and three affected suites **12/12** pass. Existing APK is debug; no new signed release was built.
+- Current service blockers: Supabase MCP reports MangaDock **INACTIVE**, its API hostname returns **ENOTFOUND**, and previous local Backend/Metro/MIT ports have no listeners. CAPTCHA's three HTTPS assets remain HTTP 200 and match staged uploads; the development test keys remain configured. Recorded live/device/visual/release/configuration and uncommitted workspace follow-up in [full audit](Mobile/docs/2026-10-16-native-status-audit.md). No app-source, private env, remote-state, Git or issue-state mutation.
+- ภาษาไทย: เทียบ wiring native ปัจจุบันกับ feature mapping และตรวจ issues migration 30 รายการ ยังเปิดทั้งหมด Mobile tests **218/218** typecheck env และ Hermes export **772 modules/~3 MB/11 assets** ผ่าน Backend build และ tests สาม suites ที่เกี่ยวข้อง **12/12** ผ่าน APK ที่มีเป็น debug ไม่สร้าง signed release ใหม่ Supabase MCP เป็น **INACTIVE** hostname API **ENOTFOUND** พอร์ต Backend/Metro/MIT เดิมไม่มี listener แต่ CAPTCHA HTTPS สาม assets ยัง 200/ตรง upload และใช้ test keys บันทึกงานค้างบริการ/อุปกรณ์/ภาพ/release/config/workspace ในรายงาน ไม่แก้ app source/env/remote/Git/issue state
+
+## Native Reader development CAPTCHA deployment — 2026-10-05
+
+- Deployed exactly three existing CAPTCHA assets with generated public development-key config on the user's selected Cloudflare account; live page: https://mangadock-mobile-captcha-dev.pages.dev/. Hosted bodies match upload, JavaScript MIME types are correct and hosting redirects preserve request state. CLI create initially delegated to Workers and failed; verified direct Pages opt-out then created/deployed successfully without changing other projects.
+- Set the ignored Mobile CAPTCHA URL and added required Expo API/Auth names after discovering Frontend-style aliases in local env. Preserved all old assignments, used the existing project/public publishable key and copied no server secret. Env validation passes; verified and restarted only Mobile Metro, then checked fresh Android bundle values and exclusion of server-only variable names. Focused tests **19/19**, hosted Supabase Auth HTTP 200, Backend CAPTCHA HTTP 201.
+- The existing always-pass development test pair was retained; actual browser/device challenge return and production bot protection remain unaccepted. No app/dependency/Frontend/Backend/MIT source change, Git commit or issue closure. [Evidence and rollback](Mobile/docs/2026-10-05-reader-captcha-setup.md).
+- ภาษาไทย: deploy CAPTCHA เดิมสาม assets พร้อม public config ทดสอบบน account ที่ผู้ใช้เลือก ตรวจเนื้อหา/MIME/state hosting ผ่าน CLI create แรกส่งไป Workers และไม่ผ่าน ตรวจ opt-out Pages ตรงแล้วสร้าง/deploy สำเร็จ ไม่เปลี่ยนโครงการอื่น ตั้ง URL และเพิ่มชื่อ Expo API/Auth ที่ขาดใน env Mobile คง assignments เดิม ใช้ project/publishable key เดิม ไม่คัดลอก secret env validation ผ่าน restart เฉพาะ Metro ที่ตรวจ workspace แล้ว bundle Android ใหม่มีค่าครบและไม่รวมชื่อ server-only Focused tests 19/19 Supabase Auth 200 Backend CAPTCHA 201 คงคู่ทดสอบ always-pass ยังต้องรับรอง browser/กลับเข้าแอปและ protection จริง ไม่เปลี่ยน source/dependency หรือ commit/ปิด issue ดูรายงานด้านบน
+
+## Supabase native Auth redirects — 2026-10-05
+
+- Added all five native return URLs to the existing hosted project through authenticated Supabase CLI 2.119.0. Preserved ten web URLs, Site URL and all 17 undeclared remote properties; reviewed config updates changed from 1 before push to 0 afterward.
+- Live diagnostic cancellations passed 7/7 destination checks, including Google/Facebook native callbacks and the original web callback. No application source changed; actual account login/device session acceptance remains open. [Evidence and rollback](Mobile/docs/2026-10-05-native-auth-redirects.md).
+- ภาษาไทย: เพิ่ม native URL ทั้งห้าแล้ว คงเว็บเดิม 10 ค่าและ settings อื่น ตรวจปลายทางจริงผ่าน 7/7 ให้ลอง social login ใหม่ได้โดยไม่ต้อง build การตรวจนี้ยังไม่ใช่การเข้าสู่ระบบบัญชีจริง
 
 ---
 
+## #1107 Expired Facebook avatar no longer makes download managers offer image.bin (2026-10-24)
+
+**Why:** a download manager kept offering to save `image.bin` from `/_next/image?url=…platform-lookaside…`.
+**Root cause (reproduced):**
+- The navbar chip and `/studio/account` rendered the user photo with `next/image`.
+- When a signed Facebook CDN URL expires, the optimizer answers **404 with no `Content-Type`**.
+- A response with no type looks like a file download.
+
+**Fix:** both now use the shared `UserAvatar`. It is a plain `<img>`, and falls back to the uid mascot when the photo fails.
+
+**Validated:** production build, fake session.
+- Expired `fbsbx` avatar, before the fix: `/` and `/studio/account` each made a `/_next/image` request (404, type `null`).
+- After the fix: 0 such requests, and the chip shows the mascot.
+- A working photo still renders (`naturalWidth` 380).
+- `tsc` is clean. eslint shows only the existing `set-state-in-effect` at `NavbarActions.tsx:35`, which is untouched.
+
+---
+
+## #1105 Content level "ชวนคิด" (suggestive) + reading history respects the level (2026-10-24)
+
+**Why:** "อ่านต่อ" showed Tanaka-kun wa Mite Iru. at level "ปิด". MangaDex rates it `suggestive` (tags Romance/Drama/
+School Life only), and `off` used to include suggestive. History lists were also never filtered at all.
+**What (the developer chose this over an override list):**
+- **Levels are now off → suggestive → erotica → all.** `off` (and every anonymous caller) is `safe` only. The new
+  "ชวนคิด" level adds `suggestive` and needs nothing. 18+ and "ทั้งหมด" keep the age / Terms gates.
+  DB check constraint migrated (`content_level_suggestive`).
+- **Cache keys:** `suggestive` keeps the old unsuffixed keys (they held exactly safe + suggestive). `off` gets
+  `:r=off`. Landing cache bumped to `landing:full:v6` because the home rows are now safe only.
+- **`GET /books/ratings?ids=`** returns the MangaDex rating of up to 100 UUIDs. One MangaDex request for the
+  uncached ones; each rating is cached for 24 h; unknown ids are left out.
+- **`useLevelFiltered`** (`lib/historyRatings.ts`) filters the "อ่านต่อ" row and the history tab by level.
+  - The list is held empty until the ratings arrive, so a hidden cover never flashes.
+  - The result is memoized.
+  - If the ratings call fails, the whole list is shown (it is the user's own history).
+- **Search:** the "เรต" filter is shown only at 18+ / ทั้งหมด.
+
+**Validated:**
+- Backend 1221/1221 tests, frontend 511/511, tsc and eslint clean on the changed lines.
+- Live backend:
+  - an anonymous search returns `safe` only;
+  - `/books/ratings` returns Tanaka-kun as `suggestive`.
+- Production-build E2E against the real `/books/ratings`:
+  - signed out, "อ่านต่อ" hides Tanaka and keeps Frieren;
+  - at "ชวนคิด", both show on home and in the history tab;
+  - back at "ปิด", the tab hides Tanaka;
+  - choosing "ชวนคิด" opens no dialog;
+  - no "เฉพาะ 18+" chip at suggestive.
+- The #1102 probe still passes.
+
+---
+
+## #1102 Frontend: 18+ content settings tab, badges, search rating filter (PRD #1100) (2026-10-24)
+
+**What:** the client half of #1101.
+- **Settings → "เนื้อหา"** (`/settings/content`) offers three levels. Raising the level opens one dialog
+  (`useModalDialog`) asking for what is missing: the age checkbox for 18+, plus the Thai Terms ("the platform is
+  not involved") for "ทั้งหมด". Lowering saves without a dialog.
+- **`lib/contentLevel`** holds the level (`useSyncExternalStore`) and clears the API cache when it changes.
+  `ContentLevelSync` keeps it in step with the session.
+- **`apiFetch`** adds the session token to catalog reads only while the level is above `off`. Search, /new and
+  genre now use it, and their keys (plus the chapter lists') carry `levelKey()`. At `off` the requests and keys are
+  exactly as before.
+- **18+ badge** on the grid, search and popup.
+- **Search** gets a "เรต" filter ("ทั้งหมด" / "เฉพาะ 18+" → `adult=only`), shown only above `off`.
+
+**Validated:** production build. The settings and search APIs were answered locally; the server-side gate is
+covered by the backend.
+- The age dialog's confirm stays disabled until the box is checked; then `PUT {erotica, confirmAge}`.
+- "ทั้งหมด" shows only the Terms, not the age box again. Escape closes it; then `PUT {all, acceptTos}`.
+- Lowering to "ปิด" sends a `PUT` with no dialog.
+- On search: the request carries the token, the 18+ badge shows, and "เฉพาะ 18+" sends `adult=only`.
+- Signed out: no token and no rating filter.
+- Unit 507/507 and test:auth 12/12. The earlier dialog and popup probes still pass. eslint is no worse than main.
+## #1101 Backend: opt-in 18+ content levels (PRD #1100) (2026-10-24)
+
+**What:** the developer asked for an 18+ filter: every rating may be enabled, `pornographic` behind accepting a
+Terms notice, and only for a signed-in user who confirmed being 18+.
+- **Database:** `profiles.content_level` (`off`/`erotica`/`all`, default `off`), `adult_confirmed_at` and
+  `adult_tos_accepted_at`. Applied through the Supabase MCP; all 18 existing profiles are `off`.
+- **Gate:** `ContentLevelService` (a global module) applies `applyLevelChange`: `erotica` needs the age confirmed,
+  and `all` also needs the Terms; the server stamps the times. It serves the level from a 60 s per-user cache that a
+  save replaces, and fails closed to `off`.
+- **Endpoints:** `GET`/`PUT /users/me/content-settings`.
+- **Catalog routes** (search, genre, new releases, chapter list, preview): they use `OptionalAuthGuard`, and
+  `ratingScope(level)` is threaded down to every MangaDex request. Cache keys get `:r=<level>` (plus `:adult` for
+  search's `adult=only`) except at `off`, which keeps today's keys.
+- **Search leak closed:** the alt-name extras no longer add `erotica` for everyone.
+- **`contentRating`** is now on `LandingBook` and `MangaDetail`.
+- **RLS checked:** `profiles` has only a SELECT-own policy, so users can't write the level through PostgREST and
+  bypass the gate.
+
+**Validated:**
+- Jest: backend 1215/1215. New suites cover the gate and ratings (11), the service (5), the controller scope (3),
+  and the MangaDex URLs and cache keys (4).
+- Live (local backend): anonymous search, search with `adult=only`, search with a bogus token, the genre page and
+  new releases all return only safe/suggestive. The settings endpoint returns 401 without a session.
+- **Not live:** the signed-in path, which needs a real account; it is unit-tested instead.
+
+---
+
+## #1062 Light-theme ok/danger reach AA on their tints (2026-10-24)
+
+**What:** the developer asked the agent to pick the values. The light-theme `--ok` changes from `#1a8a4a` to
+`#125c32`, and `--danger` from `#c8322f` to `#972524`. The hue stays the same; only the HSL lightness goes down.
+Both were chosen by the browser's own mixing: Tailwind v4's `/N` is `color-mix` in oklab, and a plain-sRGB
+calculation came out 0.1–0.7 too optimistic. Each value is the lightest that passes 4.5:1 for text on its `/10`,
+`/15` and `/20` tints over `--bg` and `--surface`, as plain text, and as a filled `text-bg` button. The dark theme
+is untouched.
+
+**Validated:** production CSS measured in Chromium.
+- **Light, before:** the worst case was 3.88 (ok) and 3.96 (danger).
+- **Light, after:** 20 cases, minimum 4.63.
+- **Dark:** minimum 6.57, unchanged.
+## #863 Supabase reads give up after 8 s; auth and writes keep their client (2026-10-24)
+
+**Decision (the developer asked the agent to make it): option (b).**
+- `SupabaseService.reads` is a second client with `db: { timeout: 8000 }`, so PostgREST requests are aborted after
+  8 s.
+- `listVersionsByTitle`, the title page's main data that hung for 25 s, now uses it. A slow upstream gives a
+  retryable error instead of a hang.
+- `client` keeps no timeout:
+  - `db.timeout` never touched `AuthGuard`'s JWT checks, which go through GoTrue anyway;
+  - an aborted request can still commit on the server, so wallet/unlock writes stay where a failure can't be
+    reported for a write that happened.
+- The search alt-name read kept its own 3 s cap from #1046.
+
+**Validated:**
+- Jest: 3 new tests red first, then green. They check that `reads` is a separate client with the timeout, that
+  `client` has none, and that `listVersionsByTitle` goes through `reads`. Backend 1183/1183, and the build passes.
+  eslint is below main (supabase.service 2 → 1).
+- Against the real project, supabase-js 2.99.1 with a 1 ms `db.timeout` aborted (`AbortError`) in 23 ms, so the
+  option really cuts requests.
+- Live, through the frontend proxy: `/versions/title/<id>` returned 200 in 0.37 s.
+## #1094 Forum post image viewer: large view, arrows on hover, swipe on phones (2026-10-24)
+
+**What:** the developer asked for a large view of post images, because clicking one opened the raw file in a new tab,
+and for IG-style navigation when a post has several images. `PostImageViewer` is a dialog built on `useModalDialog`.
+- **Navigation:**
+  - previous/next arrows, shown on hover or keyboard focus and hidden on touch screens;
+  - ← and → keys;
+  - an IG swipe on touch: the image follows the finger, the ends resist, there is no wrap, and a fast flick counts.
+- **Position:** an "n / m" counter (aria-live) and dots.
+- **Closing:** Escape or a backdrop click; focus returns to the image that opened it.
+- The math is in `lib/imageViewer.ts`, unit-tested 8/8. The grid images are now buttons, disabled while a spoiler
+  is hidden. `PostImage` gained `fit="contain"`.
+
+**Validated:** production build on a real 4-image post.
+- **Desktop:** clicking opens the viewer at "2 / 4" with no new tab. The arrow is opacity 1 on hover. Clicking
+  next goes to 3, → goes to 4, and there is no next arrow at the end. Focus stays on an arrow at the end. Escape
+  closes the viewer and focus returns.
+- **Phone** (390 px touch, CDP touch events): no arrows. Swipes go 1 → 2 → 3 → 2, and the viewer stays open.
+- Screenshots were sent to the developer. Unit 504/504. Real tsc is clean, and eslint matches main.
+## #1092 Post page sticky bar sits under the drawer and spans the phone width (2026-10-24)
+
+**What:** the developer reported two problems with the post page's sticky title bar on a phone.
+- **It showed through the opened community drawer.** Both were `z-50`, and the bar came later in the DOM. The bar is
+  now `z-40`: above the post's `z-30` menus, below the drawer and navbar.
+- **It stopped 16 px short of each edge,** because it sat in `main`'s `px-4`. It now uses `-mx-4 px-4` on phones,
+  cancelled at `lg`. The page wrapper's own `[overflow-x:clip]` would have cut that off, and `main` already clips, so
+  the inner clip was removed.
+
+**Validated:** production build at 390 px with the real local backend.
+- **Before:** the bar spanned 16 → 374, and showed over the open drawer.
+- **After:** it spans 0 → 390, and the drawer covers it.
+- Desktop is unchanged (the bar stays within its column), and there is no horizontal overflow at 320, 390 or 1280.
+- eslint matches main.
+## #959 Image proxy is limited to MangaDex image hosts, with no redirects (2026-10-24)
+
+**What:** `fetchProxiedImage` accepted any `https://` URL and followed redirects. It now fetches only from
+`uploads.mangadex.org` and `*.mangadex.network` (MangaDex@Home nodes, any port). Any other host gets 403 before any
+request is made, and `redirect: 'error'` means a redirect can't leave the list.
+
+The list comes from the data, not a guess. A Supabase query over every image-URL column found covers only on
+`uploads.mangadex.org`. Profile photos (Google, Facebook, DiceBear) and our own uploads (relative paths) never pass
+through the proxy. Chapter pages come from the at-home `baseUrl`.
+
+**Validated:**
+- Jest: 7 new cases red first, then 23/23. They cover look-alike, userinfo, loopback and subdomain-suffix hosts, the
+  at-home node with its own port, and the redirect mode. The backend is 1188/1188, and the build passes.
+- Live, through the frontend's `/api/img-proxy` with the real local backend: a MangaDex cover returns 200 image/jpeg
+  (134 KB); `example.com` and the userinfo trick return 403.
+- In the reader, every proxied page returns 200 (`uploads.mangadex.org` ×10, a `*.mangadex.network` node ×1), with
+  no 403.
+
+---
+
+## #1088 Book popup buttons show one spinner while chapters load (2026-10-24)
+
+**What:** the developer reported "( ( กำลังโหลด". The buttons already swap their icon for a spinner while loading,
+and fc90239c had added a second spinner inside the label. The label is now plain text. The secondary "อ่านตอนที่ …"
+button now swaps its book icon for the spinner, like the others.
+
+**Validated:** production build with the chapter request held.
+- **Before:** 2 spinners on "ดูตอนทั้งหมด" (1280 px) and on the phone read button (390 px); 1 spinner next to a book
+  icon on the desktop read button.
+- **After:** one spinner each and no other icon. A screenshot was sent to the developer.
+- The book popup probe still passes, and unit tests are 496/496. Real tsc is clean, and eslint matches main.
+
+---
+
+## #1085 One keyboard-ownership rule for dialogs; book popup on useModalDialog (2026-10-23)
+
+**What:** a `/simplify` pass on #1073 found the question "is this keyboard event this dialog's?" answered four ways.
+`ownsKeyboardNow` now serves the Tab trap, Escape in `useModalDialog`, the reader and the book popup.
+`focusInNestedDialog` and `focusWrapTarget`'s `focusInOtherLayer` are removed as dead. `useModalDialog` gets an optional
+`isTop` and reads `onClose` at key time, so it no longer re-subscribes per render. `BookDetailModal` drops its own Escape
+listener for `useModalDialog`. `keepTabStops`' condition is shorter. The single layer stack is a proposal, #1086.
+
+**Validated:** production build.
+- Every dialog probe from #1069, #1073, #1076, #1078, #1081 and #1083 passes.
+- In the book popup, focus stays inside through 20 Tab/Shift+Tab presses, Escape closes it, focus returns to the
+  opener, and the URL is restored.
+- Unit 496/496: one test went with the removed option.
+- Real tsc is clean, and eslint error and warning counts match main per file. In `BookDetailModal` the TDZ error is
+  gone, and a pre-existing `setState`-in-effect error from March, which it had masked, now shows.
+
+---
+
+## #1083 Four pointer-only controls work from the keyboard (2026-10-23)
+
+**What:**
+- **Post image drop zone.** It was a `<div onClick>` with a hidden file input. It's now `role="button"` and
+  focusable, and Enter/Space opens the picker.
+- **Own-comment actions below `sm`.** The edit/delete sheet opened only on a touch long-press. A "ตัวเลือกความคิดเห็น"
+  button now opens it too.
+- **Banner reposition.** It was drag only. The surface is now a vertical slider: arrows step 5, PageUp/PageDown step
+  20, Home and End go to the ends (`lib/bannerPosition.ts`, unit-tested). It takes focus when reposition opens.
+- **Studio sidebar separator.** Enter resets to the default width, as double-click does.
+
+**Validated:** production-build probe, fake session, API answered locally.
+- **Before:** none of the three new controls existed, and on main the separator's `onKeyDown` has no Enter.
+- **After:** Enter opens the file picker, the comment button opens the sheet, and the slider is focused on open with
+  2×ArrowUp going 50 → 60. On the separator, 2×ArrowRight goes 220 → 240, then Enter goes back to 220.
+- Unit 497/497. Real tsc is clean, and eslint matches main.
+
+---
+
+## #1081 Profile banner controls and the password hint reachable from the keyboard (2026-10-23)
+
+**What:** a hover-only sweep turned up two real cases.
+- **Profile banner controls.** The upload and reposition buttons sat in an `opacity-0 group-hover` wrapper. They now
+  also show on `group-focus-within` and on `@media(hover:none)`.
+- **AccountsTab "ไม่ได้ตั้งค่า" hint.** It was `hidden group-hover:block`, and its link was a `<strong onClick>`. The
+  chip is now a button that goes to the password tab, with the hint as its `aria-describedby`, shown on
+  focus-within too.
+
+**Validated:** production-build probe, fake session, API answered locally.
+- **Before:** the banner button was opacity 0 on focus, and the chip wasn't a button.
+- **After:** opacity 1, the hint shows on focus, and Enter goes to `/settings/password`.
+- Real tsc is clean, and eslint matches main.
+
+---
+
+## #1078 / #1079 Form fields have names; login modal's hidden forms leave the Tab order (2026-10-23)
+
+**What:**
+- **#1078.** 35 fields had no accessible name. About half had a visible `<label>` next to them that wasn't linked, and
+  the rest relied on a placeholder. Each now has an `aria-label` taken from its visible label, or from the placeholder's
+  words when no label is shown (label in name). The 3 hidden file inputs are untouched. The search page's
+  "ตัวกรองขั้นสูง" toggle also gets `aria-expanded`.
+- **#1079.** `LoginModal` keeps all three forms mounted for the slide. The inactive ones are now `inert`, where before
+  Tab walked into 7 invisible fields.
+
+**Validated:** production build, fake session, API answered locally.
+- **Before:** 0 named in the sampled set (login, register, navbar search, post form, search year filters).
+- **After:** all named, the advanced toggle is expanded, and the login modal has 0 invisible Tab stops (7 before).
+- Switching to register still accepts typing, and the login dialog probe from #1073 still passes.
+- Unit 493/493 and test:auth 12/12. Real tsc is clean, and eslint matches main per file.
+
+---
+
+## #1076 Icon-only buttons have names; hover-only delete buttons reachable (2026-10-23)
+
+**What:** six icon-only controls (`✕` or an X `svg`) had no accessible name: the post-image remove button, the
+Topup QR ✕ (it cancels the payment), the Topup ✕, the search clear in MangaPicker and in Studio search, and the Studio
+upload page delete. Each now has an `aria-label`. Two of them were hover-only, so they couldn't be seen or reached
+from the keyboard or on touch. The image-remove button used `opacity-0`, and the page delete used `hidden`, which
+kept it out of the Tab order. Both are now opacity-hidden and show on `focus-visible` and on `@media(hover:none)`.
+
+**Validated:** production-build probe, fake session, API answered locally (the image upload included).
+- **Before:** 0 named on main.
+- **After:** the Topup ✕, both search clears and "ลบรูปที่ 1" are named, and the remove button is opacity 1 on
+  keyboard focus.
+- The upload-page delete wasn't tested end-to-end, because it needs an upload session.
+- Real tsc is clean, and eslint matches main per file.
+
+---
+
+## #1073 App modals are real dialogs; one Escape closes one layer (2026-10-23)
+
+**What:** thirteen app modals blocked the page without being dialogs. They had no role or name, no Tab trap and no
+focus return. `useModalDialog` (in `hooks/useDialogFocus.ts`) combines `useDialogFocus` (#837) with Escape. Escape
+belongs to the innermost aria-modal dialog that holds focus (`ownsEscapeNow`). It is listened in the bubble phase and
+skipped when an inner popover already consumed it (`usePopoverDismiss` now calls `preventDefault`). The reader and the
+book popup stand aside while focus is in a dialog inside or over them. The Tab trap treats a radio group as one stop
+(`keepTabStops`), and gives focus back to the real opener when an `autoFocus` field took focus first (`pickOpener`).
+
+Per-modal decisions:
+- `DailyCheckin`: Escape works only after the claim, because before it there is no close.
+- `MfaVerifyScreen`: no Escape, because its only exit signs the user out.
+- `Topup`: Escape works as the scrim click does, and a pending payment stays pending.
+- `Reauth`: Escape cancels.
+- The docs drawer is left out: the developer's WIP is in that file.
+
+**Validated:**
+- Production build, fake session, `/api/proxy` answered by Playwright. 9 modals pass: named dialog, focus in, Tab
+  stays inside, Escape closes, focus back on the opener. The check-in stays open on Escape before the claim.
+- Popover inside the post form: before the fix, the first Escape closed the whole form. After it, Escape #1 closes
+  the dropdown and #2 closes the form.
+- No regressions: the admin overlay probe still passes 5/5, and the book popup still closes on Escape.
+- CI unit set 493/493 and `test:auth` 12/12. Real tsc is clean, and eslint matches main per file.
+- Not covered end-to-end: the comment action sheet (phone long-press), Reauth, MFA and LinkAccount. They use the
+  same hook path.
+
+---
+
+## #1069 Admin overlays are real dialogs (2026-10-23)
+
+**What:** five admin overlays behaved as modals without being dialogs: the user drawer, the role and ban confirms,
+the content delete confirm, and the transaction panel. They had no role or name, Escape did nothing, and focus
+stayed on the page behind them. `admin/components/AdminDialog` adds `role="dialog"`, `aria-modal` and an
+`aria-label`, and uses `useDialogFocus` (#837). Escape and a scrim click close it, and focus returns to the opener.
+The transaction row's "Detail →" is now a button, so the panel opens from the keyboard. The role select is
+controlled: Cancel used to leave it showing the unapplied role.
+
+**Validated:** production build, fake admin session, admin APIs answered by Playwright with every write refused
+(0 sent). The dialog probe went from 0/5 to 5/5: named dialog, focus in, Tab stays inside, Escape closes, focus back
+on the opener. After Cancel the role select showed 2 against an applied 0 before the fix, and 0 after. Real tsc is
+clean, and eslint matches main.
+
+---
+
+## #1068 Admin wallet-adjust inputs: real names and the focus ring (2026-10-23)
+
+**What:** #1040 / #1044 left the admin user drawer's coin-adjust amount and reason inputs alone while the wallet area
+was parked; the developer lifted that. Each now has an `aria-label` ("Coin adjustment amount", "Reason for the
+adjustment") and the `focus:outline-none` opt-out is gone, so the standard 2 px accent ring shows. The adjust logic is
+untouched.
+
+**Validated:** production build, signed in as admin via the local fake session with the admin users API answered by
+Playwright (no wallet write sent): before — no name, outline `none`; after — both named, `solid 2px` ring on focus.
+Real tsc clean; eslint equal to main.
+
+---
+
+## #778 Light mode is on: a theme toggle in the nav (2026-10-23)
+
+**What:** with every user-facing route token-clean (#1048 light sweep, #776 auth screens), `ThemeToggle` goes into
+`NavbarActions` after the search — the same bar on desktop and phone, for guests too. It cycles light → system → dark
+(`lib/theme.ts`, persisted in `md-theme`, applied by the boot script before first paint). Its size is now `h-8 w-8`
+like the bell next to it (it was unused, so nothing else changes). `/docs` needed no island: its page carries its own
+fixed palette and looks the same in both themes; `/status` and `/metrics` are API routes.
+From review: signed in on a phone the bar is full (bell, coins, avatar) and the toggle squeezed the logo (67 px at
+390), so there the theme is a row of the account menu (`ThemeMenuRow`); all three icons render and CSS picks the
+painted one (no dark icon before hydration); `<meta name="theme-color">` follows the theme (boot script + applyTheme);
+scrollbar thumbs are an ink tint (white ones vanished in light). The 360/320 px squeeze predates this — filed apart.
+
+**Validated:** production build, guest, at 1440 and 390: the toggle is visible, cycles light/system/dark (`data-theme`
++ storage), and a reload keeps light; `/docs` renders identically in light and dark; the full route sweep (72 views,
+signed in) has 0 horizontal overflow with the extra control; phone nav screenshot in both themes checked. Real tsc
+clean; eslint equal to main.
+
+---
+
+## #776 The auth-flow screens on the Strata tokens (2026-10-23)
+
+**What:** the developer lifted the parking of the auth files. The login / link / MFA / re-auth modals, the OAuth
+callback, the security page with its session list, activity log and TOTP modal moved from dark-tuned classes to the
+Strata tokens — ~130 class edits, styling only (`git diff` has no non-class line): `text-white/…` → `ink` / `ink-2` /
+`ink-3`, `bg-white/5|10` → `fill` / `raised`, `border-white/…` → `line` / `ink-3`, blue primary buttons → the ink
+`PRIMARY_FILL`, red / green → `danger` / `ok`, black scrims → `scrim`, and the dead v3 `placeholder-white/*` →
+`placeholder:text-ink-3`. Six hand-drawn spinners became `Loader` (inline in buttons, a section loader while the OAuth
+window is open), and the callback shows a `Loader page` while it completes. The login and link modals' panels were
+translucent glass over the dark scrim — black in light mode — and are now an opaque `bg-surface` (blur dropped). Brand
+colours (Google, Facebook) and the TOTP QR's white backing stay. The callback test's import allow-list gained the Loader.
+From review: the OAuth-wait overlay sits on the scrim (black in both themes), so its text stays fixed white; hairlines
+and the drag handle mapped to `raised` were near-invisible — now `line` / `ink-3`, and the tab pill is `surface`; the
+TOTP done button uses the ink primary (green was 4.0:1); blur dropped from the three now-solid panels. Light-theme
+`--ok` / `--danger` on their own tints sit just under AA app-wide — a token decision, filed separately.
+
+**Validated:** production build, both themes: the light sweep's white-on-light texts on `/settings/security` gone; a
+contrast check of the login modal and the security / accounts pages finds 0 low-contrast texts in light and dark;
+screenshots checked. Frontend tests: the callback suite 8/8 (the docs-page SSR tests that need a docs server fail as
+on main); real tsc clean; eslint per file equal to main.
+
+---
+
+## #1060 The book popup closes smoothly instead of warping; 5 more transition lists fixed (2026-10-23)
+
+**What:** the developer saw `BookDetailModal` "warp" shut — shrink at once, then vanish. Measured per frame: on desktop
+its panel's `opacity` faded over 22 frames but `scale` (1 → 0.9) and `translate` (0 → 32 px) had 0 in-between frames;
+on a phone the bottom-sheet slide had 0 frames (it just appeared/disappeared). The panel's `transition-[transform,opacity]`
+doesn't name Tailwind v4's separate `scale` / `translate` properties — #1053's class again. The close timer was fine
+(400 / 300 ms). Same list-without-the-property in the post page's menu, `ui/Button`, `ui/Pill` (press) and
+`ui/CopyButton` (icon swap): all six lists now name `translate,scale,rotate` next to `transform`.
+From review: a browser-Back close waited a flat 300 ms, cutting the 400 ms desktop exit short (opacity 0.05 at
+unmount); it now uses `handleClose`'s 300 / 400 ms.
+
+**Validated:** production build. Modal per-frame probe — desktop open and close: scale 20 / translate 22 / opacity 22
+in-between frames (was 0 / 0 / 22); phone sheet slide 17 in / 16 out (was 0). A whole-app snap detector (16 routes,
+every element using a scale/translate/rotate utility whose transition names `transform` but not that property): 4
+snapping groups → 0. Back-close probe: desktop reaches scale 0.9 / opacity 0 (was cut at 0.905 / 0.05), phone slides
+the full sheet. tsc clean.
+
+---
+
+## #1053 Hover scale animates instead of snapping on /new, /mylist, /categories (2026-10-23)
+
+**What:** the developer saw low-fps hover on the `MangaGrid` pages but smooth hover on Home. Measured per frame on a
+production build: the cover image scaled over 26 frames, the card around it had **0** in-between frames — it jumped
+1 → 1.05. Tailwind v4's `scale-*` / `translate-*` / `rotate-*` set the CSS `scale` / `translate` / `rotate`
+properties, and `.smooth-hover` / `.smooth-hover-fast` only transitioned `transform`, so those never animated (Home's
+`BookRow` uses Tailwind's `transition`, which includes `scale`). No frame was dropped; the snap around a gliding image
+read as stutter. Both classes now transition `scale` / `translate` / `rotate` at the existing `transform` timing — which
+also fixes the search-page cards, the `active:scale-95` buttons and the Studio landing cards' lift.
+
+**Validated:** per-frame probe on `/new` and `/categories/action`: card in-between frames 0 → 12 (in + out), image
+unchanged at 26. The developer can try it on the running build.
+
+---
+
+## #1048 Light mode: the logo keeps its "Manga"; the empty upload slot loses its scrim (2026-10-23)
+
+**What:** a light-mode sweep for #778 (23 user-facing routes × 1440/390 px, production build, local fake session:
+overflow, broken images, text contrast against the composited background) found the theme otherwise clean — and the
+hard-coded-colour grep left only shadows and the over-image title. Two defects: `public/MangaDock.svg` draws "Manga" in
+near-white, so on the light navbar only "Dock" showed; and Studio upload drew its dark scrim even with no cover,
+turning the empty slot into a grey-to-black panel. New `MangaDock-light.svg` (those 5 fills → ink `#131316`);
+`MangaDockLogo` renders both and `globals.css` shows the one for the effective theme, mirroring the theme selectors
+(light base; dark via `data-theme="dark"` or the OS when "system"). Upload draws the scrim only when a cover shows;
+otherwise the title is `text-ink-2`.
+
+**Validated:** probe over 4 cases (light, dark, system+OS light, system+OS dark): before — always the white-text logo,
+a scrim and white title on the empty slot; after — the matching logo in each case, no scrim, an ink title. The light
+sweep's upload contrast flag is gone; crops of the light navbar and the empty slot checked. Real tsc clean; eslint
+equal to main.
+
+---
+
+## #863 (part) A slow Supabase no longer holds up search: the alt-name lookup has a budget (2026-10-23)
+
+**What:** with Supabase slow, an uncached `GET /books/search` hung for the full client timeout on
+`MangaCatalogService.findTitleIdsByAltName` (the `chapter_versions` alt-name query; the Supabase client has no request
+timeout). That lookup is best-effort — searchBooks already catches its failure and keeps the MangaDex results — so it
+now gives up after `altNameTimeoutMs` = 3 s (`.abortSignal(AbortSignal.timeout(...))`). This is #863's option (c),
+scoped to that one read: the shared client used by auth and wallet is unchanged. The issue stays open for the
+developer's decision on the client-wide timeout (auth/writes) and the versions read path, where a timeout turns a slow
+answer into a failure.
+
+**Validated:** Jest `manga-catalog.service.spec.ts` red → green: a query that only settles when its abort signal fires
+(Supabase hanging) — search returns the MangaDex results, the query was aborted, no extra fetch. The existing 12 tests
+pass with the reworked mock (eq awaitable, abortSignal chained). Real tsc clean; eslint on the spec one better than main.
+
+---
+
+## #1044 Fields keep the app's focus ring (2026-10-23)
+
+**What:** a High Craft keyboard-focus sweep (Tab through 21 routes, production build, local fake session) plus a
+source scan: ~21 text fields / selects and the admin filter bars' shared `inputCls` set `outline-none` /
+`focus:outline-none`, dropping the app's standard field ring (`globals.css`, WCAG 2.4.7) for a faint border shift
+(often to mid-grey `border-ink-3`). The opt-out is removed so the standard 2 px accent ring sits on the field's border;
+the border cue stays. Left alone: the navbar `SearchBar` (its wrapper has a `focus-within` ring), the disabled profile
+email, and the admin wallet-adjust inputs (wallet path, parked).
+From review: the profile `inputClass` and four Studio upload fields swapped the ring for a 1 px ring at 30–40 % alpha
+(likely under 3:1) — also back on the standard ring; and on the search year filters the ring covered the invalid red
+border, so an invalid field's ring is now `outline-danger`. (`DocsClient` has the same weak ring but is the developer's WIP.)
+
+**Validated:** the focus sweep before — 10 focus stops with no indicator; after — 1, the Studio sidebar resize handle,
+whose indicator is its `::after` line (pseudo-elements are invisible to the check). Screenshot of a focused admin field
+checked; the profile and upload fields now get a 2 px accent ring (after the 150 ms colour transition) and an invalid year
+field's ring is the danger red. Real tsc clean; eslint per file equal to main; indentation of every edited line unchanged.
+
+---
+
+## #1041 Studio selects have a name; the translator-language toggles are a named group (2026-10-23)
+
+**What:** from the #1040 review — the sweep only saw native fields. `StudioSelect`'s trigger was named only by its
+value ("-- เลือกภาษา --", "ไทย"), so its visible label (account "ภาษาหลัก", upload "ภาษาที่แปล") or its purpose (works
+status / language filters, wallet month / year) was never announced. It takes an optional `label` and the trigger reads
+"label: value"; all six call sites pass one. The account page's "ภาษาที่แปลได้" toggles were a bare `<label>` over a row
+of buttons: now `role="group"` named by that heading (hint as its description), each toggle `type="button"` with
+`aria-pressed`. From review: at the 10-language cap an 11th press did nothing, silently — the toggles still off are now
+`aria-disabled` and muted; the two leftover unassociated `<label>`s (now duplicated by the `label` prop) became `<p>`.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session: before — no select
+reachable by its name, 4 unnamed triggers, no group; after — every select found by `getByRole('button', { name })`,
+0 unnamed triggers on all four pages (wallet on its กราฟ tab), the group found by name with 13 pressable toggles; after pressing 10, the other 3 are `aria-disabled` (0 before). Real
+tsc clean; eslint per file equal to main.
+
+---
+
+## #1040 Form fields named only by a placeholder get a real name (2026-10-23)
+
+**What:** a High Craft accessibility sweep (every route × 1280/390 px, production build, local fake session; checks
+unnamed buttons/links, unlabelled fields, images without `alt`, duplicate ids) found one class: 12 fields named only by
+their placeholder — community search, book search, the post comment box, the Studio works filter, both Studio manga
+searches, the Studio bio (its visible "แนะนำตัว" label was not associated) and five admin filters. Each now has an
+`aria-label`, and the bio label is tied to its textarea (`htmlFor` / `id`). No unnamed controls, missing `alt` or
+duplicate ids were found anywhere.
+
+**Validated:** the same sweep after the change: the only fields left are the two on the parked `settings/password`;
+the picker modal's search has its accessible name (`getByRole('textbox', { name })` = 1). Real tsc clean; eslint per
+file equal to main.
+
+---
+
+## #1034 Studio sales stats error offers a retry (2026-10-23)
+
+**What:** found by the High Craft sweep. A failed stats load in `app/studio/components/StatsOverview.tsx` showed a
+plain "โหลดสถิติไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง" card with no way to retry (only switching the range or reloading the
+page). It now uses `LoadError` like every other failed load: the retry clears the result (the loader shows) and bumps a
+reload counter in the effect's deps.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in `STATS1034=1`
+(stats fail once, then answer): before — the card had no retry; after — ลองใหม่ loads the stats (the empty-range
+state). Real tsc clean; eslint equal to main.
+
+---
+
+## #1033 /admin/transactions no longer scrolls sideways on a phone (2026-10-23)
+
+**What:** found by a High Craft sweep of every route at 1280 / 390 px. At 390 px the page was 686 px wide (+296): the
+last header cell's `<span className="sr-only">` is `position: absolute`, and the table's `overflow-x-auto` wrapper was
+not positioned, so the span's containing block lay outside the scroller — it was not clipped and stretched the page.
+Found by hiding elements one at a time (only that span / its `<th>` brought `scrollWidth` back). The wrapper is now
+`relative`.
+
+**Validated:** production build, signed in as admin (role 8) via the local fake session: page `scrollWidth` 686 → 390;
+the table still scrolls inside its wrapper (704 in 356); the sr-only label is intact; all five admin pages 0 overflow at
+both widths.
+
+---
+
+## #1029 Studio upload's selected cover falls back on a dead cover (2026-10-23)
+
+**What:** after choosing a manga in `app/studio/upload/page.tsx`, the big selected-cover `<Image unoptimized>` had no
+`onError`, so a cover that 404s showed the browser's broken-image icon (the pickers fall back since #925). The page
+now remembers the URL that failed (`failedCover`) and shows the book glyph for it; keyed on the URL, so choosing
+another book tries its cover afresh. The title overlay stays.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in search (probe
+`upload1029.cjs`): before — selecting "Cover Broken Everywhere" left a broken `<img>`; after — the glyph, and then
+selecting "Cover Falls Back" loads its cover. Screenshot checked. Real tsc clean; eslint equal to main.
+
+---
+
+## #934 Signed-in failures that stayed silent: follows load, CSV export, notification rows (2026-10-23)
+
+**What (the items #987/#991/#1013 had not covered):**
+- `hooks/useSeriesFollow.ts`: a failed follows load (non-ok or network) was swallowed, so mylist's ติดตาม tab read
+  "ยังไม่มี series ที่ติดตาม". The store now records `loadFailed` (`followsLoadFailed()`); mylist shows `LoadError` with a
+  retry (`loadFollows`) instead of the empty message.
+- `mylist/page.tsx`: a failed CSV export did nothing; it now shows an error toast (network or non-ok).
+- `components/NotificationBell.tsx`: a notification without a link was a `<div onClick>` the keyboard never reached,
+  and on a linked one the mark-read handler sat on an inner div that a keyboard Enter on the link never hit. Each row
+  is now the control itself — a `<Link>` or a `<button>` with the handler — with the inner markup as block spans.
+
+**Validated:** E2E on a production build, signed in via the local fake session, stand-in `MYLIST934=1` (probe
+`mylist934.cjs`): before — empty message on a failed follows load, no feedback on a failed export, Tab skipped the
+no-link row and neither row was marked read from the keyboard; after — LoadError then the empty state after a working
+retry, the export toast, the no-link row reached by Tab, and Enter marks both n1 and n2 read. Screenshot of the panel
+checked. Real tsc clean; eslint clean; hook tests 105/105.
+
+---
+
+## #925 Studio manga pickers fall back to the glyph on a dead cover (2026-10-23)
+
+**What:** the Studio pickers (`app/studio/search/page.tsx`, `app/studio/components/MangaPickerModal.tsx`) showed the
+book glyph only when a book had no `thumbnail`, and rendered `<Image>` with no `onError` otherwise — a cover that 404s
+showed the browser's broken-image icon. New `app/studio/components/PickerCover.tsx` uses `useCoverSrc` like the public
+cards (#921): every source tried, then the glyph. Both pickers use it; their duplicated glyph markup and the now-unused
+`Image` / `resolvedThumbnail` imports went (the search page's `book as any` with them — eslint one better than main).
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in search
+(probe `picker925.cjs`): before — "Cover Broken Everywhere" was a broken `<img>` in both pickers; after — the glyph, no
+broken image, and the working cover still loads (screenshot checked). Real tsc clean.
+
+---
+
+## #935 Studio ConfirmDialog holds and returns focus (2026-10-23)
+
+**What:** `app/studio/components/ConfirmDialog.tsx` declared `aria-modal="true"` but Tab walked out to the page behind
+it, and after Escape or Cancel focus fell to the skip link instead of the "ลบ" button that opened it. It now uses the
+app's `useDialogFocus` (#837), like `BookRouteModal`: Tab and Shift+Tab stay inside, focus returns to the opener on
+close. The hook runs before the existing focus-Cancel effect, so it records the opener first; the root gets
+`tabIndex={-1}` / `outline-none` for the hook's initial focus.
+From the review: a *confirmed* delete removes the row whose "ลบ" opened the dialog, so focus still fell to `<body>`.
+The manga page now remembers the deleted `versionId` and, once the list re-renders without it (the cached list comes
+first and still holds it), moves focus that fell to `<body>` to the page heading.
+
+**Validated:** E2E on a production build, signed in as a creator through the local fake session, stand-in `STUDIO=1`
+(probe `confirm935.cjs`): before — Tab reached the skip link and the page, and focus after closing was the skip link;
+after — 4 Tab + 3 Shift+Tab stay on ยกเลิก/ยืนยัน, and focus is back on "ลบ" after Escape and after Cancel; after a confirmed delete focus was `<body>` (red), now the
+heading `H2`. Real tsc clean;
+eslint clean. (Build output on C: through a `.next` junction — D: is full.)
+
+---
+
+## #1025 Profile bodies are DTOs (2026-10-23)
+
+**What:** `PATCH /users/me`, `POST /users/me/become-translator`, `PATCH /users/me/translator-profile` and
+`POST /users/me/photo-history` took plain types under a 50 MB JSON limit: a multi-MB `displayName` / `photoURL` was
+stored and joined into every forum feed as the author; a non-string `bio` 500'd on `.trim()`; photo-history 500'd on a
+non-string entry and kept social URLs uncapped. New `Backend/src/users/profile.dto.ts` (`UpdateProfileDto`,
+`TranslatorProfileDto`, `PhotoHistoryDto`) bounds every field above what the UI sends (name 100, URL 2048, bio 500 = what
+was already kept, languages ≤ 20 × 35 for 13 offered, country 100, preferred language 35, photos ≤ 50 × 2048). The
+manual photos array check went (the DTO covers it). `ProfileTab` display-name input gets `maxLength={100}`.
+From the review: a field may be absent but not null (`ValidateIf(v !== undefined)`; `{bio:null}` still 500'd), and the
+login backfill `upsertUser` (token name / picture = user-editable Supabase metadata) cuts the name at 100 and drops a
+URL over 2048 — it bypassed the DTO and fed the same feed columns. Limits shared as `PROFILE_LIMITS`.
+
+**Validated:** `profile.dto.spec.ts` runs the app's own `ValidationPipe` against the controller's real parameter types:
+red (the bodies were plain `Object`) → green. AuthContext's and the studio's real payloads validate; wrong types and
+over-long values and nulls are refused, an absent body passes; `upsertUser` caps a 5 000-char token name and drops a
+2 048+ URL (red → green). Users suites 106/106; real tsc clean both sides; eslint clean on the touched files.
+
+---
+
+## #1023 Editing or deleting already-deleted forum content is a 404 (2026-10-23)
+
+**What:** `updatePost`, `updateComment`, `deletePost` and `deleteComment` looked their row up without a `deleted_at`
+filter. On the author's already-deleted content, `updatePost` wrote the edit and then answered 404 (its `getPost`
+re-read filters deleted posts), `updateComment` wrote and answered 200, and a second delete overwrote the original
+`deleted_at` and broadcast again. The four lookups now filter `deleted_at IS NULL`: a 404 before any write. Frontend
+`communityApi.deletePost` / `deleteComment` treat that 404 as done (content deleted in another tab or by a moderator), so
+a stale tab clears its cache instead of showing "delete failed". From the review: `updateComment` / `deleteComment` on a
+live comment of a deleted post are a 404 too, through `assertCommentPostLive`, the post check now shared with `vote` (#1020).
+
+**Validated:** Backend Jest red (4) → green with a mock that answers like the database (the deleted row is found only
+when the query does not exclude it): each of the four is a 404 with no update and no broadcast. A live comment of a deleted post: edit/delete 404 with no write (red 2 on the pre-change service). Forum suites 83/83.
+Frontend `communityApi.delete.test.ts` red (2) → green: a 404 resolves and clears the cache; a 503 still throws and
+keeps it. Real tsc clean both sides; eslint equal to main.
+
+---
+
+## #1020 A comment vote needs the comment's post to be live (2026-10-23)
+
+**What:** after #1019 a vote must target a live comment, but `deletePost` does not cascade `deleted_at` to the
+post's comments, so a live comment of a deleted post could still be voted through the API (stored against content no
+one can see). `vote` now, for a comment target, also requires its post to exist and not be deleted (404 "Comment not
+found"): one extra primary-key read on comment votes only. No migration; `deletePost` unchanged.
+
+**Validated:** Jest `forum/forum.service.spec.ts` red (1) → green: a comment of a deleted post is a 404 with no RPC; a
+comment of a live post is cast. Forum suites 76/76; real tsc clean; eslint equal to main.
+
+---
+
+## #1019 Comments and votes need a live target (2026-10-23)
+
+**What:**
+- `createComment` checked a reply's parent but never the post. A missing post hit the foreign key (500), and a
+  soft-deleted post still took comments. It now requires the post to exist and not be deleted (404 "Post not found").
+- `vote` cast through `cast_vote_atomic` into `forum_votes`, which has no foreign key on `target_id`, so a vote on a
+  missing or deleted post or comment was stored as an orphan row (200). It now resolves the target first, requiring it
+  to exist and not be deleted (404). That lookup also yields the comment's post for the broadcast, replacing the
+  post-RPC lookup: no extra query for a comment vote, one PK read for a post vote. No migration.
+
+**Validated:** Jest `forum/forum.service.spec.ts` red (4) → green. A vote on a missing or deleted post or comment is a
+404 with no RPC; a comment on a missing or deleted post is a 404 with no insert; a live post takes the comment; the
+existing vote and broadcast tests pass with the target present. Forum suites 74/74; real tsc clean; eslint one better
+than main.
+
+---
+
+## #1017 Chapter-version create and update share one validated price rule (2026-10-23)
+
+**What:** `POST /versions` typed its body as a plain object, so a negative `priceCoins` was stored (PATCH refused it,
+and unlock treats a negative price as free). A fractional or int4-overflowing price was a 500, as were non-string text
+fields, and text was unbounded. `CreateVersionDto` / `UpdateVersionMetadataDto` now require:
+- a price that is a whole number from 0 to the int4 maximum (a database bound, not a product limit);
+- typed, bounded strings (description 1,000 = the studio's cap);
+- `chapterId` optional, as the studio sends.
+
+**Validated:** Jest `versions/version.dto.spec.ts` red (module missing) → green. The studio's create (with or without
+`chapterId`, or minimal) and metadata payloads validate; a negative, fractional or overflowing price, a numeric
+description or title, a description over 1,000 and a numeric chapter number are rejected. versions suites pass 21/21.
+Real tsc clean; eslint clean.
+
+---
+
+## #1015 Write bodies are validated; malformed ids are 400, an unknown followee 404 (2026-10-23)
+
+**What:** four write routes typed `@Body()` as plain objects, so the global `ValidationPipe` checked nothing:
+`POST /reviews/:mangaId`, `/reader-comments`, `/content-reports`, `/translation-feedback`. A wrong type became a 500
+(`.trim` on a number, a non-integer into an int column), translation feedback stored `vote: 0` or `5`, and text was
+unbounded (50 MB body limit). Each now has a class-validator DTO:
+- text up to 5,000 (review, comment), details up to 1,000, title up to 500, ids up to 100;
+- page an integer from 0 to 10,000; rating 1–5; vote exactly 1 or −1;
+- the services keep their allow-lists.
+
+Malformed ids on `DELETE /reader-comments/:id`, `PATCH /notifications/:id/read` and follow/unfollow, which Postgres
+rejects with 22P02, are now 400 via `isInvalidId`, without assuming the column type. A follow of a user with no profile
+(foreign key, 23503) is 404.
+
+**Validated:** Jest `common/write-dtos.spec.ts` (22) and `common/write-id-errors.spec.ts` (5, a real supabase-js
+client with a stubbed fetch) red → green; the module suites pass (40). Real tsc clean. eslint improved on main in four
+files; the remaining unused `Param` import in the translation-feedback controller predates this.
+
+---
+
+## #1013 Spinners that never stopped: empty search after an in-flight one, a failed page image, the notification list (2026-10-23)
+
+**What:**
+- `/search`: going back to an empty query while a search was in flight aborted it, the `AbortError` path skipped the
+  reset, and the empty branch never cleared `loading`, so 12 skeletons stayed up and the prompt stayed hidden. The empty
+  branch now clears it.
+- Reader `PageRenderer`: the page `<img>` had no `onError`, so a failed page spun forever over an invisible image. It
+  now shows "โหลดหน้านี้ไม่สำเร็จ" with a retry. The failure is keyed on the image source, so another page never shows it,
+  and a later successful load clears it.
+- `NotificationBell.fetchList`: a throw skipped `setLoading(false)`; it is now in `finally`.
+- Token awaits outside any try (`useSeriesFollow`, the mascot config load, the studio edit load) are caught, so a
+  rejected session cannot leave a flag set.
+- The admin "Apply" (wallet adjust) button has the same shape but is left to the developer (wallet path).
+
+**Validated:** production build + stand-in `STUCK1013=1`. Main: no prompt (skeletons), no page error and the page never
+loads, the notification spinner stuck (red). Fix: the prompt shows; "โหลดหน้านี้ไม่สำเร็จ" shows and the retry loads the
+page; the spinner stops (green). The reader998, reader-drawer and related-retry probes pass. The token-await cases are
+checked by reading. Real tsc 0 errors; eslint matches or improves on main (`NotificationBell`'s error is gone).
+
+---
+
+## #1011 A mascot save no longer always fails (2026-10-23)
+
+**What:** `MascotEditor.save` made the PNG with `new Promise(r => canvas.toBlob(r, "image/png") ?? r(null))`.
+`toBlob` returns `undefined` and calls back later, so `?? r(null)` always settled the promise with `null` first. Every
+save threw "สร้างรูปมาสคอตไม่สำเร็จ" after the mascot config was already stored, and the profile picture never changed.
+`lib/canvasToPng.ts` now resolves with the blob from the callback, and with `null` only without a canvas.
+
+**Validated:** bun test `lib/canvasToPng.test.ts`, red (module missing) → green, 3 tests: an asynchronously delivered blob
+comes back (not `null`), a `null` encode stays `null`, and no canvas gives `null`. The mascot tests still pass. Real tsc
+0 errors; eslint clean. **Not driven in the browser:** the save applies the mascot as the profile picture, which tests
+don't do, per the developer's instruction.
+
+---
+
+## #1009 The public patch route serves patches only (2026-10-23)
+
+**What (security, class only):** `GET /r2-patches/*` is public and registered in every storage mode. It handed the rest
+of the path to `StorageProvider.get` with no check that the key was a patch, so any readable object or file could be
+served. It now serves only `isServablePatchKey` keys: `uploads/patches/` followed by `PatchStore`'s safe segments
+(`[\w.-]`, never `..`), ending in `.png`. Everything else, including absolute keys, is a 404 before storage is touched.
+`PatchStore` URLs are always `${origin}/uploads/patches/...`, so real patches are unaffected.
+
+**Validated:** Jest `books/patches.controller.spec.ts`, red (10 of 11 bad keys read storage) → green (12/12). A real
+patch is served. Outside the store, `..` (shallow and deep), POSIX absolute, a Windows drive, a backslash, an encoded
+separator, an empty segment, a non-PNG, the store root and empty are all 404 with no storage read. The patch-store
+suites pass (27). The local backend logs show no requests to the route; the 20 matches are startup route registrations.
+The developer was notified to consider rotating `Backend/.env` secrets if a disk-mode backend was publicly reachable.
+
+---
+
+## #1007 Avatar delete accepts only a generated filename; the disk provider contains relative keys (2026-10-23)
+
+**What (security, class only):** `DELETE /users/me/avatar` built a storage key under `uploads/avatars/` from the body's
+`filename`, checking only that it started with `<uid>_`. The disk storage provider joined relative keys onto its root
+without checking that the result stayed inside, so the prefix check was the only guard. Two layers now:
+- the route accepts only the shape `uploadAvatar` generates, `<uid>_<digits>.<ext>`;
+- `DiskStorageProvider.getAbsPath` refuses a relative key that resolves outside `rootDir`, for every method; absolute
+  keys from in-process callers are unchanged.
+
+No frontend code calls this route.
+
+**Validated:** Jest red (11) → green:
+- `users/users.avatar-delete.spec.ts`: separator, parent segment, backslash, no extension, a non-numeric stamp,
+  another user and empty are all rejected; the generated shape is deleted;
+- `disk-storage.provider.spec.ts`: delete, deleteDir, exists, get, put and a nested climb refuse a key outside the root;
+  in-root relative and absolute keys still work. The traversal targets don't exist, so the red run deleted nothing.
+
+users and storage suites pass (161). eslint: only the existing `options` unused-var error in the provider.
+
+**Review round (security-review + scrutinize, fix-then-ship):** the check is now `rel === '' || rel === '..' ||
+rel.startsWith('..' + sep) || isAbsolute(rel)`. A key resolving to the root itself is refused (`deleteDir` of it would
+wipe the working directory), and a name like `..cache` is no longer mistaken for a climb. The containment tests now
+run on a temp root (`process.cwd` mocked) with sentinel files. With the guard removed they fail 7/7 and touch only the
+temp tree. The first version targeted paths beside `Backend/` and, on the unguarded red run, `put` wrote a 1-byte
+probe file there (removed). The review also found the separate `/r2-patches` exposure (own issue).
+
+---
+
+## #1004 Admin tables: one request per debounced filter change, and only the latest answer writes (2026-10-23)
+
+**What:** in `/admin/users`, `/admin/transactions` and `/admin/content`, the page effect depended on the loader, a
+`useCallback` over the filters. Every keystroke rebuilt it and fired a request at once, which defeated the 300 ms
+debounce, and whichever answer landed last filled the table, so it could show rows for a half-typed search. `/admin/audit`
+loaded the current page and then page 1 on a filter change, with no guard.
+
+All four loaders now have a request counter, so only the latest request writes rows, total and loading/error. In the
+three filtered pages, the page effect and the debounced filter effect call the loader through a ref and depend only on
+`page` or the filters. eslint also lost an error each of these three pages had on main.
+
+**Validated:** production build + stand-in `ADMIN_RACE=1` (a search for "a" answers 2 s late), with an admin (role 8)
+through the local fake session. Typing "ab" in `/admin/users`:
+- main sent `["a", "ab"]` and showed the stale "a" rows (red);
+- the fix sends `["ab"]` once, after the debounce, and shows only "ab"'s rows (green);
+- the first visit sends exactly 1 request.
+
+transactions / content / audit are the same pattern, checked by reading. Real tsc 0 errors; eslint clean on all four.
+
+---
+
+## #1001 A translation for the chapter the reader left never lands on the new chapter (2026-10-23)
+
+**What:** `useChapterTranslation` resets on a chapter, target-language or derivative change and aborts the batch, but
+two paths escaped it:
+- **Single-page translation** had no abort and no check after its `await`. Chapter A's patches were written at the same
+  page index of chapter B, and that page was marked done, so B's "แปลทั้งตอน" skipped it.
+- **Whole-chapter translation** awaited `checkMitHealth()` before creating its `AbortController`, so a chapter change
+  during the check let it run with the old `pages` and `chapterId`.
+
+A `generationRef`, bumped by both reset effects, is captured at the start of each path and checked after every `await`
+(and in the single-page `finally`, so a stale run doesn't clear a newer run's busy flags).
+
+**Validated:** production build + stand-in `TRANS_RACE=1` (no real MIT: two English uploads, health OK, chapter 1's
+single-page patch answers 2 s late). Start "แปลหน้านี้" on chapter 1, then click "ตอนถัดไป":
+- main: chapter 2 shows `patch-ver-v1` (red); fix: no overlay (green);
+- control (stay on chapter 1): the patch shows, so the normal path is intact;
+- `reader998` and `reader-drawer` pass.
+
+The whole-chapter health-check window is checked by reading. Real tsc 0 errors; eslint clean.
+
+---
+
+## #999 The latest sort or search wins — manga community hot/new, forum side-menu search, manga picker search (2026-10-23)
+
+**What:** three effects wrote the answer for a sort or query the user had already left:
+- the manga community page's hot ⇄ new switch: the slower sort's posts replaced the chosen list;
+- `ForumSideMenu` search: older results, and a cleared box could be refilled by an in-flight search;
+- `MangaSearchSelector`: older results in the manga picker.
+
+Each now has a request counter (a ref): a response or failure applies only if it belongs to the latest request, and
+clearing the side-menu query invalidates an in-flight search. This is the same pattern as the search page, `/new` and
+the community feed.
+
+**Validated:** production build + stand-in `RACE999=1` (the first sort/search answers 2 s late).
+- Main: after switching to "New" the hot post was shown; after typing "ab" the "aa" result was shown (red).
+- Fix: only the new post and only the "ab" result (green).
+- The clear-the-box check passes on both builds (by then "aa" was already cached), so it does not prove that part.
+- `MangaSearchSelector` is the same code, checked by reading.
+- Real tsc 0 errors; eslint clean on all three files.
+
+---
+
+## #998 The reader never shows (or records) the chapter it just left (2026-10-23)
+
+**What:** the reader stays mounted across chapters, and the effect that loads a chapter's pages never cancelled the
+previous request; its cleanup only released the scroll lock. When chapter A's pages answered after B's, the reader
+showed A's pages under B's header and wrote A to reading history, so "continue reading" reopened the wrong chapter. The
+effect now has an `AbortController` and a `cancelled` flag, and every `.then` and `.catch` returns early once superseded.
+
+**Validated:** production build + stand-in `READER_RACE=1` (chapter 1, an uploaded version, answers 2 s late), with a
+reader who has already passed the CAPTCHA (stored clearance token). Open chapter 1, then click "ตอนถัดไป" at ~35 ms.
+Main: counter `1 / 3`, image `p1`, history `ver:v1` (red). Fix: `1 / 2`, image `q1`, history `ver:v2` (green). The
+`reader-drawer` and `e2e919` probes still pass. Real tsc 0 errors; eslint matches main.
+
+---
+
+## #995 Series follow, banner upload and banner position say when they fail (2026-10-23)
+
+**What:** three writes outside #987's list still failed silently. The series bell reverted correctly (#667) but with no
+message, so the user thought the click had not registered. The banner upload and the banner position save only logged
+to the console. Each failure now shows the error toast (`"…ไม่สำเร็จ ลองใหม่อีกครั้ง"`). The revert and the reposition mode
+are unchanged, so a failed position save can be saved again.
+
+**Validated:** production build, local fake session. The stand-in's `FLAKY_ONCE` now takes an optional method
+(`"POST ^/users/me/follows$"`), so the follow-list GET is not the request that fails. Main: the follow revert and a
+failed position save show nothing (red). Fix: "ติดตามไม่สำเร็จ ลองใหม่อีกครั้ง" and the bell reverts, then follows on
+retry; "บันทึกตำแหน่งภาพปกไม่สำเร็จ ลองใหม่อีกครั้ง" and it stays in reposition mode (green). The banner upload is checked by
+reading only (uploads are not triggered). Real tsc 0 errors; eslint clean on both files; hooks tests 105/105.
+
+**Review round:**
+- A banner (and a forum image) over the server's 5 MB is refused before upload, with a toast naming the limit, instead
+  of "try again" for a file that can never pass (`lib/uploadLimits.ts`, unit-tested). E2E: a 6 MB banner shows the toast and
+  sends no upload request.
+- A dead session (`Unauthorized`) in the banner handlers, and a missing token in the series toggle, open the login
+  prompt instead of "try again" or a silent no-op.
+
+---
+
+## #993 Studio publish: one PATCH per click, the button busy while it is in flight (2026-10-23)
+
+**What:** "เผยแพร่" had no in-flight guard and was never disabled. A double-click sent two status PATCHes, and the
+backend refused the second (400 "Cannot transition from published to published"), so an error toast flashed for a
+publish that worked. The page now tracks `publishingId`. `handleSubmit` returns early while a publish is in flight,
+and the version row and the group card disable that version's button and show "กำลังเผยแพร่...".
+
+**Validated:** E2E on a production build, signed in as a creator (role 2) through the local fake session; the stand-in
+(`STUDIO=1`) changes the status on receipt and answers after 600 ms. A double-click on main sent `PATCH [400, 200]`
+(red); with the fix it sends `[200]`, with the success toast and no error (green). Real tsc 0 errors; eslint matches main.
+
+---
+
+## #992 A vote clears the cached copies it made stale — the next click no longer undoes it (2026-10-23)
+
+**What:** `communityApi.vote()` stored the vote but invalidated nothing, while every other forum write clears its
+entries. For up to 60 s, the cached post (`post:<id>`), the feed (tag `forum_posts`) and the comment list
+(`comments:<postId>`) showed the old count and `userVote`. A click there sent `+1` again, the server took it as an
+undo, and the button showed "voted" against a server with no vote. A successful post vote now clears `post:<id>`
+and the feed. A comment vote clears `comments:<postId>`, passed from `CommentThread` through `VoteButtons`'
+new `postId`. A failed vote clears nothing.
+
+**Validated:** bun test `lib/communityApi.vote.test.ts` red (2) → green (3): a post vote clears the post and the feed
+but not other posts; a comment vote clears its list; a failed vote keeps everything. E2E on a production build, signed in
+through the local fake session: vote, go to `/community`, go back (same document). Main-equivalent build:
+`GET /forum/posts/abc` 0 times (the cached copy was served). Fix: 1 time. Real tsc 0 errors; eslint matches main.
+
+---
+
+## #987 A failed write says so and keeps the typed text — reports, replies, posts, reader comments, votes, notifications (2026-10-22)
+
+**What:** writes that failed were silent or claimed success (`fetch` resolves on a 4xx/5xx; other handlers caught the
+error and only logged it). The report dialog said "ส่งรายงานแล้ว ✅" for a refused report, and a failed reply wiped the
+typed text before the request. Every write now checks the answer; raw `fetch` callers check `res.ok`. Typed text is
+cleared only after success, and a failure shows the existing error toast (`FollowUserButton`'s "…ไม่สำเร็จ ลองใหม่อีกครั้ง").
+The report dialog shows its error inside the dialog and keeps the form. Reader-comment delete and review delete are
+guarded against a second click. Notifications are marked read only once the server accepted it, through a new `send()`
+that returns `res.ok`, because the existing `apiFetch` returns `null` both for a failure and for an empty success body.
+
+**Validated:** production build + stand-in (`WRITES=1`, `FLAKY_ONCE` fails the first matching write), signed in through
+the local fake session. Main-equivalent build (red):
+- comment: the text is restored but there is no message;
+- reply: the box closes and the text is lost;
+- vote: no message;
+- report: "ส่งรายงานแล้ว" shown for a 503.
+
+Fix (green):
+- comment: the text is kept, the toast shows, and the retry posts and clears the box;
+- reply: the box stays open with its text and the toast shows; the retry is accepted (`POST [503, 201]`) and closes the box;
+- vote: the toast shows;
+- report: the error is shown inside the dialog with the form kept, and the retry reaches "ส่งรายงานแล้ว".
+
+Not run end to end: post edit/delete, comment edit/delete, the create-post failures on `/community`, the manga page and
+the quick post, reader comments, review delete and notifications. These are checked by tsc and code reading (same
+pattern). eslint matches main on all ten files.
+
+**Review round:**
+- The database-down toast (`SupabaseGuard`, 10 s) was replaced by the caller's generic toast for the same 503.
+  Toasts now carry a `priority`, and the outage toasts are 1, so a lower one never replaces them. E2E with
+  `FLAKY_CODE=SUPABASE_OFFLINE`: red showed the generic toast, green keeps the DB toast and the text.
+- A reply is read-only while it is being sent.
+- Opening a notification marks it read quietly; only "read all" reports a failure, and it is guarded.
+- A dead session opens the login prompt instead of "try again".
+- The in-flight deletes disable their buttons.
+- A failed forum image upload shows a toast.
+
+**Typecheck correction:** `npx tsc` in Frontend prints npm's "not the tsc command" notice instead of type-checking, so
+earlier "tsc clean" claims (#985, #988) were empty greps. The real compiler is `node node_modules/typescript/bin/tsc`.
+It was proven to run (284 app files; a planted error is caught) and reports 0 errors on main + #987, which re-verifies
+#985 and #988.
+
+---
+
+## #988 Forum compose follows the server: role-filtered categories on the manga page, clipped auto titles, input limits (2026-10-22)
+
+**What:**
+- The manga community page offered every category to every role. A regular user saw ประกาศ, which the backend
+  refuses from non-admins (403), and อัปเดตมังงะ, which needs role ≥ 1. The page now uses `availableCategories(userRole)`,
+  as `/community` does, and falls back to `general` when the chosen category becomes unavailable.
+- The popup's quick post built `พูดคุยเกี่ยวกับเรื่อง ${title}`, which a long manga title pushes past the DTO's 200.
+  The title and `targetMangaTitle` are now cut with `clipToLimit`, which counts code points as class-validator does.
+- No forum input had a limit. Every post / comment / reply / edit field now has the server's `maxLength`
+  (`lib/forumLimits.ts`: title 200, content 10,000, comment 5,000) and a `LimitCounter` from 90 % of the limit.
+
+**Validated:** bun test `lib/forumLimits.test.ts`: red (module missing) → green, 4 tests (limits mirror the DTOs; unchanged
+within the limit; cut to exactly 200 with an ellipsis; an emoji is never split). Production build + stand-in, signed in
+through a local fake session (Playwright answers every Supabase-host request locally, 0 reached the network). Main
+build: the picker shows ทั่วไป / ประกาศ / สปอยล์ / อัปเดตมังงะ and no `maxlength` (red). Fix: ทั่วไป / สปอยล์, `maxlength` 200 /
+10000, counter "195 / 200" (green). tsc clean; eslint matches main.
+
+---
+
+## #985 A favourite or like the server refused stays pending and retries — an un-favourite no longer comes back (2026-10-22)
+
+**What:** `userCache.flush()` awaited raw `fetch` calls (which resolve on a 4xx/5xx) and then marked every item synced.
+A refused add was never re-sent. A refused removal was recorded as done while the server kept the row, so the next
+login's merge (which re-adds server favourites missing locally) brought the book back. Nothing retried. It also marked
+toggles made while a flush was in flight as synced. Now each request marks only its own item, and only on `res.ok`,
+applied after the logout-generation check. A failed item stays pending, and a flush with any failure retries on its
+own after `RETRY_DELAY` (30 s) whenever anything is still pending. That includes a toggle made while a flush was in
+flight, which the overlapping flush saw as already synced. A permanent 4xx (not 401/408/429) is settled and logged instead of
+retried forever, and ids are URL-encoded.
+
+**Validated:** bun test `lib/userCache.test.ts`, red → green (11 with the review round):
+- add 500 → pending, then re-sent and marked;
+- removal 500 → pending, then the DELETE is re-sent;
+- a mixed batch re-sends only the failed item;
+- a failed flush retries by itself at 30 s (not at 29 s), and a successful one schedules nothing;
+- a re-add made while a DELETE is in flight is still sent;
+- a permanent 400 is not retried;
+- ids are encoded;
+- the login merge marks the server's state as synced.
+
+`identityReset.test.ts` still passes. Full suite: 474 pass; 8 fail in `docs.integration.test.ts`, which needs a live
+server on :4000 (none was running). tsc clean, and eslint is clean on both main and the branch. Not checked
+in a browser: the module has no UI of its own, and a real sync needs a signed-in session.
+
+---
+
+## #983 Three more places no longer cache a failed load (hero read button, community manga header, studio title) (2026-10-22)
+
+**What:** a sweep of every `cacheOrFetch` call site after #981 found three fetchers that resolved on a non-ok answer, so
+the failure was cached. `HeroDetailButton` cached the chapters error body for 5 min, which hid "อ่านเลย". The community
+manga page cached `null` for 30 min: no header title or cover, and posts created in that window were saved without
+`targetMangaTitle` / `targetMangaCover`. The studio title page cached a JSON error body for 30 min and showed
+"ไม่ระบุชื่อเรื่อง". Each now throws on a non-ok answer, as the other 21 call sites already do. The existing catch keeps
+the failure display, nothing is cached, and the next mount retries.
+
+**Validated:** production build + stand-in (`FLAKY_ONCE=<regex>`: the first matching request is a 503). The hero (switching
+slide 4 → 1 → 4 remounts it) and the community page (client navigation away and back), main build vs fix:
+`heroSecond 0 → 1`, community title `generic → "Cover Falls Back · คอมมูนิตี้ · MangaDock"`, with the request log
+`503` then no refetch on main, `503, 200` with the fix. A control run with nothing failing shows both on both visits.
+The studio page needs creator login, so it is verified by code reading only. eslint matches main, and the build passes.
+
+---
+
+## #981 One failed related-books load no longer hides "มังงะที่คล้ายกัน" for 30 min (2026-10-22)
+
+**What:** `GET /books/:id/related` answered 200 `[]` on any failure (detail fetch, tag list, rated row), and
+`RelatedManga` cached whatever resolved, including a 503 body, for `TTL.LONG` (30 min), so one outage hid the row
+until a reload. Backend: only an unknown id (`NotFoundException`), a book without genres, or a genre MangaDex has no
+tag for answers `[]`. A detail outage propagates, an unavailable rated row is a 503, and `getMangaTagId` throws 503
+itself when the tag list can't be loaded and no expired map is left to answer from (so `getNewReleases` no longer
+re-reads the cache to tell the cases apart).
+Frontend: `RelatedManga` throws on a non-ok answer, so nothing is cached. The row stays hidden on failure, and the
+next open retries.
+
+**Validated:** Jest red → green, 5 new tests in `books/books-related.spec.ts` and `books/mangadex-cache-correctness.spec.ts`;
+the getNewReleases tag tests are unchanged and pass. Production build + stand-in (`RELATED_FLAKY=1`): main build
+`related:[503]`, the second open makes no request and shows no row (red). With the fix it is `[503,200]` and the row
+shows "Cover Loads" and "No Cover At All". Backend full run locally: 901/901 tests; 20 suites can't load `openai`
+(missing from the local node_modules, unrelated). CI is the authority there.
+
+---
+
+## #978 /forum/trending-manga: a database error is the database-down signal, not "nothing trending" (2026-10-22)
+
+**What:** `getTrendingManga` answered `[]` when the `get_trending_manga` RPC failed (database error or network), so
+`/community/trending` said nothing was trending, `communityApi` cached that for 5 min, and the page's own load-error
+state (#911) never showed. A database error now throws an Error naming Supabase (`AllExceptionsFilter` → 503
+`SUPABASE_OFFLINE`, the app's database-down toast) and a failed call propagates; the frontend already throws on a
+non-ok answer without caching and shows its retry.
+
+**Validated:** Jest red → green in `forum/forum.service.spec.ts` — the old "returns empty array on Supabase error"
+test now asserts a Supabase rejection, plus a rejected-call case; forum suites 70/70. eslint unchanged.
+
+---
+
+## #976 Book detail: an unknown id is a 404, an outage a 503 (or stale), half a detail is not cached (2026-10-22)
+
+**What:** `getMangaDetail` builds the detail from two MangaDex fetches (the manga; its covers) and each turned any
+failure into empty fields. An unknown id (MangaDex 404/400) and an outage both answered 200 with an empty detail, so
+the book popup's #919 "not found" vs "load failed" split never saw a real 404, and the browser kept the empty answer
+30 min; a detail with only covers (manga fetch down) or only the manga (covers down) was cached the full 20 min. The
+fetches now say why they are empty (`fetchMangaCovers` → `null`; `fetchMangaAuthors` → `failure: notFound |
+unavailable`, also for a 200 without the manga): not found → `NotFoundException`; manga down → stale detail or `ServiceUnavailableException`; covers down
+→ served with the stale covers if any, uncached; only a detail whose two parts answered is cached. Related books, series context and
+the cover proxy already catch and degrade.
+
+**Validated:** Jest red → green, `books/detail-outage.spec.ts` (8): 404 and 400 → 404 with no cache write; manga
+503 → 503, or the stale detail when there is one; a 200 without the manga → 503; covers 503 → served with its title (stale covers if any), uncached;
+both fine → cached. Full Backend suite 108 suites / 1,064 tests; eslint unchanged on the service, clean on the new spec.
+
+---
+
+## #974 A shared /book/<id> link carries the book's title, not the site's (2026-10-22)
+
+**What:** a direct `/book/<id>` (the URL the book popup pushes, so the one people share) served the site title and
+description; the book's name was only set client-side after hydration, so link previews and crawlers saw every book
+as the same page. `app/book/[id]/page.tsx` now has `generateMetadata`: it fetches `/books/manga/<id>` (server timeout
+#858; not cached by Next — the backend caches details, an outage answer must not stick) and returns "<book> ·
+MangaDock" (trimmed), the first 160 characters of the markdown-stripped description, and `og:title` / `og:description`. Any miss keeps the site defaults. No `og:image` — the site has no `metadataBase` / OG
+setup yet.
+
+**Validated:** production build: before, `/book/cover-fallback` → site title; after, `<title>Cover Falls Back ·
+MangaDock</title>` + `og:title`, and an unknown id keeps the site title. The #919 book-route probe (backend down / real
+404 / healthy) still passes; a markdown description reaches the preview as plain text; closing the popup returns
+to `/` with the site title. tsc 0; eslint clean on the file.
+
+---
+
+## #971 An unknown genre slug is the 404 page, and the genre list lives in one place (2026-10-22)
+
+**What:** `/categories/<anything>` rendered a genre page named after the slug ("nope") with an empty grid — the
+backend answers an unknown slug with an empty list — so a stale or mistyped link looked like a real, empty genre and
+was indexable. The 18 genres were also written twice (`Navbar.tsx`, the genre page). Now `app/lib/genres.ts` is the
+one list; `categories/[genre]/page.tsx` is a server page that calls `notFound()` for any other slug and renders the
+client `GenrePage.tsx` otherwise. The status stays 200: the root `app/loading.tsx` streams the shell before the page
+resolves, so Next serves the 404 page with `noindex` instead (a 404 status would need a proxy rewrite or dropping the
+root loading state; `notFound()` from `generateMetadata` was tried too — Googlebot still gets 200).
+`dynamicParams = false` + `generateStaticParams` was tried first and had no effect on this dynamically rendered
+route. The page passes the validated genre to `GenrePage` as props (no `useParams`), and `generateMetadata` puts
+"แอคชัน · MangaDock" in the server HTML.
+
+**Validated:** production build: before, `/categories/nope` → heading "nope", no noindex; after, `nope` and `ACTION`
+→ "ไม่พบหน้านี้" + `noindex`, `action` → "แอคชัน" without noindex; the navbar still links all 18 genres. tsc 0; eslint
+clean on the touched files.
+
+---
+
+## #970 A MangaDex outage is a 503 for search and genre, not "200, no results" (2026-10-22)
+
+**What:** `fetchMangaWithParamsPaged` and `getGenreManga` turned a MangaDex 5xx / 403 / 429 / maintenance page /
+network error into an empty list. The browser showed "ไม่พบหนังสือ" or an empty genre instead of its load-error retry
+(#911) and cached the empty answer (search 5 min, genre 30 min); a year-range search cached it server-side for 20 min,
+and a scan failing partway cached partial matches as complete. The paged fetch now marks an outage `unavailable` (a
+400/404 — our own bad request — stays a plain empty answer); `MangaCatalogService.searchPage` (both search paths)
+turns it into a 503 before anything is cached; the genre listing answers 503 on a failed fetch; new releases
+answer 503 when all four rows are down, otherwise serve the rest uncached, never with the flag in the JSON (review).
+
+**Validated:** Jest red → green, `books/search-outage.spec.ts` (9): 503 and network error marked unavailable, 400
+not; search and a year scan failing on its second page answer 503 with no cache write; genre 503 on both failures.
+Full Backend suite 107 suites / 1,056 tests. eslint unchanged on the services, clean on the new spec. The browser side
+needs no change: both pages already show the retry state for a non-ok answer and never cache it (#911).
+
+---
+
+## #967 A guest's reading history opens on /mylist instead of a login wall (2026-10-22)
+
+**What:** a guest's reading history lives on the device (`mangadock_reading_history`; logout clears it via
+`identityReset`), and home shows it in the "อ่านต่อ" row with "ดูเพิ่มเติม" → `/mylist?tab=history` — which showed only
+"เข้าสู่ระบบเพื่อดูรายการของคุณ", because `mylist/page.tsx` gated every tab on `user`. The history tab now shows the
+local history to a guest; favorites / follows / liked (guests can't add to them) keep the login prompt, and CSV export
+stays signed-in only.
+
+**Validated:** production build, guest with one local history entry: before, "ดูเพิ่มเติม" landed on the login wall;
+after, the book shows on the history tab and `?tab=favorites` still asks to log in. tsc 0; eslint clean on the file.
+
+---
+
+## #965 Search filters: no dead rating filter, one search per year, honest empty state (2026-10-22)
+
+**What:** on `/search` the "≥ 3★ / ≥ 4★ / ≥ 4.5★" filter could only empty the list — every search result (and every
+"my list" item) has `averageRating: 0`, MangaDex search carries no rating; typing a year sent one backend search per
+keystroke (`2`, `20`, `201`, `2015`); a list emptied by filters still said "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด" with no
+way to clear them. The rating filter is removed (until results carry real ratings — a separate decision); the year
+boxes keep a draft and apply only a complete 4-digit year in range after a 400 ms pause; with any filter on, the empty
+state says no book matches the selected filters and offers "ล้างตัวกรอง".
+
+**Validated:** production build, stand-in search that answers empty under a year filter: before, ≥ 3★ took 4 results
+to 0, "2015" sent 4 searches, the empty text blamed spelling; after, no rating filter, one search (`yearFrom=2015`), the
+empty state names the filters and its button brings the 4 results back. The #926 search keyboard probe still passes.
+tsc 0; eslint identical to main.
+
+---
+
+## #963 Malformed ids and paging values no longer answer 500 (2026-10-22)
+
+**What:** `GET /versions/<not a uuid>` and `/versions/translator/<not a uuid>` turned Postgres 22P02 into a plain
+`Error` (500); `/forum/posts?authorUid=<not a uuid>` answered 500; forum and reviews list params went straight into
+`.range()` (negative or NaN). `lookupFailure` (#915) moves from `forum/` to `common/` with a small `isInvalidId`;
+`getVersion` uses it (an id that cannot exist → 404, other failures → the database-down signal); the translator and
+author filters answer an empty list for a non-uuid id; forum and reviews paging go through `queryInt` (#958).
+
+**Validated:** Jest red (8 of 14) → green: `assert-found.spec` (+2 `isInvalidId`), `versions-invalid-id.spec` (3),
+`forum-invalid-input.spec` (2), `reviews-paging.spec` (1). Full Backend suite: 106 suites / 1,047 tests pass. eslint
+unchanged or lower on every touched file.
+
+---
+
+## #961 MangaDex cache: no cut-short chapter lists, no untagged answers under a tag (2026-10-22)
+
+**What:** `getMangaChapters` paged the feed 500 at a time and `break`-ed on a failed page, then cached whatever it had —
+a list missing every chapter past 500 stayed cached for the TTL. `getNewReleases` with a tag it could not resolve
+(tag list down, or no such tag) dropped the filter and read/wrote the untagged cache key. Now only a complete chapter list
+is cached for the full TTL (a cut-short one is served from the stale copy if there is one, otherwise as is and kept only
+60 s — review: so a failing MangaDex is not re-fetched in full on every request), and an unresolved
+tag answers 404 when the tag list is known but lacks it, 503 when the list could not be loaded — `/new` shows that as a
+failed load with a retry — never the untagged rows.
+
+**Validated:** `mangadex-cache-correctness.spec.ts` red → green: failed second page → partial list returned and cached
+60 s only; stale full list preferred; complete list still cached; unresolved tag → 503 / 404 with no untagged cache
+read and no `/manga?` fetch. `src/books` + `src/common`: 52 suites / 483 tests pass. eslint unchanged.
+
+---
+
+## #958 Book query params validated; a bad request no longer reports "MangaDex offline" to everyone (2026-10-22)
+
+**What:** `/books/new-releases`, `/books/genre/:slug`, `/books/search` and `/books/:id/related` passed `parseInt(...)`
+straight on (`?limit=abc` → NaN; no upper bound on new-releases/genre; negative page/offset), and
+`MangaDexService.fetchMangaWithParamsPaged` broadcast any non-2xx MangaDex answer as `mangadex: offline` to every SSE
+client — so one client's bad query, answered with a MangaDex 400, put the outage banner in front of every user. New
+`common/query-int.queryInt(value, fallback, { min, max })` parses and clamps each param; a 4xx other than 429 is logged
+as our own rejected request and no longer broadcast — only 400 and 404, after review: 403 (blocked), 429, 5xx and
+network errors still are. Also from review: the reported `total` is capped at the 10,000 results MangaDex can page to.
+
+**Validated:** Jest red → green: `query-int.spec.ts` (5), `mangadex-status-4xx.spec.ts` (5: 400 no broadcast; 403, 429,
+503 still "offline"; total capped), `books-query-params.spec.ts` (4: junk → defaults, clamps, never NaN). `src/books` + `src/common`: 51
+suites / 478 tests pass (with the scratchpad `openai` on NODE_PATH, as the worktree lacks it). tsc: no errors in touched
+files (pre-existing spec errors elsewhere). eslint: books.controller 2 → 0 findings, mangadex.service 6 → 5.
+
+---
+
+## #956 The guest login toast is reachable from the popup and can be held (2026-10-22)
+
+**What:** a guest pressing "ถูกใจ" / "เพิ่มในรายการ" / the reviews' sign-in prompt in the book popup gets a toast offering
+"เข้าสู่ระบบ", but the popup's Tab trap kept focus inside the popup and the toast's 4 s timer ignored hover and focus.
+Now `useDialogFocus` adds a shown toast's controls (`[data-toast-card]`) to the open dialog's Tab cycle and walks that
+cycle itself while a toast is up (`cycleTarget`; the dialog stays sealed); the cycle skips controls inside `[inert]`
+parts (collapsed groups, closed menus). The toast holds its timer while hovered or focused and resumes with exactly what
+was left (the progress bar pauses with it), a new toast under a resting pointer or focus is held at once, a toast with an
+action stays at least 8 s (a keyboard user must Tab to it first), and closing it from its own button returns focus to
+where it came from (not after its action, which opens the login modal). The toast stays where it was in the DOM (its
+live region untouched) and is not a "layer above" for `hasLayerAbove` (`data-toast-layer`); a dialog folds it into its
+cycle only when nothing else is layered above it. `AuthContext` untouched.
+
+**Validated:** `useDialogFocus.test.ts` 16 pass (5 new `cycleTarget`, red → green). Production build: before, 40 Tabs
+from the popup never reached the toast and a hovered toast was gone after 6 s. A first version (portal + the popup's trap
+standing aside) reached it but let focus wander behind the aria-modal popup — replaced after review. After: Tab goes
+from the popup's controls to the toast and back into the popup (never the page behind), closing it by keyboard returns
+focus into the popup, and a hovered toast outlives its 8 s and leaves after the pointer. The probe also caught the new
+cycle sticking on an inert collapsed chapter group, fixed by the `[inert]` filter. Reader-drawer, failed-lists, popup,
+chapter-groups, community-drawer and reader-menu probes pass. A second review found two stacked-layer problems, both
+reproduced on the previous build then fixed: from a toast raised in the reader's comment drawer (reader over the popup)
+Tab went into the popup behind the reader, now it cycles drawer <-> toast only; after the toast's action focus jumped to a
+popup button behind the login modal, now it stays off the popup. tsc 0; eslint 0 on the touched files.
+
+---
+
+## #954 Popup reviews: a failed load is not "no reviews yet" (2026-10-22)
+
+**What:** `ReviewSection.fetchPublic` wrote the summary and list only when each response was ok and had no `catch`, so a
+failed load showed "ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!" with no retry (the #911 / #930 class). A `reviewsFailed` state (either
+response not ok, or the fetch throws) now shows the shared `LoadError` with a retry of `fetchPublic`. The unhandled
+rejection a throwing fetch would have caused was not observed — the Next proxy turns a backend failure into a 502.
+Review follow-up: both responses are parsed before either is shown, and the stars/count header hides while failed (a
+failed reload after a delete kept the old count); a failed summary now also hides a loaded list (accepted).
+
+**Validated:** production build, stand-in reviews endpoints dropping their first connection: before, "ยังไม่มีรีวิว…";
+after, "โหลดรีวิวไม่สำเร็จ" + "ลองใหม่", and the retry shows the real (empty) answer; no page errors. tsc 0; eslint 0.
+
+---
+
+## #952 Collapsed chapter-version groups out of the Tab order (2026-10-22)
+
+**What:** in the book popup's `ChapterList`, a chapter with several versions is a collapsible "ตอนที่ N · N เวอร์ชัน"
+group; collapsed it was only `grid-template-rows: 0fr` + `overflow-hidden`, so its version rows stayed in the Tab order,
+and its toggle had no expanded state. The collapsible part now has an id (`useId`-prefixed: a popup can open over
+another, and indexed by position, since user chapter numbers are free text) and is `inert` while collapsed; the toggle
+is `type="button"` with `aria-expanded` / `aria-controls`.
+
+**Validated:** production build, stand-in chapter 2 in two versions: before, 2 Tab stops inside the collapsed group and
+no `aria-expanded`; after, 0 while collapsed, the toggle reads `false` → `true`, and both rows are reachable once open.
+The #923 popup probe still passes. tsc 0; eslint 0 (as on main).
+
+---
+
+## #950 Reader toolbar menus: out of the Tab order while closed, named zoom, Escape closes the menu (2026-10-22)
+
+**What:** the reader's translate dropdown and mobile "เพิ่มเติม" menu were hidden only with `pointer-events-none
+opacity-0`, so their items stayed in the Tab order (13 of 18 reader stops invisible at 390 px, 8 of 23 at 1440 px); their
+toggles had no expanded state; the mobile zoom −/+ (the only zoom control on mobile) were unnamed; Escape with a menu open
+closed the whole reader. Now both panels are `inert` while closed with an id, the toggles carry `aria-expanded` /
+`aria-controls`, the zoom buttons are "ย่อ" / "ขยาย" (as on desktop), and the reader's Escape closes an open menu first
+(refs, like `commentOpenRef`) and returns focus to its toggle. Review follow-ups: items close their menu through a helper
+that refocuses the toggle; keyboard focus leaving an open menu closes it; the Escape ref tracks the visible state.
+
+**Validated:** production build, reader on an uploaded version: before, 13/18 (390 px) and 8/23 (1440 px) invisible stops
+and 2 unnamed buttons; after, 0 invisible at both widths (5 and 15 stops), 0 unnamed, each menu opens by keyboard with
+its items reachable, and Escape closes only the menu with focus on its toggle; walking out of an open menu closes it; a
+view item activated by keyboard leaves focus on the toggle. The #928 drawer probe still passes. tsc
+0; eslint identical to main.
+
+---
+
+## #948 Mobile hero popup keeps the book it was opened on (2026-10-22)
+
+**What:** on mobile, the home hero rendered `<BookDetailModal book={book}>` with the live `books[idx]` while autoplay kept
+rotating behind it, so within 5 s the open popup's title, cover and chapters became the next hero book while its URL
+and the details loaded on open stayed from the first. The popup now opens on a snapshot of the tapped book (`openBook`
+state replaces the `mobileDlOpen` flag). Review follow-up (traced, then reproduced): on desktop, rotation remounted
+`HeroDetailButton` (`key={book.id}`) and dropped its open popup without the close path (URL `/book/<id>` left behind);
+the carousel now skips its tick while `modalStack.anyOpen()` (new).
+
+**Validated:** production build at 390 px: before, the popup opened on "Cover Loads" showed "No Cover At All" 11 s later
+with the URL still `/book/cover-ok`; after, it still shows "Cover Loads". Desktop, popup open, pointer leaving the window,
+11 s: before gone with the URL left behind, after still open. Rotation resumes once the popup is closed and focus leaves
+the hero. `bookModalHistory.test.ts` 14 pass (new `anyOpen`). tsc 0; eslint unchanged (one pre-existing warning).
+
+---
+
+## #946 Community feed: a stale "load more" no longer mixes categories (2026-10-22)
+
+**What:** `/community`'s `loadMore` had no sequence check (#911 guarded only `fetchPosts`), so pressing "โหลดโพสต์เพิ่ม" and
+switching category before the answer arrived appended the previous category's posts to the new feed. It now captures
+`fetchSeq` and drops its answer (or its error toast) once a newer feed request has started. The icon-only ✕ buttons
+clearing the manga and category filters are named ("ล้างตัวกรองมังงะ" / "ล้างตัวกรองหมวด"). Review follow-up (pre-existing):
+offset paging repeated a post when posts arrived between pages; `loadMore` now appends only posts not already listed.
+
+**Validated:** production build, stand-in feed answering "load more" after 2 s: before, the announcement feed held the
+20 old-category posts; after, only the 20 announcement posts; the category clear button is named; with page 2 starting
+one row early, post 19 showed twice before and once after. The #940 drawer probe
+still passes. tsc 0; eslint identical to main.
+
+---
+
+## #944 Genre page and /new: page and tab kept in the URL, stale answers ignored (2026-10-22)
+
+**What:** the genre page's and `/new`'s list effects never cancelled, so two quick "next" clicks could leave page 2's books
+under a "3" label; the genre page's page lived only in `useState` (a refresh or a back from a book returned to page 1);
+`/new` read `?tab=` but never wrote it. Both effects now drop a superseded answer (a cancel flag in the cleanup); the genre
+page derives its page from `?page=` (in a `Suspense` boundary, as `/new` already was) and replaces it in place, so
+"← ย้อนกลับ" still leaves the genre; `/new` writes its tab with `router.replace`. The genre page replaces through
+`lib/inAppBack.replaceUrl` (native `replaceState` carrying only #942's landing mark): `router.replace` dropped that mark,
+and a native call carrying Next's own state keys was not synced to `useSearchParams` (both measured). A `?page=` past
+the end moves to the last page; `parseInt` handles junk such as `Infinity`.
+
+**Validated:** production build, stand-in backend answering each genre page (page 2 delayed 1.5 s): before, `?page=3`
+opened page 1, the race ended with page 2's books under "3", a reload went back to page 1, and `/new` kept no tab; after,
+`?page=3` opens page 3, the race ends on page 3's books with `?page=3` in the URL, a reload keeps it, and `/new`'s tab is
+written as `?tab=latest` and survives a reload; after paging, the breadcrumb back leaves the genre (`/`); `?page=9999` →
+page 4, `?page=Infinity` → page 1. `inAppBack.test.ts` 7 pass (2 new for `replaceUrl`). The #942 back-button probe still
+passes. tsc 0; eslint identical to main on the touched files.
+
+---
+
+## #942 Back buttons stay in MangaDock when the page was opened directly (2026-10-22)
+
+**What:** the genre page's "← ย้อนกลับ" and the community post's "ย้อนกลับ" called `router.back()` unconditionally, so a
+page opened directly (a shared link in a fresh tab) sent the visitor off the site; `history.length` cannot tell (a fresh
+tab already has two entries). New `lib/inAppBack`: on the document's first render `SmoothScrolling` marks that history
+entry (`replaceState`, keeping Next's own state) as where the visitor landed; `goBackOr(router, fallback)` pushes the
+parent page (`/`, `/community`) on that entry and goes back on every other. (A first version tracked "moved inside the
+app" + a same-origin referrer; the review showed it still left the site after browser-back to the landing page and did
+nothing in a tab opened by Ctrl-click from MangaDock.)
+
+**Validated:** `inAppBack.test.ts` red → green, 5 tests. Production build, stand-in backend: before, a genre page and a
+post opened in a fresh tab went to `about:blank` on back, as did the landing page after a browser-back and a post opened
+with a same-origin referrer; after, they land on `/` and `/community`; Next keeps the marker through client navigation
+and browser-back; `/search` → genre via the Navbar menu → back still returns to `/search`. tsc 0; eslint 0 on the
+touched files.
+
+---
+
+## #940 Community mobile drawer is a real dialog (2026-10-22)
+
+**What:** the community drawer (`app/community/layout.tsx`) was `role="dialog"` + `aria-modal` but, closed, it was only
+faded and slid out, so its 8 controls stayed in the Tab order; open, Tab escaped it, focus did not return to the menu
+button, and the page behind scrolled; the Navbar's menu button had an English name. Now `useDialogFocus` replaces the
+ad-hoc "focus the first control" effect, the drawer is `inert` while closed and holds the shared page scroll lock (#936)
+while open, and the button is "เปิดเมนูคอมมูนิตี้" with `aria-haspopup="dialog"`. Found by measurement and the review:
+widening past `lg` hid the open drawer and its button but kept the page locked; a `matchMedia` listener closes it.
+
+**Validated:** production build, `/community` at 390 px: before, 8 Tab stops inside the closed drawer, Tab escaped the
+open one, the page was not locked, focus did not return; after, 0 stops while closed, focus moves in, 12 Tabs stay
+inside, `<html>` is locked while open, Escape closes it with focus on the menu button and the page unlocked; open at
+390 then resized to 1280: before `<html>` stayed hidden, after it unlocks and the drawer is inert. The #938
+mobile-nav probe still passes. tsc 0; eslint 0 on both files (as on main).
+
+---
+
+## #938 Mobile genre panel: out of the Tab order while closed (2026-10-22)
+
+**What:** on every mobile page the collapsed genre panel above the bottom nav (`max-h-0 opacity-0`) kept its 18 links in
+the Tab order, its "หมวดหมู่" toggle had no expanded state, and the open panel could not be closed by Escape or a tap
+outside. Mirrors #870's desktop fix: the panel is `inert` while closed, has an id, `role="region"` and a name; the toggle
+is `type="button"` with `aria-expanded` / `aria-controls`; `usePopoverDismiss` on the bottom nav closes it on Escape
+(focus back to the toggle) or an outside tap.
+
+**Validated:** production build, `/search` at 390 px, Tab walk keyed on elements: before, 37 stops of which 18 invisible
+(every genre link); after, 19 stops, 0 invisible; the toggle reads `aria-expanded="false"`, opens to `"true"` with its
+links reachable, and Escape closes it with focus on the toggle. tsc 0; eslint 0 on `Navbar.tsx` (as on main).
+
+---
+
+## #936 Page scroll lock shared by the reader and the book popup (2026-10-22)
+
+**What:** closing the reader before passing its CAPTCHA left `body` at `overflow: hidden` (the load effect locked and
+then returned early without a cleanup), so the page could not scroll until a reload; closing a reader opened from the
+book popup unlocked the page while the popup was still open (each layer wrote `body.style.overflow` directly). New
+`lib/scrollLock`: a ref-counted lock where each holder releases once and the page unlocks with the last release; the
+reader releases on every exit of its effect, the popup on unmount. Found while verifying: the lock never stopped the
+wheel at all — Lenis scrolls the page itself, so a wheel over the popup's backdrop moved the page behind it (300 -> 695
+px); `SmoothScrolling` now stops/starts the root Lenis on the lock's changes. The lock sits on `<html>`, so the parked
+`LoginModal` / `LinkAccountModal`, which still write `body.style.overflow`, cannot unlock the page under a popup. The
+Studio picker is unchanged.
+
+**Validated:** `scrollLock.test.ts` red → green, 5 tests (the last for the lock-change hook). Production build, stand-in backend, the
+Cloudflare challenge host blocked (the widget never loads): before, the page stayed `hidden` after closing a
+CAPTCHA-gated reader, and was unlocked under the open popup after closing its reader; after, the page scrolls again,
+stays locked under the popup, and unlocks when the popup closes; a real wheel over the popup's backdrop no longer moves
+the page (before 300 -> 695, after 700 -> 700) and scrolls it again once the popup is closed. The #928 reader probe still
+passes. tsc 0; eslint identical to main on the touched files.
+
+---
+
+## #932 Home row cards work by keyboard (2026-10-22)
+
+**What:** on desktop, Tab walked through five invisible controls per `BookRow` card (the hover info panel's buttons and
+the expand-cover button, whose `focus-visible:opacity-100` lost to `md:opacity-0`); on mobile the cover was a
+`<div onClick>`, so nothing could open a book; `ContinueReadingRow` had the same structure plus an "อ่านต่อ" badge that was
+a `<div onClick>`. Both rows now give the cover a real `<button>` overlay named "ดูรายละเอียด <title>" (as the Top 10 cards
+are named), open the hover state on keyboard focus with `has-[:focus-visible]` / `group-has-[:focus-visible]` next to each
+`hover` variant (a mouse click does not pin it), re-check the panel side on focus, and make the badge a `<button>`.
+Review follow-ups: the panel's duplicate "ดูรายละเอียด" leaves the Tab order, the badge is named per book, and focus from
+inside a portaled popup no longer runs the card's hover logic.
+
+**Validated:** production build, stand-in rows plus a local reading history, Tab walk measuring each stop inside a row
+card after the 300 ms fade: before, 6 stops at effective opacity 0 at 1440 px and no control named after a book at either
+width; after, 0 invisible stops, 3 row openers per walk, the "อ่านต่อ" badge reachable, Enter on an opener opens the
+popup, at 1440 and 390 px; mouse probe: cover -> popup, expand -> lightbox, badge -> reader at both widths. Screenshot:
+the focused card shows its panel and an inset accent ring. tsc 0; eslint identical to main on both files.
+
+---
+
+## #930 Popup discussion and reader comments: a failed load is not "none yet" (2026-10-22)
+
+**What:** the book popup's discussion (`MangaDiscussion`) caught a failed `listPosts`, logged it and said
+"ยังไม่มีบทสนทนา"; the reader's comment drawer treated a non-ok answer as no data ("ยังไม่มีความคิดเห็น") and rethrew a
+network error from its effect (unhandled rejection). Both now show the shared `LoadError` with a retry, as #911 did for
+the public pages: the discussion retries `fetchPosts`, the drawer an attempt counter in its load effect, and the drawer
+no longer rethrows. "None yet" stays for a real, successful empty answer. Review follow-up: a post that succeeds while
+the list shows the failure reloads the list (it stayed hidden behind the error); closing the drawer resets the failure.
+
+**Validated:** production build, stand-in backend failing the first request of each list with 503: before, both said
+"ยังไม่มี…"; after, "โหลดบทสนทนาไม่สำเร็จ" / "โหลดความคิดเห็นไม่สำเร็จ" with "ลองใหม่", and the retry shows the real answer
+(the empty discussion; the 30 comments), 0 page errors; the #928 drawer probe still passes. The post-while-failed reload
+needs a signed-in user and was not exercised in a browser. tsc 0; eslint 0 on both files (as on main).
+
+---
+
+## #928 Reader comment drawer: typing, Escape and focus (2026-10-22)
+
+**What:** in the reader, ←/→ turned the page while the cursor was in the comment box (the window `keydown` handler never
+looked at the target), and the drawer then reloaded another page's comments; Escape inside the drawer closed the whole
+reader; the drawer was no dialog — no role/name, focus stayed behind, its controls stayed in the Tab order while closed
+off-screen, and its ✕ / 🗑 buttons had no name. Now: `lib/typingTarget.isTypingTarget` (input/textarea/select/editable)
+gates the reader's page keys; Escape closes the drawer first (`commentOpenRef`, like the chapter picker); the drawer is
+`role="dialog"` + `aria-modal`, named by its heading, uses `useDialogFocus` (the reader's Tab trap stands aside while it is
+open) and is `inert` while closed; the icon buttons are named. Scrutinize follow-ups in the same PR: page arrows are off
+while the drawer is open (not only in text fields) and zoom shortcuts keep working in a text field; the drawer takes the
+reader's "nothing over me" check, so a guest's login toast is reachable by Tab; the wheel is left to the open drawer
+(the reader no longer zooms, and its list has `data-lenis-prevent` like the reader's own scroller).
+
+**Validated:** `typingTarget.test.ts` red (module missing) → green, 4 tests. Production build, stand-in backend, reader
+opened on an uploaded version (no CAPTCHA) from a continue-reading button: before — arrows in a text field moved 2/3 →
+3/3, the closed drawer had 2 Tab stops, no dialog, Escape closed the reader; after — arrows in the text field leave 2/3
+(outside one they still turn the page), 0 Tab stops in the closed drawer, the open drawer is a named dialog holding focus
+and Tab, Escape closes only the drawer and focus returns to its button. The comment box itself needs a signed-in reader,
+so the probe uses a stand-in textarea inside the reader (the bug lives in the reader's key handler). Review follow-ups,
+red on the first commit -> green: arrows with focus on the open drawer keep the page; the login toast's "เข้าสู่ระบบ" is
+reached by Tab (never activated); a wheel starting in the drawer's list is no longer cancelled. A real mouse wheel could
+not be tested here: the reader's CAPTCHA gate (z-400) still covers this uploaded-version path and was left alone. tsc 0;
+eslint identical to main on both files.
+
+---
+
+## #926 Search results open by keyboard (2026-10-22)
+
+**What:** `SearchResultCard` was a `<div onClick>` with no control for the book itself, so Tab passed every result
+(reaching only the hover-only "ดูหน้าปกขนาดใหญ่" buttons) and a screen reader found nothing named after the book.
+`MangaGrid` fixed the same thing in #838; the search card now mirrors it: the title is a `<button type="button">`
+(stops propagation) and the card's click stays the mouse target. No visual change. Review nit applied here: the
+expand-cover button (search and `MangaGrid`) is `type="button"` and named per book ("ดูหน้าปกขนาดใหญ่: <title>").
+
+**Validated:** production build, stand-in results: before, a Tab walk from the search box never focused a result; after,
+it reaches "Cover Loads" by its title, Enter opens one popup, Escape closes it, and a mouse click on the cover still opens
+exactly one. The focused title shows the app's 2 px accent outline (screenshot). tsc 0; eslint unchanged (2 pre-existing
+`as any` errors in the file).
+
+---
+
+## #923 The book popup shows a placeholder when a cover fails to load (2026-10-22)
+
+**What:** after #921 the cards showed a placeholder, but opening one showed `BookDetailModal` with two broken images (the
+blurred background and the cover) — it rendered `selectedCover ?? resolvedThumbnail(book)` with no `onError`, so it
+never even tried the proxy fallback. It now uses #921's `useCoverSrc(book)`: a picked alternative cover still wins (its
+error does not advance the book's sources); when every source fails both covers show `CoverPlaceholder` and the blurred
+background is left out. Scrutinize follow-ups in the same PR: a picked alternative cover that fails returns to the book's
+own cover, and an alternative-cover tile that fails shows a placeholder and can no longer be picked or enlarged.
+
+**Validated:** production build, stand-in backend with four books, popup opened from `/search` at 1440 and 390 px:
+before the fix 6 of 8 checks failed (2 broken images each, the fallback book included); after, 8/8 — 0 broken images, the
+working and fallback covers load, the two dead ones show the placeholder found by `getByRole('img', { name })`. Alternative
+covers (stand-in: volume 1 loads, 2 dead, 3 serves once): before the follow-up, tile 2 was a broken image and picking 3
+left three broken images; after, 0 broken — tile 2 is a disabled placeholder, picking 1 shows it, picking 3 falls back to
+the book's own cover and disables tile 3. tsc 0; eslint unchanged from main (3 pre-existing findings in the file).
+
+---
+
+## #921 A cover that fails to load shows a placeholder, not a broken image (2026-10-22)
+
+**What:** six cover cards (search, `MangaGrid`, `BookRow`, `TopTenCard`, `RelatedManga`, `ContinueReadingRow`) and the
+home hero each had their own one-shot fallback; when the fallback also failed — or there was no cover at all — the browser
+drew its broken-image icon (search used an external `placehold.co` "No Cover" image instead). `coverSources(book)`
+(`lib/imgUrl`) lists every source a card may try, in order and without repeats; `useCoverSrc(book)` steps to the next one
+on each error and returns `null` when none is left, keyed on the sources so a reused card (the hero rotating) restarts.
+Cards then show `CoverPlaceholder` (book glyph + title on the surface tokens), named like the image was — `role="img"`
+`aria-label={title}`, or `decorative` where the image had `alt=""` (on mobile BookRow/ContinueReading have no other
+visible name); the hero keeps its existing quiet gradient.
+The expand-cover button and lightbox are hidden when there is no cover. Removes `placehold.co`, a DOM `src` mutation, the
+hero's set-state-in-effect (an eslint error on main) and `MangaGrid`'s private `cdnFallback`.
+
+**Validated:** `imgUrl.test.ts` 16 pass (4 new for `coverSources`). Production build against a stand-in backend with four
+books — cover loads / local copy 404 then proxy works / every source 404 / no cover: on `/search`, `/categories/action`,
+`/new` and `/` at 1440 and 390 px, 0 broken `<img>`, the working cover loads, the two dead books show the placeholder, and
+0 requests to placehold.co. The fallback book loads from `/api/img-proxy` on every page; on `/` at 390 px it is off-screen
+in a lazy row and loads once scrolled into view; the dead cover is a named `img` in the accessibility tree on every page.
+tsc 0; eslint: no new findings (HeroCarousel goes from 1 error to 0). Scrutinize: one should-fix (the placeholder was
+`aria-hidden`, leaving mobile row cards unnamed) fixed in this PR; stale-error, mutation and proxy paths checked OK.
+
+---
+
+## #919 A direct /book link: "book not found" only for a real 404 (2026-10-22)
+
+**What:** `BookRouteModal` (direct `/book/<id>` visits) turned every failure into "ไม่พบข้อมูลหนังสือ", because
+`loadMangaDetail` threw the same error for a 404 and a 500; the overlay was also not a dialog (no role, no focus, no Escape).
+`loadMangaDetail` now throws `HttpError(status)` (#913's `lib/httpError`); the modal has a third state, "failed", shown as the
+shared `LoadError` with a retry; "missing" stays for a 404 or an unusable detail. Both overlays are a small `NoticeDialog`
+— `role="dialog"`, `aria-modal`, focus on the first button, Escape and the scrim close it, like the loading skeleton.
+
+**Validated:** `mangaDetail.test.ts` red → green (404 → isNotFound, 503 → not). Production build, direct link: backend down
+→ dialog "โหลดหนังสือไม่สำเร็จ", focus on "ลองใหม่"; a stand-in answering 404 → "ไม่พบข้อมูลหนังสือ", focus on "← กลับหน้าแรก";
+the real backend → the book popup; Escape closes each back to "/". Start the backend, press Enter on the focused "ลองใหม่"
+→ the book popup opens. tsc 0; eslint 0 on both files.
+
+**Review round:** the dialogs declared `aria-modal` but Tab walked into the page behind — `NoticeDialog` and the loading
+skeleton now use the app's `useDialogFocus` (#837); the failed dialog no longer nests `LoadError`'s card or repeats its label
+as an alert (`LoadError framed={false}`); the comment now says a 200 of the wrong shape is "failed" (with a retry), not
+"missing". Re-verified: down → focus "ลองใหม่", 6 Tabs stay inside (ลองใหม่ ⇄ กลับหน้าแรก), Escape → "/", no alert inside the
+dialog, a single card (screenshot); 404 → focus and Tab stay on "← กลับหน้าแรก".
+
+---
+
+## #915 Forum lookups: 404 only for a missing row, 503 for a database failure (2026-10-22)
+
+**What:** `ForumService` turned any Supabase error on its six single-row lookups (post, profile, post/comment edit and
+delete) into `NotFoundException`, so an outage read as "not found" — to users, and to the frontend, which since #913
+trusts a 404. `forum/assert-found.ts` `lookupFailure(error, message): never` throws a 404 only when there is no row, or
+Supabase's no-rows code `PGRST116`, or `22P02` (an id that is not a uuid cannot exist); any other error is a 503
+"Database unavailable". Returning `never` lets each site keep its `if (error || !row)` shape with `row` narrowed after it.
+
+**Validated:** `assert-found.spec.ts` red → green (5); `src/forum` jest 72 pass; eslint count on `forum.service.ts` = main's.
+Live, built backend: with `SUPABASE_URL` pointed at a dead port → post, not-a-uuid and profile all **503** (were 404);
+against the real Supabase → unknown uuid 404, `not-a-uuid` 404, an existing post 200, unknown profile 404. (Run with the
+main checkout's `node_modules` junctioned and `openai` from an isolated scratch install — D: had 0.3 GB free.)
+
+**Review round:** the hand-made 503 discarded the Postgres error (the filter logged only "Database unavailable"), and it
+carried code `INTERNAL_ERROR`, so the frontend's Supabase-down toast (keyed on `SUPABASE_OFFLINE`) never fired. Any other
+error is now a plain `Error("Supabase lookup failed (<code>): <message>")`, which `AllExceptionsFilter` already maps to its
+database-down signal — 503, code `SUPABASE_OFFLINE` — and logs as CRITICAL with the cause; the spec runs the thrown error
+through the real filter. Live: dead `SUPABASE_URL` → 503 `SUPABASE_CONNECTION_ERROR`, log "Supabase lookup failed (no code):
+TypeError: fetch failed". `src/forum` 73 pass.
+
+---
+
+## #913 Community detail pages: "not found" only for a real 404 (2026-10-22)
+
+**What:** with the backend down, `/community/p/[id]` said "ไม่พบข้อมูลกระทู้", `/community/profile/[uid]` "ไม่พบโปรไฟล์" and
+`/community/manga/[mangaId]` "ยังไม่มีโพสต์ในชุมชนนี้" — claims about the data that nothing checked. `lib/httpError.ts`
+(`HttpError(status)`, `isNotFound`) lets `getPost` / `getProfile` carry the status; each page shows "not found" only for a
+404, the genuine empty state only for an empty list, and the shared `LoadError` (#911) with a retry otherwise. The post
+page's tab-return check now reads the status from the error instead of a second fetch; the profile clears the previous
+profile when `uid` changes (a failed load used to leave the old profile under the new URL); both pages' error and
+not-found states carry an `h1`.
+
+**Validated:** `httpError.test.ts` red → green (4). Production build: backend not running → all three show the load error
+(post/profile with "โหลด…ไม่สำเร็จ" headings); a stand-in backend answering real 404s and an empty manga list → "ไม่พบข้อมูลกระทู้",
+"ไม่พบโปรไฟล์" and "ยังไม่มีโพสต์ในชุมชนนี้". tsc 0; eslint 0 on the touched files (as main); `bun test` 440 pass.
+
+**Review round:** the manga header still said "0 โพสต์" on a failed load — no count then; a post created after a failed
+load hid behind the error — creating clears the failed state; the title skeleton kept pulsing — the failure path fetches the
+manga's title on its own; with `Promise.all` a 500 from the comments could beat the post's 404 and turn "not found" into
+"failed" — the post's own result decides now (both still start together). Re-verified: down/404/empty matrix unchanged; no
+post count on failure; stand-in with post 404 + comments 500 → "ไม่พบข้อมูลกระทู้". The backend maps every Supabase error on
+these two lookups to a 404 — filed separately.
+
+---
+
+## #911 A failed load says so, with a retry — never "no results" (2026-10-22)
+
+**What:** with the backend down, `/search` said "ไม่พบหนังสือที่ตรงกับ …", `/community` "ยังไม่มีโพสต์ในหมวดหมู่นี้" and
+`/community/trending` "ยังไม่มีมังงะที่กำลังเป็นที่นิยม" — a failed request shown as an empty result — while `/new` and
+`/categories/[genre]` said they could not load but offered no retry. `components/ui/LoadError` (promoted from
+`StudioLoadError`, #828 — now a thin wrapper with the Studio mascot) shows the sleeping mascot, "โหลด…ไม่สำเร็จ" and a
+"ลองใหม่" with a busy state (`role="alert"`); each page keeps an explicit failed state and re-runs its own fetch. Found on the
+way: search parsed error bodies as results (`r.json()` without `r.ok`) and would cache them 5 min; the community feed kept
+the previous category's posts after a failed switch; its failure toasts duplicated the inline state (dropped for the initial
+load); `/new` kept all four tab panels mounted at `opacity-0`, so screen readers read every grid and Tab walked through
+invisible books — hidden panels are `inert` (pagination state survives).
+
+**Validated:** production build, backend not running: all five pages show the load error, none shows an empty-result
+message. Then a stand-in backend on :4001 (books for search/genre/new-releases, genuinely empty forum + trending) and
+"ลองใหม่": search and categories show the books, community and trending show their real empty states, `/new`'s active tab
+shows the books; a tab that failed earlier shows its own error and recovers on its retry. tsc 0; eslint per file = main's;
+`bun test` 436 pass.
+
+**Review round:** a failed search followed by an empty query kept the error next to the start prompt — cleared in the
+empty-query branch; a failed community switch kept the old `total`, so "โหลดโพสต์เพิ่ม" sat next to the error and loaded
+into a page still marked failed — `total` reset too; only the latest feed request may write (a slow answer for the previous
+category used to only toast, now it would have wiped the new one); an optimistic new post clears the failed state; trending
+resets its failed flag before the cache check. Re-verified: failed search → clear query → no alert, prompt shown; failed
+community load → no load-more button; the five-page down/retry check unchanged.
+
+---
+
+## #909 Home is never blank when the backend is down (2026-10-22)
+
+**What:** with the backend unreachable the home page was blank below the Navbar. Measured: `<main>` started at y = 0, and the
+only explanation — `HomeStatusLine`'s "CAUTION · ไม่สามารถเชื่อมต่อ backend ได้…" — rendered at y = 0, under the fixed 65 px
+Navbar (`elementFromPoint` hit the header): the hero normally owns the top offset and there is no hero without landing data.
+`HomeCachedLanding` then rendered an empty `<section>` when the browser had nothing cached. Now: with no hero the content takes
+the `page-shell-nav` offset (`pt-22 md:pt-28`); the no-cache branch shows the sleeping error mascot, "ยังโหลดรายการมังงะไม่ได้"
+and "ลองใหม่" (`router.refresh()` in a transition — `/` is dynamic and a failed fetch is not data-cached, so it really
+re-fetches); the status line sits on the content edge instead of a centred `max-w-5xl` box (it started 164 px right of the
+rows at 1440).
+
+**Validated:** production build, backend not running, 1440 and 390: status line at y 112 / 88 (header bottom 65) and
+hit-test visible; empty state and retry visible; "ลองใหม่" issues an RSC refetch and shows "กำลังโหลด…" while it runs;
+status line left edge = card left edge (48 / 24). Not exercised: home with the backend up (no backend here) — the offset class
+applies only when there is no hero. tsc 0; eslint warnings = main's (1 + 1).
+
+**Review round:** (1) a successful "ลองใหม่" left the old "backend down" line under the restored hero — `router.refresh()`
+keeps `HomeStatusLine` mounted and its initial state is read once; it is now keyed on the server's verdict. (2) First paint
+showed "can't load" to users who do have cached books (initial `[]`) — `null` until the cache is read. (3) Backend up but no
+rows was still blank — the empty state now shows whenever there is no data. The status-line move also applies to the
+"MangaDex stale" line above real rows (now on the content edge — an intended change, not "unchanged").
+Verified with a stand-in backend on :4001 serving one landing payload: SSR HTML has no empty-state text (no flash); backend
+down → CAUTION + empty state; start the stand-in, press "ลองใหม่" → hero and "ยอดนิยม" row, CAUTION and empty state gone; stand-in
+with no rows (fresh server — Next keeps a 200 landing in its data cache, in memory as well as on disk) → empty state + retry.
+
+---
+
+## #907 Save, check-in and review messages are announced (2026-10-22)
+
+**What:** status messages rendered as plain `<div>`/`<p>` (WCAG 4.1.3) — a screen-reader user pressing Save / Check in /
+Submit heard nothing. Settings → profile success/error, the daily check-in error and the review submit error now sit in
+always-mounted `role="status"` / `role="alert"` containers that are filled when there is a message (a region inserted together
+with its text is not announced reliably). Unstyled wrappers: 0 px when empty, so layout is unchanged. `PasswordTab` and
+`AccountsTab` have the same pattern but are in the auth boundary — parked with the auth-flow files (#776).
+
+**Validated:** production build, signed in (local session), Settings → profile: before Save both regions exist, empty,
+0 px tall; Save → the status region receives "อัปเดตชื่อผู้ใช้สำเร็จ ✓" (MutationObserver on live regions). The check-in
+modal and the review form were not triggered (both need the backend, not running locally) — same wrapper, checked by
+reading. tsc 0; eslint 0 on the three files.
+
+**Review round:** no double announcement (none of the three calls the toast), regions exist before any text, no parked file
+touched. ProfileTab returns a fragment, so its two regions became two children of the page's `space-y-5` — grouped in one
+wrapper. Measured: no message → wrapper 0 px and the gap above the form stays one 20 px step; with a message → 20 px from
+the box to the form.
+
+---
+
+## #874 Studio and community custom selects work by keyboard (2026-10-21)
+
+**What:** `StudioSelect` (Studio upload/works/wallet/account), `CountrySelect` (Studio account) and `MangaSearchSelector`
+(community composer tag picker) closed only on an outside mouse click and exposed no state. They now use
+`usePopoverDismiss` from #870 (Escape closes, focus back to the trigger; Escape inside a dialog stays the dialog's), carry
+`aria-expanded` + `aria-controls` (the two search inputs as `role="combobox"` + `aria-autocomplete="list"`), mark the chosen
+option `aria-current`, and keep a closing panel `inert`. Found on the way: choosing an option unmounted the focused button and
+dropped focus to `<body>` — focus now goes to the trigger (selects) or to the chip's new "เอาแท็ก … ออก" button / back to the
+input (tag picker). The two inputs open on click, typing or ArrowDown instead of on focus, so returning focus to them does not
+reopen the list. The tag picker's label is linked to its input and its clear button is named.
+
+**Validated:** production build, signed in (local session; tag-search results stubbed, backend not running), keyboard
+only: Studio language select and country combobox — focus alone keeps them closed, Enter/ArrowDown opens, Tab enters the
+list, Escape closes with focus on the trigger, choosing leaves focus on the trigger showing the choice, reopening marks it
+`aria-current`, mouse open/outside-close unchanged; tag picker — typing opens, Escape closes the list but not the composer,
+choose → focus on "เอาแท็ก One Piece ออก", clear → focus on the input. tsc 0; eslint 0 on all three (as main); `bun test`
+436 pass. TDD n-a: wiring of the hook tested in #870; no logic of its own.
+
+**Review round:** returning focus to the country input after *any* choice would raise a phone's soft keyboard after a tap
+— it now refocuses only on a keyboard choice. "Focus is in the list" did not tell them apart (a click focuses the option
+button too, measured: mouse choice still refocused), so the signal is `:focus-visible` on the chosen option; re-measured:
+mouse choice → focus stays where the click left it (as before #874), keyboard choice → input. The tag picker's open
+condition is derived once (`expanded`) instead of pasted into the attribute and the render; the "ประเทศ" label names the
+country combobox (`id` prop); comments corrected (the panel turns inert while fading, it does not unmount). An earlier
+probe ran against a stale server from the previous session still holding port 4000 — caught by its start time and redone.
+
+---
+
+## #870 Navbar popovers close by keyboard (2026-10-21)
+
+**What:** the categories menu (`Navbar`), notifications (`NotificationBell`) and user menu (`NavbarActions`) closed only on an
+outside mouse click — Escape left the categories menu open with focus inside it — and the bell and user-menu triggers had no
+`aria-expanded`. `hooks/popoverDismiss.ts` (`usePopoverDismiss`) replaces the three copied outside-click effects: outside
+mousedown closes; Escape closes and, if focus was inside, returns it to the trigger (`[aria-expanded]` in the container).
+Bell and user-menu triggers get `aria-haspopup` + `aria-expanded`. The user-menu trigger keeps its visible name (photo alt +
+display name) — no `aria-label`, which would hide the visible text (WCAG 2.5.3).
+
+**Validated:** `popoverDismiss.test.ts` red → green (4). Production build, signed in (local session), 1440: each popover
+opens with Enter (`aria-expanded=true`), Escape closes it with focus back on its trigger (the bell's panel had no focusable
+items, so Tab had already left and focus was not pulled back), a mouse click opens and an outside click closes. tsc 0;
+eslint counts on the three components equal main's (net −17 lines).
+
+**Review round:** the panels are disclosures, not ARIA menus (no `menuitem`s, no arrow keys), so `aria-haspopup` would
+have announced menu keyboarding that does not exist — replaced by `aria-controls` → panel ids, as the categories button
+already did. Escape is left to a dialog opened over a lingering popover (focus inside `[role=dialog]`/`[aria-modal]`), so one
+key closes one layer. Closed panels were only faded (`opacity-0`), so Tab walked into invisible items — each panel is
+`inert` while closed. Re-verified: Tab after Escape goes to the next header control (categories → "ค้นหา"), not into the
+closed panel; open panels still Tab-reachable; mouse open/outside-close unchanged. Tests 5 pass.
+
+---
+
+## #865 A failed landing row no longer sits empty for 20 minutes (2026-10-21)
+
+**What:** a landing row whose MangaDex call failed (now including the 6 s timeout from #861) comes back as an empty row —
+`fetchMangaWithParamsPaged` swallows the error — so the landing cached that empty row for the full `CACHE_TTL_MS`. Now an
+empty row is the failure signal: it is filled from the stale landing's row with the same id, and a partial landing is
+cached for `PARTIAL_LANDING_TTL_MS` (2 min) so the next request re-fetches it. A complete landing still gets the full TTL;
+all-empty still goes to `serveStale` as before.
+
+**Validated:** `landing.service.spec.ts` red → green (partial: fresh row kept, failed row filled from stale, TTL < 5 min;
+complete: TTL ≥ 20 min). `src/books` jest 339 pass; eslint 0 (as main). Rebuilt backend: landing 200 (4 rows × 20) — served
+from cache, so the miss path is covered by the specs only; the landing cache was deliberately not wiped (its stale copy is
+the fallback this relies on).
+
+**Review round:** the cache-hit thumbnail patch rewrote the landing with the full TTL, undoing the 2-min retry whenever the
+image cache is on — partial landings now carry `partial: true` and both writes use `landingTtl()` (spec drives the patch
+path with an enabled image cache stub). The filled rows are logged by id; the comment states the "empty means failed"
+coupling (sound while every row is an unfiltered sort); with no stale copy an empty row is still cached briefly. Serial
+MangaDex chains (getRelated ≈ 3 × 6 s) split out to their own issue. `src/books` 340 pass.
+
+---
+
+## #856 Skip link past the Navbar (2026-10-21)
+
+**What:** no page had a way past the Navbar for keyboard users (WCAG 2.4.1). `components/SkipLink.tsx` renders
+"ข้ามไปเนื้อหาหลัก" as the first focusable element (root layout): parked above the viewport until focused, then a solid ink
+pill top-left; activating it focuses the page's `<main>` (`focusMain`: `tabindex="-1"` if it has none, so it is not an extra
+Tab stop) without adding `#main` to the URL. Every `<main>` (12, one per route) carries `id="main"`, so the href is a real
+target — axe only treats an in-page link as a skip link when its target exists (otherwise `region` flagged it on every page).
+`sr-only`/`focus:not-sr-only` was tried first: Tailwind v4's `not-sr-only` sets `padding: 0`, which left a cramped label over
+the logo (screenshot) — replaced by the translate pattern.
+
+**Validated:** `SkipLink.test.ts` red → green (3). Production build, keyboard only, 1440 and 390: on `/`, `/new`,
+`/community` the first Tab shows the link (134×42 at 16,16), Enter puts focus on `<main>`, the next Tab reaches the first
+control in the content (e.g. "อ่านเลย", "มังงะมาใหม่"), not the Navbar; `/search` autofocuses its input, so Tab already starts
+in the content. axe structure sweep 10 routes × 2 widths → 0; signed-in sweep (27) → only `color-contrast`. tsc 0.
+
+**Review round:** (1) focusing `<main>` by script after an Enter keypress matches `:focus-visible`, so the global ring drew a
+2 px accent outline around the whole page (computed style confirmed) — `main[tabindex="-1"]:focus-visible { outline: none }`
+in the same `@layer base`; the link and the next control keep their rings. (2) `/docs` had no `id="main"` and
+SimulationsView nested a `<main>` inside the docs `<main>` — both docs `<main>`s (alternate branches) get the id, the nested
+one is a `<div>`. Re-verified: /new and /docs — link ringed, `<main>` focused with no outline, next Tab ringed inside
+`<main>`; axe structure 11 routes (incl. /docs) × 2 widths → 0.
+
+---
+
+## #861 MangaDex fetches time out (2026-10-21)
+
+**What:** every MangaDex call goes through `MangaDexService.mangadexFetch`, which had no `signal` — a hung request held the
+caller (e.g. `/books/landing` on a cold cache) for as long as the connection lived. It now passes
+`AbortSignal.timeout(mangadexTimeoutMs)` (6 s, below the frontend's 8 s server-render budget from #858; overridable in
+tests like `fetchFn`), so a hung request rejects into the callers' existing error handling — every one of the 9 call sites
+is inside a try/catch returning empty/stale/null, none escapes as a 500. All are JSON API calls (manga, feed, cover, tag,
+at-home server) — no image bytes. Not a stale-cache fallback for landing: a timed-out row becomes an empty row (as any
+MangaDex error already did) and is cached for the landing TTL — follow-up filed, with the serial-call budgets (getRelated
+≈ 3 × 6 s).
+
+**Validated:** `mangadex-fetch-timeout.spec.ts` red → green (3: a never-answering MangaDex rejects in < 1 s at a 30 ms
+timeout; headers and `no-store` kept; default < 8 s). `src/books` jest: 337 pass, 0 fail. Rebuilt backend live: landing
+200 (4 rows / 80 items), chapters 200 (48), an uncached genre page fetched fresh from MangaDex in 182 ms. Found on the way:
+an uncached search still hangs 30 s — traced to `findTitleIdsByAltName`, a Supabase query, not MangaDex (filed
+separately; it touches the client the auth guard uses).
+
+---
+
+## #858 Server renders stop waiting on a hung backend (2026-10-21)
+
+**What:** `/book/[id]/reviews` is server-rendered and awaited two backend calls with no timeout; with the backend's upstream
+hung, the page did not render within 120 s. `lib/reviewsFetch.ts` (moved out of the page, `fetch` injectable) passes
+`AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS)` (8 s, `lib/serverFetch.ts`), so a hung backend lands in the existing
+"no reviews" fallback. The home page's landing fetch gets the same signal, landing in its cached-landing fallback on a cold
+cache. The two API routes (`img-proxy`, `docs/github`) are not page renders and are left as they are.
+
+**Validated:** `reviewsFetch.test.ts` red → green (hanging fetch → fallback in < 1 s at a 50 ms timeout; healthy backend →
+both URLs and parsed results). Production build, with the backend's `/reviews/:id/summary` still not answering in 10 s: the
+reviews page returns 200 in 8.06 s with the empty state and title "รีวิว · MangaDock"; direct reviews → /new → Back keeps
+"รีวิว · MangaDock" (the #855 path its review raised); home 200. tsc 0; eslint on touched files: the one warning is on main.
+
+**Review round:** Next 16.1.6 decides fetch cacheability from `cache`/`revalidate`/method only — `signal` neither
+disables the data cache nor enters the key (`next/dist/server/lib/patch-fetch.js:331-358`), so home keeps its 1800 s ISR
+cache. Dropped an `as RequestInit` cast (Next types `next` on the global `RequestInit`); the module owns the backend
+default; the test asserts both calls carry the signal and `revalidate: 60`. Re-measured: reviews page 200 in 8.03 s. The
+root cause on a cold home load — the backend's MangaDex calls have no timeout — is filed as a backend follow-up.
+
+---
+
+## #855 Every page names itself in the tab (2026-10-21)
+
+**What:** all routes shared the root title "MangaDock by Hayate | Manga Streaming Platform" (WCAG 2.4.2). Almost every
+route is a client component under a client layout, so `hooks/pageTitle.ts` adds `usePageTitle(title)` →
+`"<title> · MangaDock"`: list pages by their heading, dynamic ones by the loaded name (search query, category, post, manga
+community, the book popup), Settings/Studio/Admin by the active tab in their layout, the 404 and error page via
+`<PageTitle>`. The titles live on a small stack (newest on top, root when empty) because React unmounts a parent's effects
+before its child's — "restore what I replaced" left a page's title stuck after navigating away with the popup open. Next
+re-commits its metadata `<title>` text after hydration (traced: our write at ~115 ms reverted with no element added), so
+while a page claims the title a `MutationObserver` on `<head>` puts it back.
+
+**Validated:** `pageTitle.test.ts` red → green (6, incl. parent-first unmount). Production build: direct loads of 10 public
+routes and 14 signed-in routes (local session) each show their own title; home and pages without a hook show the root title;
+client navigation /new → popup → Escape → back → /community → / gives the expected title at every step. tsc 0; eslint
+counts on touched files equal main's; `bun test` 425 pass.
+
+**Review round:** (1) a spike of React 19's hoisted `<title>` (one element instead of the stack and observer) failed on a
+production build: on a direct load Next adds a second copy of its root title ahead of ours after hydration, and on client
+navigation `<title>` elements pile up (up to four) with the winner depending on commit order — kept the stack. (2) The
+stack's root is now the constant `SITE_TITLE` (shared with the layout metadata) instead of the title found at the first
+claim, which wrote a stale root after landing on a metadata-titled page; every route but home claims a title, so "nothing
+claimed" means home. (3) Added: community profile (loaded name), `/book/[id]/reviews` ("รีวิว", metadata unified to
+" · MangaDock"); Studio uses `studioPageTitle` so upload/search/manga are distinct. Verified again: 10 public routes,
+Studio 5 routes (upload now "อัปโหลด"), navigation sequence unchanged. Not verified: the reviews page — its server render
+waits on a backend call with no timeout and hung for 120 s (filed separately).
+
+---
+
+## #852 JS smooth scrolling honours reduced motion (2026-10-21)
+
+**What:** `scroll-behavior: auto` in globals.css cannot override an explicit `behavior: "smooth"` passed from JS. All 27 call
+sites outside `app/docs` (pagers, row arrows, popup/reader jumps, Navbar strip, `useHorizontalScroll`) now pass
+`scrollBehavior()` (`hooks/reducedMotion.ts`: `"auto"` under reduced motion, else `"smooth"`), and the reader's held-arrow
+`lenis.scrollTo` gets `immediate` under reduced motion so it follows the key without a glide.
+
+**Validated:** `reducedMotion.test.ts` red → green (5). Production build, headless Chromium 1440, sampled every 40 ms:
+`scrollBy` (home row arrow) reduced 1008 at once vs default 0 → 2 → 53 → 285 → 617 → 1008; `window.scrollTo` (`/new` pager)
+reduced 0 at once vs default 1480 → 1432 → 1136 → 819 → 0. Not measured: `scrollIntoView` (popup chapter jump stayed
+disabled — chapters did not load from the backend in the reduced run) and the reader's held arrow (needs a loaded chapter);
+both go through the same helper; a second attempt at the reader also failed because the backend's
+`/versions/title/*` upstream timed out (25 s), so the popup never offered a read button. Review: lenis 1.3.18 `scrollTo` with
+`immediate` sets target = animated scroll (no lerp), traced in `node_modules/lenis/dist/lenis.mjs`; `prefersReducedMotion()`
+reads the module's cached query (no new MediaQueryList per call, so the reader checks it per frame and follows a
+mid-chapter change). tsc 0; eslint counts on the 11 touched files equal main's; `bun test` 419 pass.
+
+---
+
+## #849 Reduced motion reaches JS motion; the hero can be paused (2026-10-21)
+
+**What:** the CSS reduced-motion rule cannot reach motion driven from JS. `hooks/reducedMotion.ts` adds `useReducedMotion()`
+(`useSyncExternalStore` over the media query, injectable like `pageVisibility.ts`). Lenis — the root instance and every
+`useLocalLenis` panel — scrolls natively under reduced motion. The hero, which rotated every 5 s forever and paused only
+under a hovering mouse (WCAG 2.2.2), has a 24 px pause/play button after its dots, holds while keyboard focus is inside it,
+and starts paused under reduced motion (`heroAutoplay`: the user's choice wins, otherwise the preference decides).
+
+**Validated:** `reducedMotion.test.ts` red → green (4). Production build, headless Chromium 1440: reduced motion → hero
+still after 6.5 s, button reads "เล่นอัตโนมัติ"; no preference → advances in 6.5 s, pause holds 11 s, play resumes, focus on a
+dot holds 11 s, leaving resumes. One wheel tick of 400: reduced → page 0 → 400 at once, popup scroller 0 → 400 at once;
+no preference → eased (31 → 132 → 205 …, popup 59 → 152 → 220 …). Toggle 24 × 24 at 390 and 1440, focus ring whole.
+tsc 0; eslint counts on touched files equal main's; `bun test` 418 pass (the 9 local `app/docs` SSR failures unchanged).
+
+**Review round:** (1) the community sidebar is its own `<ReactLenis>` (`community/layout.tsx`), missed by the first pass —
+now `smoothWheel: !reducedMotion` (wheel 300: reduced 0 → 168 at once; default 13 → 55 → 86 …). (2) A click focuses the
+button, so the focus hold now takes keyboard focus only (`:focus-visible`), and Play clears it. (3) Found while verifying,
+proved by reading the hooks off the React fiber: Play left the **hover** hold stuck — the click swaps the Pause svg for Play
+under the pointer, and a hovered node that leaves the DOM stops React's `onMouseLeave` reaching the hero. Icons are
+`pointer-events-none`; after Play + move away the hold is false and rotation resumes in 6.5 s with focus still on the button.
+Follow-up: JS `behavior: "smooth"` scroll calls and the reader's eased `lenis.scrollTo` are a separate issue.
+
+---
+
+## #848 Hero carousel dots are real tap targets (2026-10-21)
+
+**What:** axe `target-size` (WCAG 2.2 AA) over 10 public routes at 390 px failed only on the hero carousel dots: 8 × 8 px
+buttons 14 px apart. Each dot is now a 24 × 24 px button with the 8 px dot drawn inside; the liquid pill measures the inner
+dot, and the row's margins absorb the taller buttons so nothing moves. Dot pitch is 24 px (was 14) — the one visible change.
+
+**Validated:** production build, before/after measured in headless Chromium: dot top unchanged (390: 593 px, 1440: 554 px),
+desktop first dot still flush with the "อ่านเลย" button (left 560 px); buttons 24 × 24; after tapping dot 4 the pill sits
+exactly on it (left 155 = dot 155 at 390; 632 = 632 at 1440); keyboard focus ring is a circle around the dot. Review found
+the desktop info column's `overflow-hidden` clipped the left 8 px of dot 1 (hit test and ring); the column's clip box now
+reaches 8 px further left (`-ml-2 pl-2`) — dot 1 hit-tests across all 24 px, title still at left 560. axe
+`target-size` → 0 nodes on all 10 routes (was 10 nodes on `/` and `/book/[id]`). tsc 0.
+
+---
+
+## #846 Named controls and landmarks in Studio, Settings, Admin and the post page (2026-10-21)
+
+**What:** an axe sweep of the signed-in routes (Studio, Settings, Admin) found unnamed controls and missing or duplicate
+landmarks. Admin filter selects, date inputs and row role selects got names; wide tables are named, focusable scroll
+regions; an empty Transactions header cell has sr-only text. Studio upload's back button and form fields, and the
+profile name and email fields, are labelled (`htmlFor`, not the placeholder). Studio and Settings each have exactly one top-level `<main>`, and every `<nav>` has
+its own name (main menu, bottom menu, Studio, Settings). The post page's loading skeleton (sr-only) and "post not found"
+state now carry an `h1`, so a slow or deleted post still has a page heading.
+
+**Validated:** production build; axe over 27 signed-in route/width pairs (local session, mocked data) → only
+`color-contrast` left (Strata `ink-3` token, parked for the developer); axe structure sweep over 10 public routes ×
+1440/390 → 0 violations (the post page was audited while its API timed out, i.e. the loading state). tsc 0; `bun test`
+414 pass, the 9 failures are the `app/docs/__tests__` suites this diff does not touch.
+
+---
+
+## #843 Cover lightbox reachable by keyboard (2026-10-21)
+
+**What:** the per-volume enlarge icon was a `<div onClick>` inside the volume `<button>` — mouse-only. The tile is now a
+wrapper holding two sibling buttons (volume, and "ขยายปก เล่ม N", shown on hover or keyboard focus); `CoverLightbox` is
+`role="dialog"` `aria-modal` with `useDialogFocus` (focus in, Tab inside, focus back to the enlarge button), standing aside
+when a layer is above it.
+
+**Validated:** production build. Keyboard: Tab from a volume reaches "ขยายปก เล่ม 1" (visible, opacity 1) → Enter opens the
+lightbox with focus inside → 6 Tabs stay inside → Escape closes it, focus back on the enlarge button, popup still open.
+Mouse: hover shows the button, tile click selects the volume, enlarge click opens, close button closes. tsc 0; eslint
+counts unchanged.
+
+**Follow-up (#845):** the enlarge-cover buttons on grid cards, book rows and search results were `opacity-0` until hover,
+so keyboard focus landed on an invisible control; they now show on `focus-visible` too, and the tile hover border stays.
+
+---
+
+## #840 Reader takes keyboard focus; Escape closes only the top layer (2026-10-21)
+
+**What:** the reader (portal, `fixed inset-0`) is now `role="dialog"` `aria-modal` and uses `useDialogFocus` (#837): focus
+moves in on open, Tab stays inside, focus returns to the popup's read button on close. Found on the way: Escape in the
+reader — and in the cover lightbox — also closed the book popup underneath (the popup listens on `window` and was
+registered first). Both now handle Escape in the capture phase and stop it.
+
+**Validated:** production build, keyboard only, reader opened from the popup: focus inside the reader, 25 Tabs never leave
+it, ArrowRight still pages (1 → 2 / 26), Escape closes only the reader and focus is back on "อ่านตอนที่ 0" with the popup
+still open. Lightbox (opened by mouse) + Escape → lightbox closed, popup still open. Guest login prompt (z 9999, opened from the
+reader) shown → Tab from the reader's last control leaves the reader (the prompt is reachable); hidden → Tab wraps. tsc 0;
+eslint counts unchanged.
+
+---
+
+## #837 #838 Book popup keyboard focus; grid cards reachable by keyboard (2026-10-21)
+
+**What:** the book popup (`role="dialog"` + `aria-modal` since #835) left focus on the page behind it, let Tab walk the
+page underneath, and dropped focus to `<body>` on close. New `hooks/useDialogFocus.ts` (pure `focusWrapTarget`, unit-
+tested): focus moves in on open, Tab/Shift+Tab wrap inside while the popup is the top-most (`modalStack.isTop`, so a
+stacked related-manga popup owns the keyboard), focus returns to the opener on close. While testing it: `MangaGrid`
+cards (`/new`, categories, My List) were an `<article onClick>` with a `<p>` title — not reachable by keyboard; the
+title is now a `<button>` (mouse behaviour unchanged).
+
+**Validated:** `useDialogFocus.test.ts` red → green (5 cases). Production build, keyboard only: Tab to a grid title →
+Enter opens the popup with focus inside; 80 Tabs / 20 Shift+Tabs never leave it (24 stops); Escape closes and focus is
+back on the title. Stacked: related manga opened from the popup → 2 dialogs, 40 Tabs stay in the top one, Escape →
+focus back on that related button; the reader opened from the popup keeps its own Tab order (0 of 12 Tabs pulled back). axe: no new violations.
+
+---
+
+## #835 Landmarks, redundant alts, heading structure (axe) (2026-10-21)
+
+**What:** the non-contrast axe-core findings: the home hero now sits in the page's one `<main>`; `BookDetailModal` is a
+`role="dialog"` with `aria-modal` and the title as label; covers next to their own caption/label (volume covers, related
+manga, mobile hero cards) get `alt=""`; `/search` has an `sr-only` `h1`; PostCard titles are `h2`; `ForumSideMenu` is a
+`<nav aria-label>` instead of a nested `<aside>`. No visual change.
+
+**Validated:** axe over 9 public routes × 1440/390: `region` 34 → 0, `image-redundant-alt` 34 → 0, `page-has-heading-one`,
+`heading-order`, `landmark-complementary-is-top-level` → 0; only colour-contrast (Strata token values, #833) remains.
+Screenshots: home layout unchanged at 1440/390. tsc 0; eslint counts unchanged.
+
+---
+
+## #833 Controls no longer use the tertiary ink-3 token (WCAG AA contrast) (2026-10-21)
+
+**What:** an axe-core audit (already in node_modules) over 9 public routes × 1440/390 found 236 colour-contrast
+failures. Controls in `ink-3` (3.75:1 on `bg`) — inactive tabs, "ดูเพิ่มเติม", Hot/New, filter/underline buttons, chapter
+pills, Navbar + mobile bottom-bar inactive items, the category back button — moved to `ink-2` (7.8:1); no token value
+changed. One rule: every control — text or icon-only (close, kebab, view toggles, delete/report) — uses `ink-2`; static
+meta text stays `ink-3`. TopupModal and DangerTab (parked) untouched. The Studio mobile tabs, which mark the active
+tab by colour alone, also get `font-semibold` on the active one.
+
+**Validated:** axe re-run: interactive failures 79 → 0; total 236 → 134. Remaining 134 are static text that fails
+because of the Strata token values themselves (`ink-3` 42% mix: 3.75:1; `accent` tags: 4.16:1) — left for the developer
+(numbers in PR). Visual check 1440/390: active/inactive distinction kept.
+
+---
+
+## #830 Settings tab strip keeps the active tab visible on a phone (2026-10-21)
+
+**What:** at 390 px the settings tab strip always started at the left, so on stats and danger zone the active tab
+was off-screen. The strip scrolls its own scrollLeft (pure `lib/stripScroll.ts`, never the page) to show the active tab on navigation, and both navs mark it with
+`aria-current="page"` — same pattern as the admin strip (#819).
+
+**Validated:** `stripScroll.test.ts` red → green; production build, local test session at 390: active tab fully visible on profile, password,
+accounts, stats and danger (stats/danger were off-screen); 0 page overflow. tsc 0; eslint 0.
+
+---
+
+## #828 Studio says "could not load" instead of showing zero works and 0 coins (2026-10-21)
+
+**What:** a failed Studio overview/works load showed a toast and then a full set of zero metrics and empty charts
+("you have no works"); a failed wallet call was swallowed into a 0-coin balance. New pure
+`studio/lib/studioLoadState.ts` (loading / error / ready; cached data stays) and `StudioLoadError` (sleeping studio
+mascot + "ลองใหม่"); the wallet fallbacks are `null` (a failed list never overwrites the cached one): balance and spending show "—", the coins tab shows the error + retry.
+
+**Validated:** `studioLoadState.test.ts` red → green; production build, local test session with the Studio APIs
+failing: overview and works at 1440 and 390 show the error + retry, no zero metrics, Retry re-requests once;
+signed-in Chrome with real data: overview (3 works, 9 chapters, 109 coins) and works list render as before.
+
+---
+
+## #826 Reader asks for a translation rating only on translated pages (2026-10-21)
+
+**What:** `showTranslation` defaults to true, so the "คุณภาพแปล 👍 👎" pill sat over every page, including pages never
+translated; its `bg-bg/50` + blur read as a grey smudge over manga art. New pure
+`components/reader/pageShowsTranslation.ts` gates it on the current page being in `translatedPages`/`patchedPages`;
+the pill is a solid `bg-bg/85` surface with a `text-ink-2` label.
+
+**Validated:** `pageShowsTranslation.test.ts` red → green; production build, chapter opened signed out (MIT offline):
+pill absent at 1440 and 390, no page errors. Not browser-checked: the pill on a translated page (needs a translation
+run).
+
+---
+
+## #824 Admin tables scroll on a phone instead of squashing (2026-10-21)
+
+**What:** with realistic data the admin tables (`w-full` in the new `overflow-x-auto` wrappers) squashed to 390 px:
+names stacked a word per line, action/role badges wrapped inside their pills, UIDs broke at hyphens. Tables get a
+minimum width (`min-w-[44rem]`, recent bans `32rem`) so they scroll in their card; badges, UIDs and dates are
+`whitespace-nowrap`; long names truncate with the full text in `title`.
+
+**Validated:** production build, local test session (role 8) with fixture data shaped like the admin API: 5 pages ×
+390 → 0 stacked cells (were 3/2/4/0/14 per page), 0 wrapped badges, every table scrolls in its card, 0 page overflow;
+1440 → 0 stacked cells, no table scroll, unchanged.
+
+---
+
+## #821 Background community tabs no longer starve the browser's connections (2026-10-21)
+
+**What:** the notifications dropdown that spun forever in a real Chrome session (every `/api/proxy/*` call from the
+tab hung while curl answered in ~50 ms). Root cause reproduced: `useFeedStream` / `usePostStream` kept an
+`EventSource` open in background tabs, and over HTTP/1.1 a browser shares 6 connections per host across all tabs —
+6 open `/community` tabs → every other request hangs (5 → fine). New `hooks/pageVisibility.ts` (`usePageVisible`,
+useSyncExternalStore over `visibilitychange`); both streams connect only while the tab is visible.
+
+**Validated:** `pageVisibility.test.ts` red → green; production build, headless Chromium, one profile: 6 community
+tabs with 5 hidden → live streams [0,0,0,0,0,1], a request from another tab 7 ms (was: never answers); a tab made
+visible again reconnects; same for 6 post tabs. Production behind Cloudflare negotiates HTTP/2 (not starved).
+Events while a tab is hidden are not delivered; the post page catches up on return (fresh post + comments; a post deleted meanwhile → /community).
+
+---
+
+## #819 Admin works at phone width; a failed load says so (2026-10-21)
+
+**What:** below `md` the admin sidebar is replaced by a sticky top bar with a scrolling tab strip (active tab kept in
+view, `aria-current`); `main` padding `p-4 md:p-8`; table wrappers scroll horizontally instead of clipping. One
+`AdminLoadError` (role=alert + Retry) on the Overview and above the table of Users / Content / Transactions / Audit
+when the latest load failed — the "No … found" row shows only after a successful load.
+
+**Validated:** production build, local test session (role 8) with the admin APIs answering 403: all five pages at
+390 → main 390 px wide (was ~120 px), sidebar hidden, 0 overflow, error + Retry shown, Retry re-requests once; 1440
+unchanged (main 1200 px beside the 240 px sidebar). tsc 0; eslint on the touched pages: same pre-existing
+set-state-in-effect count as main.
+
+---
+
+## #817 Opening /admin directly no longer bounces an admin home (2026-10-21)
+
+**What:** AuthContext starts with `user = null` + `loading = true`; the admin layout redirected on `user === null`
+without reading `loading`, so a direct load or refresh of any `/admin/*` page sent an admin to `/` (settings and
+studio already waited for `!loading`). The JWT role can also lag — an admin promoted in the panel has the role only
+in `profiles.role` — so the layout reads `GET /users/me` itself when the JWT is not admin. New pure
+`admin/components/adminGate.ts` → wait / redirect / allow.
+
+**Validated:** `adminGate.test.ts` red → green (5 cases); production build with a local test session (Supabase and
+admin APIs mocked locally): JWT 8 → all five admin URLs render (were redirected); JWT 1 + profile 8 → all five
+render; JWT 1 + profile 1 → redirected home. 1440 and 390.
+
+---
+
+## #814 Reading history no longer re-backfills and re-POSTs on every load (2026-10-21)
+
+**What:** the server has no column for `lastChapterNumber`, and `loadHistoryData` replaced local entries
+with the server's, so every signed-in load erased the numbers; the backfill then re-fetched each manga's
+chapter list and queued a POST that could not store the field (11 POSTs per load for a 30-entry history).
+A pure `mergeRemoteHistory` (in readingHistory.ts) keeps local display-only fields (`lastChapterNumber`, `thumbnailLocal`)
+when the server entry is for the same chapter; the backfill updates local state only.
+
+**Validated:** `readingHistory.test.ts` red → green (4 cases); signed-in browser, production build: second
+load → 0 history POSTs (was 11), 0 entries missing a chapter number. Not changed: the hero's per-slide
+chapter fetch (HeroDetailButton, by design) and a second history GET per load (AuthContext — parked).
+
+---
+
+## #812 Untranslated descriptions are no longer re-requested every hero slide (2026-10-21)
+
+**What:** `translateDescription` cached only successes, so a `translated: false` answer was re-fetched on
+every hero rotation (~5 s), each time making the backend try every Gemini model on the shared free-tier key
+(270 failure lines in one session). The "not translated" answer is now cached (as null) and still rejects;
+failed requests (network / non-2xx) stay uncached and retry.
+
+**Validated:** `translateDescription.test.ts` red → green (3 cases, counting fetch stub); production build in
+a signed-in browser: 60 s on the home page → 9 translate requests, all distinct texts (before: the same
+text repeated each rotation).
+
+---
+
+## #810 Studio nav highlights the right item on upload / manga / search (2026-10-21)
+
+**What:** `getActiveStudioTab` fell back to Overview for `/studio/upload`, `/studio/manga/[id]` and
+`/studio/search`; they now map to Works (sidebar + mobile Studio bar share the function).
+
+**Validated:** `studioTabs.test.ts` red → green; signed-in browser on a production build — upload, search and a
+work page highlight ผลงาน, `/studio` still ภาพรวม. Not browser-checked: the mobile bar (same function).
+
+---
+
+## #808 Reviews page shell + mascot empty states (2026-10-21)
+
+**What:** `/book/[id]/reviews` — the only route without the Navbar — now uses `page-shell page-shell-nav`,
+the shared page header and a `max-w-3xl` reading column; its empty state, Trending, post-page comments
+and My List (empty + signed out) show the area mascot (community / reader / login). Markup only.
+
+**Validated:** tsc 0; production build at 1440 + 390 on the four routes — 0 overflow, 0 console errors,
+screenshots reviewed; code-review + scrutinize: merge. Not checked: My List's signed-in empty tabs.
+
+---
+
+## Follow-up fixes after the Strata redesign — PRs #800 #803 #804 #805 #807 (2026-10-21)
+
+**What:**
+- **#800** — feature-audit bugs #661–#663, #666–#672, #675 (year-range search pages before paging, compare
+  reader zooms both panels, follow/vote/review/check-in rollbacks with visible errors, one shared
+  `/users/me/follows` load per page, reader fetches abort stale pages, pin/unpin audit rows) and
+  **#798**: avatar upload validated by magic bytes (`detectAllowedImage`), like every other upload.
+- **#803** (#801) — `TranslateThrottleGuard` keys on `cf-connecting-ip`, per-client 30/min checked before
+  the global 600/min, explicit fail-open; 6,000-char text cap.
+- **#804** — `UserAvatar` + `avatarSource` used for posts, comments, reader comments, reviews and the
+  profile following list; the mascot fallback is `aria-hidden`.
+- **#805** (#802) — the prompt keeps Markdown; the stripper runs only on `THOUGHTS:` and keeps links,
+  rules and blank lines; cache version v4 → v5.
+- **#807** (#806) — one `PostImage` for the forum card grid, compact thumbnail, post page and the
+  create-post preview: scheme-guarded (`safeImageSrc`), designed fallback on a blocked URL or load error;
+  the compact thumbnail is resized via `sizes` (`w=256`).
+
+**Validated:** each PR's own tests red → green, tsc 0, CI green, production-build browser checks
+(details in each PR). Not E2E-checked: the #807 uploader preview (needs a signed-in browser).
+
+**Left open:** #664 (check-in credit atomicity, wallet), #665 backend half (wallet), sweep of avatars
+stored before #798.
+
+---
+
+## #764 Strata redesign — Epics B/C/D + performance pass (2026-10-20)
+
+**What:** every user area moved onto the Strata tokens (home/catalog/search/nav #773, book popup +
+reader #774, community #775, settings/account/top-up/check-in #776, admin #777); Studio rebuilt (#786
+vendored evilcharts ECharts core, #787 `GET /studio/stats`, #788 resizable shell + stats overview, #789
+pages + CopyButton); the bot-avatars mascot cast placed per area (#783), `GET/PUT /users/me/mascot`
+(#784, migration written, not applied) and the mascot editor in settings (#785). ADR 029 records the
+design system. Emoji-as-icon replaced by lucide line icons, the coin glyph and the mascots.
+
+**Performance pass (asked for by the dev, production build, headless Chromium 1440×900):**
+home scroll 30 → 60 fps and book popup ~10 → 60 fps (backdrop-blur on 80 repeated cards and on
+full-screen scrims, measured by A/B — DESIGN.md now forbids it); mascot editor colour drag 41 → 4.8 ms
+sync work per event, frames over 50 ms 86 → 15; /settings scroll slow frames 123/389 → 0 and idle 60 fps
+(the furred preview rests as a still unless someone is dressing it). Search/new/community/studio/
+mylist/reader paging were already 60 fps.
+
+**Also fixed in passing:** profile display name painted under the banner; broken profile photo left an
+empty box; non-numeric chapter labels overflowed the Studio badge; Studio sidebar 12 px below the navbar.
+
+**Open:** light theme (#778, blocked on parked auth-flow files); profiles.mascot migration needs dev
+confirmation; colour-drag preview still ~30 fps while actively dragging (library re-shades the fur).
+
+---
+
+## #722 — one owner for the identity-change reset (2026-10-20)
+
+**What:** `Frontend/app/lib/identityReset.ts` `resetClientStateForIdentityChange()` is now the only
+list of per-user client caches dropped on an identity change (`clearUserCache`,
+`clearHistory({syncRemote: false})`, `clearFollowCache`, `clearAllApiCache`). `AuthContext.tsx`
+calls it at the four sites that used to spell the four calls out by hand (account switch,
+`SIGNED_OUT`, `signOut()`, `deleteAccount()`). ADR 015 updated.
+
+**Why:** the list had already drifted once (`clearFollowCache` was added late at every site), and the
+one cache with a pending-write flag is the one that wiped a user's server history (#720).
+
+**Not rebased:** `refactor/identity-reset-single-owner` was rebuilt on main instead. Its #720 half was
+already shipped by #712 — the branch's own history tests pass against main's
+`clearHistory({syncRemote: false})` and the "first read after re-sign-in" test fails with
+`syncRemote: true`. Main's `cacheGeneration` guards (in-flight load/flush of the previous user) stay.
+
+**Validation:** TDD — `identityReset.test.ts` red (module missing) → green, 2 tests; mutation:
+dropping any one of the four calls fails at least one test (4/4). `test:auth` 12/12 after
+allow-listing the new import in the `oauth-regression` harness (it threw `Unexpected import` →
+4 red before that). `bun test` 239 pass; the 8 failures are `app/docs/__tests__` integration tests
+that need a running server, same as before. Browser: signed out on the dev server — Supabase
+`logout` 204, signed-out UI, no `DELETE /users/me/history`. Limit: the local backend returned 404 for
+`/users/me/*`, so the account had no history to clear; the clearing itself is covered by the tests.
+
+---
+
+## Native Phase 2 first delivery and migration issue publication — 2026-10-03
+
+- Continued the approved `$grill-me` → `$to-prd` → `$to-issues` → `$tdd` direction using the existing full-parity plan. Published native [PRD #724](https://github.com/Slow-Inc/MangaDock/issues/724) and 29 bilingual slices #725–#753 through resumable GitHub CLI tooling; preserved old/new parents and left every issue open. No commit, PR, merge or duplicate plan.
+- Added native Home/hero/landing rows, the original six mobile destinations, release/tag/genre pagination and related manga using existing services/artwork. Initial personal library and read-only Community feeds/posts are implemented; Home/history resumes guarded Reader at saved Chapter/Page. Existing history writes are authenticated, serialized, account-isolated and server-acknowledged; delayed reads do not move progress backwards. Save failures show retry.
+- TDD checked response/filter/Back races and account isolation through real Mobile modules/Supabase SDK with external HTTP fixtures. Fresh Mobile verification: **121/121 tests**, typecheck, Android Hermes export **709 modules / 2.6MB / 10 assets**, all exit 0. No new runtime dependency or additional Frontend/Backend/MIT/shared-bridge source change in this batch.
+- New Phase 2 visual/live acceptance remains open: Mobile env lacks the three required public API/Supabase variables and contains Backend configuration keys; Backend runtime is unavailable. Secrets were not copied/overwritten. Automatic approval review rejected temporary-credential Metro startup with only “blocked by policy”; no bypass. Source export does not prove initialization/visual parity. Signed/physical beta and remaining Phase 2/3 workflows remain unaccepted.
+- Resume from [Phase 2 ledger](Mobile/docs/2026-10-03-native-phase2-implementation.md), [ADR 029](docs/adr/029-mobile-native-discovery-navigation-and-history.md) and [impact record](docs/reports/system-impact-report.md). Uncommitted. Configure private environments, validate, then compare populated web/native screens before accepting S11; continue S12/S20 missing criteria and later slices.
+
+## Android local SDK discovery — 2026-10-03
+
+- Reproduced `SDK location not found` with `gradlew.bat help`: installed SDK exists, both Android SDK environment variables are unset, and generated `android/local.properties` was absent. Added only the ignored local `sdk.dir` pointing to the existing SDK; documented machine setup and clean-prebuild recovery in Mobile README.
+- Verified original `app:assembleDebug` command for x86_64: **BUILD SUCCESSFUL**, exit 0, 204 tasks (5 executed / 199 up-to-date). No app-source or dependency change. Debug assembly does not prove live services or beta acceptance. Tracked documentation remains uncommitted.
+
+## Native UI follows the existing responsive mobile design — 2026-10-02
+
+- User clarified the visual baseline: root `DESIGN.md` and the actual responsive mobile Frontend. Updated Phase 1 native views with the original logo, Deep Space/indigo/amber palette, portrait search grid, centered detail cover/CTA, social-first sign-in, topup presets and progressively disclosed Reader controls. API/auth/payment/translation controllers retain their contracts; search offline errors no longer appear as an empty successful result.
+- Added Mobile-owned tokens, native shared chrome, six raster assets and a development asset generator. No new runtime dependency, Frontend/Backend/MIT source edit or shared-bridge change. PRD/slice criteria now carry this visual baseline into all phases; full bottom navigation and its destinations stay in Phase 2.
+- Verified: Mobile **88/88 tests**, typecheck, Android Hermes export **697 modules / 2.5MB**. Inspected the new logo/sign-in render on the already-installed emulator debug app. [Source mapping, before/after captures and remaining gates](Mobile/docs/2026-10-02-native-responsive-design-parity.md).
+- Live populated-screen acceptance remains open: Backend port 4001 was unavailable; an agent-started watch failed missing Supabase environment validation and was stopped. No new signed APK. Exact bundled font metrics, web/native image comparisons and authenticated Wallet/Reader checks remain. Uncommitted. Resume from the Mobile design-port note.
+
+## Android Gradle wrapper compatibility — 2026-10-02
+
+- Restored generated `Mobile/android/gradle/wrapper/gradle-wrapper.properties` from 9.4.1 to **9.3.1**, matching the installed Expo template and RN plugin wrapper. User build logs show Kotlin 2.3.0 metadata rejected by the Kotlin 2.1.20 plugin compiler; Gradle 9.3.1 `--version` confirms embedded Kotlin 2.2.21.
+- Documented the toolchain and next run in [Mobile README](Mobile/README.md#android-gradlekotlin-compatibility) and [execution ledger](Mobile/docs/2026-10-02-native-phase1-implementation.md). Native files are generated/ignored; fresh prebuild already uses 9.3.1. No new dependency or custom plugin.
+- APK build remains unverified: agent assemble failed on a sandbox Java real-path `AccessDeniedException`. Standalone Java reads the same workspace JAR (83,267 bytes) but `Path.toRealPath()` fails. Resume with `npm.cmd run android` in the user's normal Mobile terminal. Uncommitted; no additional Backend/Frontend/MIT edits.
+
+## Backend profile-join compilation fix — 2026-10-02
+
+- Fixed five TS2352 errors in reader comments, reviews, and user follows. Profile mappers now accept object, array, or null joins; empty joins preserve null author fields or omit missing follow profiles. Removed incompatible casts without changing queries or API response fields.
+- TDD reproduced lost author details and invalid follow profiles for array-shaped joins through the real Supabase SDK with a controlled HTTP boundary. Added 12 regression tests; `npm.cmd run build` passed; full Backend suite: **90 suites / 960 tests passed**.
+- Scope: three Backend services and their new specs, plus this history and the [impact report](docs/reports/system-impact-report.md). No dependency, schema, Frontend, or MIT changes. Uncommitted local fix for the reported Backend startup blocker, separate from native Mobile feature work.
+- Resume here: rerun `npm.cmd run start:dev` in `Backend` if the existing watch process has not rebuilt; database/runtime connectivity remains to be checked in the user's environment.
 ## #693 — SFX rescue gate: ADR 026 Addendum guard restored on integrate (2026-10-20)
 
 **What:** `MIT/manga_translator/manga_translator.py` rescue site now gates via `ocr_vlm.should_rescue_sfx`
@@ -1191,6 +3468,39 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## ส่งมอบ Native Phase 2 ชุดแรกและเผยแพร่ issues การย้าย — 2026-10-03
+
+- ทำต่อทิศทาง `$grill-me` → `$to-prd` → `$to-issues` → `$tdd` ที่อนุมัติโดยใช้แผน parity ครบเดิม เผยแพร่ native [PRD #724](https://github.com/Slow-Inc/MangaDock/issues/724) และ slices สองภาษา 29 งาน #725–#753 ผ่าน GitHub CLI tooling ที่ทำต่อได้ คง parents เก่า/ใหม่และเปิดทุก issue ไว้ ไม่ทำ commit/PR/merge หรือแผนซ้ำ
+- เพิ่ม Home/hero/landing rows native, navigation mobile หกปลายทางเดิม, pagination releases/tags/genres และ related manga ด้วยบริการ/artwork เดิม มีรายการส่วนตัวเริ่มต้นและเปิดดู feeds/posts Community; Home/ประวัติกู้ Reader ที่ผ่าน gates ตาม Chapter/Page ที่บันทึกไว้ History writes เดิมใช้ auth เรียงลำดับ แยกบัญชีและรอ server acknowledgement; reads ช้าไม่ทำ progress ย้อน แสดง save failures พร้อม retry
+- TDD ตรวจ races ของ response/filter/Back และการแยกบัญชีผ่าน modules Mobile/Supabase SDK จริงกับ HTTP fixtures ภายนอก การตรวจ Mobile ล่าสุด: **121/121 tests**, typecheck, Android Hermes export **709 modules / 2.6MB / 10 assets** ทุกคำสั่ง exit 0 ไม่เพิ่ม runtime dependency หรือแก้ source Frontend/Backend/MIT/shared bridge เพิ่มในรอบนี้
+- ยังเปิด acceptance ภาพ/บริการจริง Phase 2 ใหม่: env Mobile ขาด public variables API/Supabase สามตัวและมีชื่อ config Backend; runtime Backend ไม่พร้อม ไม่คัดลอก/เขียนทับ secrets Automatic approval review ปฏิเสธการเปิด Metro ด้วย credentials ชั่วคราว โดยแจ้งเพียง “blocked by policy” และไม่ได้เลี่ยง Source export ไม่ยืนยัน initialization/visual parity ส่วน signed/physical beta และ workflows Phase 2/3 ที่เหลือยังไม่ผ่าน acceptance
+- ทำต่อจาก [Ledger Phase 2](Mobile/docs/2026-10-03-native-phase2-implementation.md), [ADR 029](docs/adr/029-mobile-native-discovery-navigation-and-history.md) และ [impact record](docs/reports/system-impact-report.md) ยังไม่ commit ให้ตั้ง environments ส่วนตัว validate แล้วเทียบเว็บ/native ที่มีข้อมูลก่อนรับ S11 จากนั้นทำเกณฑ์ที่ขาดของ S12/S20 และ slices ถัดไป
+
+## ตั้งตำแหน่ง Android SDK เฉพาะเครื่อง — 2026-10-03
+
+- ทำซ้ำ `SDK location not found` ด้วย `gradlew.bat help`: SDK ติดตั้งอยู่แล้ว แต่ environment SDK ทั้งสองตัวยังว่าง และไม่มี `android/local.properties` เพิ่มเฉพาะ `sdk.dir` ในไฟล์ local ที่ Git ignore ให้ชี้ SDK เดิม พร้อมบันทึกวิธีตั้งค่าเครื่องและกู้คืนหลัง clean prebuild ใน Mobile README
+- ตรวจคำสั่ง `app:assembleDebug` เดิมสำหรับ x86_64: **BUILD SUCCESSFUL**, exit 0, 204 tasks (รัน 5 / up-to-date 199) ไม่แก้ source แอปหรือ dependencies การสร้าง debug APK ไม่ยืนยันบริการจริงหรือ acceptance beta เอกสารที่เก็บใน Git ยังไม่ได้ commit
+
+## Native UI อิง design responsive mobile เดิม — 2026-10-02
+
+- ผู้ใช้ชี้แจงต้นแบบภาพ: `DESIGN.md` รากและ Frontend responsive mobile จริง ปรับ native views Phase 1 ด้วยโลโก้เดิม สี Deep Space/indigo/amber, grid ปกค้นหา, ปก/CTA รายละเอียดกลาง, Login social ก่อนอีเมล, presets เติมเงิน และเปิด Reader controls เมื่อต้องใช้ โดยคง contracts ของ controllers API/auth/payment/translation และไม่แสดง search offline error เป็นผลสำเร็จที่ว่าง
+- เพิ่ม tokens และ shared chrome ที่ Mobile ดูแล พร้อม raster assets หกไฟล์และตัวสร้าง assets ตอนพัฒนา ไม่มี runtime dependency, การแก้ source Frontend/Backend/MIT หรือ shared bridge เกณฑ์ PRD/slices ครอบคลุมต้นแบบภาพนี้ทุก phase; bottom navigation ครบและหน้าปลายทางอยู่ Phase 2
+- ตรวจแล้ว: Mobile **88/88 tests**, typecheck, Android Hermes export **697 modules / 2.5MB** ตรวจภาพโลโก้/Login ใหม่บน debug app ที่ติดตั้งอยู่ใน emulator จริง [Mapping ภาพก่อน/หลังและเกณฑ์ที่เหลือ](Mobile/docs/2026-10-02-native-responsive-design-parity.md)
+- ยังเปิด acceptance หน้าที่มีข้อมูลจริง: Backend port 4001 ไม่พร้อม; watch ที่ agent เปิดเองล้มจาก environment Supabase ที่ขาดและหยุดแล้ว ไม่มี signed APK ใหม่ ยังต้องตรวจ metrics ฟอนต์ที่ bundle โดยตรง ภาพเทียบเว็บ/native และ Wallet/Reader ที่ต้องบัญชี ยังไม่ได้ commit ทำต่อจาก design-port note ของ Mobile
+
+## แก้ความเข้ากันได้ของ Android Gradle wrapper — 2026-10-02
+
+- คืน `Mobile/android/gradle/wrapper/gradle-wrapper.properties` ที่สร้างอัตโนมัติจาก 9.4.1 เป็น **9.3.1** ให้ตรง template Expo และ wrapper ของ RN plugin ที่ติดตั้ง Log build ผู้ใช้พบ compiler Kotlin 2.1.20 อ่าน metadata Kotlin 2.3.0 ไม่ได้; `--version` ของ Gradle 9.3.1 ยืนยัน Kotlin 2.2.21
+- บันทึก toolchain และการรันต่อใน [Mobile README](Mobile/README.md#android-gradlekotlin-compatibility) และ [execution ledger](Mobile/docs/2026-10-02-native-phase1-implementation.md) Native files เป็นไฟล์ที่สร้างและไม่เก็บใน Git; prebuild ใหม่ใช้ 9.3.1 อยู่แล้ว ไม่มี dependency หรือ custom plugin เพิ่ม
+- ยังไม่ยืนยัน APK: assemble ของ agent ล้มจาก Java หา real path ใน sandbox แล้วได้ `AccessDeniedException` ทดสอบ Java แยกอ่าน JAR เดียวกันใน workspace ได้ 83,267 bytes แต่ `Path.toRealPath()` ล้ม ทำต่อด้วย `npm.cmd run android` ใน terminal ปกติของผู้ใช้ใน Mobile ยังไม่ได้ commit และไม่แก้ Backend/Frontend/MIT เพิ่ม
+
+## แก้ Backend compile ไม่ผ่านจาก profile join — 2026-10-02
+
+- แก้ TS2352 ทั้งห้าจุดใน reader comments, reviews และ user follows ให้ตัวแปลง profile รองรับ object, array และ null; join ว่างยังคืนชื่อ/รูปเป็น null หรือข้าม profile ที่ไม่มีในรายการ follow ถอด cast ที่ไม่ตรงชนิดโดยคง query และฟิลด์ response API เดิม
+- ทำ TDD ยืนยันว่าข้อมูลชื่อ/รูปหายและรายการ follow ผิดเมื่อ join เป็น array โดยใช้ Supabase SDK จริงกับ HTTP จำลอง เพิ่ม regression tests 12 เคส; `npm.cmd run build` ผ่าน; ชุดทดสอบ Backend ทั้งหมด **90 suites / 960 tests ผ่าน**
+- ขอบเขต: Backend สาม services และ specs ใหม่ พร้อม history นี้และ [impact report](docs/reports/system-impact-report.md) ไม่มีการเปลี่ยน dependency, schema, Frontend หรือ MIT เป็นการแก้ปัญหาเปิด Backend ที่ผู้ใช้รายงาน แยกจากงาน native Mobile และยังไม่ได้ commit
+- ทำต่อจากตรงนี้: หาก watch เดิมยังไม่ rebuild ให้รัน `npm.cmd run start:dev` ใน `Backend` ใหม่; ยังต้องตรวจการเชื่อมต่อฐานข้อมูล/runtime ในเครื่องผู้ใช้
 
 ## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
 
@@ -3241,3 +5551,15 @@ Converged the 3-way divergence (`main`/`landing`/`perf`) onto `integrate/render-
 - Added 12 auth/MFA/cache regressions and a dedicated CI workflow. Canonical frontend suite: 226 passed; TypeScript and targeted lint passed.
 - Local placeholder-config build passed. Playwright checked URL errors, timeout and a preexisting synthetic session; production baseline error URL still showed pending text. Screenshots and limitations: docs/reports/phase3-auth-20261001/README.md.
 - Independent review findings fixed. Real provider/MFA/device E2E and Vercel production deployment are not claimed by this source validation.
+
+# Native Phase 2/3 implementation checkpoint — 2026-10-04
+
+- Added native collections/history CSV and OS sharing, reviews/page comments/reports/translation votes, profiles/banner/follows, check-in/notifications/preferences/statistics, full supported account security, Community CRUD/images/replies/votes/SSE, creator Studio/uploads/publish/earnings and existing staff users/content/transactions/audit. Original responsive mobile source and DESIGN.md remain the reference; server/account/business contracts stay unchanged.
+- Verification before final review: **210 Mobile tests**, typecheck, fresh Hermes Android export **772 modules / approximately 3 MB / 11 assets** and x86_64 debug native assembly passed (204 tasks). Installed SDK-compatible native media/sharing dependencies and regenerated Android without clean. Initial missing-import failures in five tracer modules were not valid behavior RED; the ledger corrects this evidence rather than claiming perfect TDD history.
+- Final source review completed in one fresh context: corrected native image construction, Studio read navigation, Android Back, same-language chapter navigation, stale post/vote SSE reconciliation and creator/source labels. Regraded lost Reader mode/RTL/zoom as Important and preserved preferences across chapters. Observed behavior RED→GREEN, including actual React component/controller flows with OS boundaries substituted; **218/218 tests**, typecheck and post-fix Hermes Android export passed. Populated web/native comparisons, real provider/captcha/payment/translation and signed physical-device acceptance S10/S29 remain open. Env validation still misses three public variables; no secrets copied or exposed. No commits, issue closure or additional Backend/Frontend/MIT source edits in this increment. See [feature/status mapping](Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](Mobile/docs/2026-10-03-native-completion-ledger.md), [ADR 030](docs/adr/030-mobile-native-account-community-and-creator-contracts.md) and [impact report](docs/reports/system-impact-report.md).
+
+## ภาษาไทย
+
+- เพิ่ม native collections/history CSV และ OS sharing รีวิว/คอมเมนต์รายหน้า/รายงาน/โหวตแปล profiles/banner/follows เช็กอิน/แจ้งเตือน/preferences/สถิติ account security ที่รองรับครบ Community CRUD/รูป/replies/votes/SSE creator Studio/uploads/publish/earnings และทีมงาน users/content/transactions/audit เดิม ยึด source responsive mobile กับ DESIGN.md คง contracts server/บัญชี/ธุรกิจ
+- ตรวจก่อน final review: **Mobile 210 tests**, typecheck, Hermes Android export ใหม่ **772 modules / ประมาณ 3 MB / assets 11 ไฟล์** และประกอบ debug native x86_64 ผ่าน (204 tasks) ติดตั้ง media/sharing dependencies ที่เข้ากับ SDK และ generate Android ใหม่โดยไม่ clean Missing-import failures แรกของ tracers ห้าตัวไม่ใช่ behavior RED ที่ถูกต้อง แก้หลักฐานใน ledger โดยไม่อ้างประวัติ TDD สมบูรณ์
+- Review source สุดท้ายใช้บริบทใหม่หนึ่งตัวแล้ว แก้ native image construction navigation อ่าน Studio Android Back การเปลี่ยนตอนภาษาเดียว SSE post/vote เก่าทับใหม่และ labels creator/source ยกระดับ preferences mode/RTL/zoom หายเป็น Important และคงข้ามตอน พบ behavior RED→GREEN จริงรวม flow components/controllers React ที่จำลองเฉพาะขอบ OS **218/218 tests**, typecheck และ Hermes Android หลังแก้ผ่าน ยังเปิดภาพ populated web/native บริการ provider/captcha/payment/translation จริงและ signed physical-device acceptance S10/S29 Validate env ยังขาด public variables สามค่า ไม่คัดลอกหรือเผย secrets ไม่มี commit/ปิด issue หรือเพิ่ม source changes Backend/Frontend/MIT รอบนี้ ดู [mapping ฟีเจอร์/สถานะ](Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](Mobile/docs/2026-10-03-native-completion-ledger.md), [ADR 030](docs/adr/030-mobile-native-account-community-and-creator-contracts.md), [impact report](docs/reports/system-impact-report.md)

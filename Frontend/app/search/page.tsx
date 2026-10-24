@@ -8,9 +8,20 @@ import CoverLightbox from "../components/CoverLightbox";
 import Navbar from "../components/Navbar";
 import { getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, type HistoryBook } from "../lib/readingHistory";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "../components/ui/CoverPlaceholder";
+import AdultBadge from "../components/ui/AdultBadge";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { apiFetch } from "../lib/apiFetch";
+import { allowsAdult, levelKey, useContentLevel } from "../lib/contentLevel";
+import { inputClass } from "../components/ui/Input";
+import Pill from "../components/ui/Pill";
+import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import type { LandingBook } from "../lib/types";
+import Mascot from "../components/mascot/Mascot";
+import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
 
 const API_BASE = "/api/proxy";
 
@@ -51,48 +62,60 @@ function mergeLocal(): LandingBook[] {
   return out;
 }
 
+/** A year typed in a filter box, once it is whole: 4 digits, 1900-2100; anything else is no filter yet (#965). */
+const completeYear = (v: string) => (/^\d{4}$/.test(v) && +v >= 1900 && +v <= 2100 ? v : "");
+
 // ─── SearchResultCard ────────────────────────────────────────────────────────
 function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () => void }) {
   const [showCover, setShowCover] = useState(false);
-  const thumb = resolvedThumbnail(book) || "https://placehold.co/200x300/1a1a1a/ffffff?text=No+Cover";
+  const cover = useCoverSrc(book);
   return (
     <>
       <div className="group flex flex-col gap-2 text-left cursor-pointer" onClick={onSelect}>
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 smooth-hover group-hover:scale-[1.03] group-hover:border-white/30 group-hover:shadow-lg group-hover:shadow-black/50">
-          <Image
-            src={thumb}
-            alt={book.title}
-            fill
-            onError={(e) => {
-              if (book.thumbnailLocal && book.thumbnail) {
-                (e.currentTarget as HTMLImageElement).src =
-                  `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
-              }
-            }}
-            className="object-cover"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-          />
-          <div className="absolute inset-0 flex items-end bg-linear-to-t from-black/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <span className="text-xs font-semibold text-white">ดูรายละเอียด</span>
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line smooth-hover group-hover:scale-[1.03] group-hover:border-ink-3">
+          {cover.src ? (
+            <Image
+              src={cover.src}
+              alt={book.title}
+              fill
+              onError={cover.onError}
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+            />
+          ) : (
+            <CoverPlaceholder title={book.title} />
+          )}
+          <div className="absolute inset-0 flex items-end bg-linear-to-t from-bg/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <span className="text-xs font-semibold text-ink">ดูรายละเอียด</span>
           </div>
+          <AdultBadge rating={book.contentRating} className="absolute left-2 top-2 z-10" />
           {/* Expand cover button */}
-          <button
+          {cover.src && <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
-            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-black/80 hover:text-white"
+            aria-label={`ดูหน้าปกขนาดใหญ่: ${book.title}`}
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink focus-visible:opacity-100"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
             </svg>
-          </button>
+          </button>}
         </div>
         <div>
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-white">{book.title}</p>
-          {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-white/45">{book.authors[0]}</p>}
-          {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-indigo-400/70">{book.categories[0]}</p>}
+          {/* The card's keyboard/screen-reader entry point, as in MangaGrid (#838, #926): the div's click is mouse-only. */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(); }}
+            className="block w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink"
+          >
+            <span className="line-clamp-2">{book.title}</span>
+          </button>
+          {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-ink-3">{book.authors[0]}</p>}
+          {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-accent/70">{book.categories[0]}</p>}
         </div>
       </div>
-      {showCover && <CoverLightbox src={thumb} alt={book.title} onClose={() => setShowCover(false)} />}
+      {showCover && cover.src && <CoverLightbox src={cover.src} alt={book.title} onClose={() => setShowCover(false)} />}
     </>
   );
 }
@@ -100,14 +123,9 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
 // ─── FilterChip ───────────────────────────────────────────────────────────────
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-        active ? "bg-white text-black" : "bg-white/8 text-white/55 hover:bg-white/15 hover:text-white/80"
-      }`}
-    >
+    <Pill size="sm" selected={active} onClick={onClick} className="shrink-0 font-medium">
       {children}
-    </button>
+    </Pill>
   );
 }
 
@@ -152,7 +170,7 @@ function ChipBar({ categories, active, onSelect }: {
   }, [categories]);
 
   const scroll = (dir: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: scrollBehavior() });
   };
 
   if (categories.length <= 1) return null;
@@ -161,11 +179,11 @@ function ChipBar({ categories, active, onSelect }: {
     <div className="relative min-w-0 flex-1">
       {canLeft && (
         <>
-          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-bg to-transparent" />
           <button
             aria-label="เลื่อนซ้าย"
             onClick={() => scroll(-1)}
-            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -185,11 +203,11 @@ function ChipBar({ categories, active, onSelect }: {
 
       {canRight && (
         <>
-          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-bg to-transparent" />
           <button
             aria-label="เลื่อนขวา"
             onClick={() => scroll(1)}
-            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -204,14 +222,21 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const query = searchParams.get("q") ?? "";
+  usePageTitle(query ? `ค้นหา “${query}”` : "ค้นหา");
 
   const [inputValue, setInputValue]       = useState(query);
   const [source, setSource]               = useState<Source>("all");
   const [langFilter, setLangFilter]       = useState("all");
   const [statusFilter, setStatusFilter]   = useState<'ongoing' | 'completed' | 'hiatus' | 'all'>('all');
+  // 18+ (#1102): the level decides what the server returns; "เฉพาะ 18+" narrows to it (shown only above off)
+  const level = useContentLevel();
+  const [adultOnlyChoice, setAdultOnly] = useState(false);
+  const adultOnly = adultOnlyChoice && allowsAdult(level);
   const [yearFrom, setYearFrom]           = useState('');
   const [yearTo, setYearTo]               = useState('');
-  const [ratingMin, setRatingMin]         = useState(0);
+  // What is typed in the year boxes; it applies once it is a whole year (#965)
+  const [yearFromDraft, setYearFromDraft] = useState('');
+  const [yearToDraft, setYearToDraft]     = useState('');
   const [showAdvanced, setShowAdvanced]   = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -220,6 +245,9 @@ function SearchResults() {
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(false);
   const [searched, setSearched]     = useState(false);
+  // A failed search is not "no results" (#911): kept apart, with a retry counter the fetch effect depends on
+  const [apiFailed, setApiFailed]   = useState(false);
+  const [retry, setRetry]           = useState(0);
   const [selectedBook, setSelectedBook] = useState<LandingBook | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -229,12 +257,23 @@ function SearchResults() {
   useEffect(() => { setInputValue(query); }, [query]);
 
   // reset page when query / lang / status / year / rating / source changes
-  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
+  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source, adultOnly]);
+
+  // A year applies once it is complete (4 digits, 1900-2100), after a pause: typing "2015" searches once, not for
+  // 2, 20 and 201 on the way (#965)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setYearFrom(completeYear(yearFromDraft));
+      setYearTo(completeYear(yearToDraft));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [yearFromDraft, yearToDraft]);
 
   // fetch from API
   useEffect(() => {
     if (source !== "all") return;
-    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); return; }
+    // also clear `loading`: a search aborted by going back to an empty query never resets it (#1013)
+    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); setApiFailed(false); setLoading(false); return; }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -242,6 +281,7 @@ function SearchResults() {
 
     setLoading(true);
     setSearched(false);
+    setApiFailed(false);
     setApiResults([]);
     setApiTotal(0);
 
@@ -251,12 +291,14 @@ function SearchResults() {
     if (statusFilter !== "all") qs.set("status", statusFilter);
     if (yearFrom) qs.set("yearFrom", yearFrom);
     if (yearTo) qs.set("yearTo", yearTo);
+    if (adultOnly) qs.set("adult", "only");
 
-    const cacheKey = `search:page:${query}:${page}:${langFilter}:${statusFilter}:${yearFrom}:${yearTo}`;
+    const cacheKey = `search:page:${query}:${page}:${langFilter}:${statusFilter}:${yearFrom}:${yearTo}${levelKey(level)}${adultOnly ? ":adult" : ""}`;
     cacheOrFetch<{ items: LandingBook[]; total: number }>(
       cacheKey,
       async () => {
-        const r = await fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
+        const r = await apiFetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
+        if (!r.ok) throw new Error(`search ${r.status}`); // an error body is not an empty result (and is not cached)
         return r.json();
       },
       TTL.MEDIUM,
@@ -268,13 +310,13 @@ function SearchResults() {
         setSearched(true);
         setLoading(false);
       })
-      .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setSearched(true); setLoading(false); } });
+      .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setApiFailed(true); setSearched(true); setLoading(false); } });
 
     return () => ctrl.abort();
-  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page]);
+  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page, retry, level, adultOnly]);
 
   // reset category when base changes
-  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
+  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
 
   // local books (favorites + history) — must be client-only to avoid hydration mismatch
   const [localBooks, setLocalBooks] = useState<LandingBook[]>([]);
@@ -297,12 +339,27 @@ function SearchResults() {
     return [...cats].sort();
   }, [sourceResults]);
 
-  // final displayed (category + rating filter)
-  const displayed = useMemo(() => {
-    let r = categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter));
-    if (ratingMin > 0) r = r.filter((b) => (b.averageRating ?? 0) >= ratingMin);
-    return r;
-  }, [sourceResults, categoryFilter, ratingMin]);
+  // final displayed (category filter). No rating filter: search results carry no rating yet (#965)
+  const displayed = useMemo(
+    () => (categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter))),
+    [sourceResults, categoryFilter],
+  );
+  const filtersOn = langFilter !== "all" || statusFilter !== "all" || !!yearFrom || !!yearTo || categoryFilter !== "all";
+  const clearYear = () => {
+    setYearFromDraft("");
+    setYearToDraft("");
+    setYearFrom("");
+    setYearTo("");
+  };
+  const clearFilters = () => {
+    setLangFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    clearYear();
+  };
+  // A typed year that cannot apply yet (partial or out of range) is flagged, not silently ignored (#965)
+  const yearFromBad = !!yearFromDraft && !completeYear(yearFromDraft);
+  const yearToBad = !!yearToDraft && !completeYear(yearToDraft);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,27 +371,29 @@ function SearchResults() {
   const isLoading = !isMyList && loading;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
-      <main className="page-shell page-shell-nav page-shell-wide">
+      <main id="main" className="page-shell page-shell-nav page-shell-wide">
+        <h1 className="sr-only">ค้นหามังงะ</h1>
 
         {/* ── Search bar ────────────────────────────────────────────── */}
         <form onSubmit={handleSearch} className="mb-7 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              aria-label="ค้นหาหนังสือหรือมังงะ"
               placeholder="ค้นหาหนังสือ, มังงะ..."
               autoFocus
-              className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 pl-12 pr-4 text-base text-white placeholder-white/30 outline-none transition focus:border-white/30 focus:bg-white/8"
+              className={`${inputClass} pl-12`}
             />
           </div>
-          <button type="submit" className="w-full rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95 sm:w-auto">
+          <button type="submit" className="w-full rounded-2xl bg-ink px-6 py-3 text-sm font-semibold text-bg transition hover:bg-ink/90 active:scale-95 sm:w-auto">
             ค้นหา
           </button>
         </form>
@@ -344,19 +403,19 @@ function SearchResults() {
           {/* Row 1: แหล่งข้อมูล + ภาษา + advanced toggle */}
           <div className="space-y-2 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="shrink-0 text-xs font-medium text-white/30">แหล่งข้อมูล</span>
+              <span className="shrink-0 text-xs font-medium text-ink-3">แหล่งข้อมูล</span>
               <FilterChip active={source === "all"} onClick={() => setSource("all")}>ทั้งหมด</FilterChip>
               <FilterChip active={source === "mylist"} onClick={() => setSource("mylist")}>
                 รายการของฉัน
                 {localBooks.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-xs">{localBooks.length}</span>
+                  <span className="ml-1.5 rounded-full bg-fill px-1.5 py-px text-xs">{localBooks.length}</span>
                 )}
               </FilterChip>
 
               {!isMyList && (
                 <>
-                  <span className="mx-1 hidden h-4 w-px shrink-0 bg-white/15 sm:block" />
-                  <span className="hidden shrink-0 text-xs font-medium text-white/30 sm:block">ภาษา</span>
+                  <span className="mx-1 hidden h-4 w-px shrink-0 bg-line sm:block" />
+                  <span className="hidden shrink-0 text-xs font-medium text-ink-3 sm:block">ภาษา</span>
                   <div className="hidden flex-wrap items-center gap-2 sm:flex">
                     {LANG_OPTIONS.map((opt) => (
                       <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
@@ -365,20 +424,20 @@ function SearchResults() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setShowAdvanced((s) => !s)}
+                    onClick={() => setShowAdvanced((s) => !s)} aria-expanded={showAdvanced}
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                      showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
-                        ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-300"
-                        : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                      showAdvanced || statusFilter !== 'all' || yearFrom || yearTo
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-line text-ink-2 hover:border-ink-3 hover:text-ink"
                     }`}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
                       <path strokeLinecap="round" d="M3 6h18M7 12h10M11 18h2" />
                     </svg>
                     ตัวกรองขั้นสูง
-                    {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
-                        {[statusFilter !== 'all', !!yearFrom || !!yearTo, ratingMin > 0].filter(Boolean).length}
+                    {(statusFilter !== 'all' || yearFrom || yearTo) && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-ink text-xs font-bold text-bg">
+                        {[statusFilter !== 'all', !!yearFrom || !!yearTo].filter(Boolean).length}
                       </span>
                     )}
                   </button>
@@ -388,7 +447,7 @@ function SearchResults() {
 
             {!isMyList && (
               <div className="flex flex-wrap items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-xs font-medium text-white/30">ภาษา</span>
+                <span className="shrink-0 text-xs font-medium text-ink-3">ภาษา</span>
                 {LANG_OPTIONS.map((opt) => (
                   <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
                     {opt.label}
@@ -400,10 +459,10 @@ function SearchResults() {
 
           {/* Advanced filter panel */}
           {!isMyList && showAdvanced && (
-            <div className="rounded-2xl border border-white/8 bg-white/3 p-4 space-y-4">
+            <div className="rounded-2xl border border-line bg-fill p-4 space-y-4">
               {/* สถานะ */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">สถานะ</span>
+                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">สถานะ</span>
                 <FilterChip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>ทั้งหมด</FilterChip>
                 {(['ongoing', 'completed', 'hiatus'] as const).map((s) => (
                   <FilterChip key={s} active={statusFilter === s} onClick={() => setStatusFilter((prev) => prev === s ? 'all' : s)}>
@@ -412,46 +471,52 @@ function SearchResults() {
                 ))}
               </div>
 
+              {/* เรต: only when the account allows 18+ (#1102) */}
+              {allowsAdult(level) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="w-14 shrink-0 text-xs font-medium text-ink-3">เรต</span>
+                  <FilterChip active={!adultOnly} onClick={() => setAdultOnly(false)}>ทั้งหมด</FilterChip>
+                  <FilterChip active={adultOnly} onClick={() => setAdultOnly(true)}>เฉพาะ 18+</FilterChip>
+                </div>
+              )}
+
               {/* ปี */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">ปี</span>
-                <input
+                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">ปี</span>
+                <input aria-label="ปี จาก"
                   type="number"
-                  value={yearFrom}
-                  onChange={(e) => setYearFrom(e.target.value)}
+                  value={yearFromDraft}
+                  onChange={(e) => setYearFromDraft(e.target.value)}
+                  aria-invalid={yearFromBad || undefined}
+                  aria-describedby={yearFromBad ? "year-hint" : undefined}
                   placeholder="จาก"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 transition focus:border-ink-3 aria-[invalid=true]:outline-danger [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
-                <span className="text-xs text-white/30">–</span>
-                <input
+                <span className="text-xs text-ink-3">–</span>
+                <input aria-label="ปี ถึง"
                   type="number"
-                  value={yearTo}
-                  onChange={(e) => setYearTo(e.target.value)}
+                  value={yearToDraft}
+                  onChange={(e) => setYearToDraft(e.target.value)}
+                  aria-invalid={yearToBad || undefined}
+                  aria-describedby={yearToBad ? "year-hint" : undefined}
                   placeholder="ถึง"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 transition focus:border-ink-3 aria-[invalid=true]:outline-danger [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
-                {(yearFrom || yearTo) && (
-                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-white/30 hover:text-white/60 transition">ล้าง</button>
+                {(yearFromDraft || yearToDraft) && (
+                  <button onClick={clearYear} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
+                )}
+                {(yearFromBad || yearToBad) && (
+                  <span id="year-hint" className="w-full pl-16 text-[11px] text-ink-3">ใส่ปี ค.ศ. 4 หลัก (1900–2100)</span>
                 )}
               </div>
 
-              {/* คะแนน */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">คะแนน</span>
-                {([0, 3, 4, 4.5] as const).map((r) => (
-                  <FilterChip key={r} active={ratingMin === r} onClick={() => setRatingMin(r)}>
-                    {r === 0 ? 'ทั้งหมด' : `≥ ${r}★`}
-                  </FilterChip>
-                ))}
-              </div>
-
               {/* Reset all */}
-              {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
+              {(statusFilter !== 'all' || yearFromDraft || yearToDraft) && (
                 <button
-                  onClick={() => { setStatusFilter('all'); setYearFrom(''); setYearTo(''); setRatingMin(0); }}
-                  className="text-xs text-white/30 underline underline-offset-2 hover:text-white/60 transition"
+                  onClick={() => { setStatusFilter('all'); clearYear(); }}
+                  className="text-xs text-ink-2 underline underline-offset-2 hover:text-ink transition"
                 >
                   ล้างตัวกรองทั้งหมด
                 </button>
@@ -462,7 +527,7 @@ function SearchResults() {
           {/* Row 3: หมวดหมู่ (dynamic from results) */}
           {availableCategories.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-medium text-white/30">หมวดหมู่</span>
+              <span className="shrink-0 text-xs font-medium text-ink-3">หมวดหมู่</span>
               <ChipBar
                 categories={["all", ...availableCategories]}
                 active={categoryFilter}
@@ -474,7 +539,7 @@ function SearchResults() {
 
         {/* ── Heading ───────────────────────────────────────────────── */}
         {(query || isMyList) && (
-          <p className="mb-6 text-sm text-white/45">
+          <p className="mb-6 text-sm text-ink-3">
             {isLoading
               ? `กำลังค้นหา "${query}"...`
               : isMyList && !query
@@ -489,10 +554,12 @@ function SearchResults() {
         {isLoading && (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-white/10" />
-                <div className="h-3 w-3/4 animate-pulse rounded bg-white/10" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+              <div key={i} aria-hidden className="flex flex-col gap-2">
+                <div className="aspect-2/3 w-full overflow-hidden rounded-xl bg-fill">
+                  <div className={`h-full w-full animate-pulse ${DOT_FIELD}`} style={shimmerDelay(i)} />
+                </div>
+                <div className="h-3 w-3/4 rounded bg-fill" />
+                <div className="h-3 w-1/2 rounded bg-fill" />
               </div>
             ))}
           </div>
@@ -512,21 +579,21 @@ function SearchResults() {
           const totalPages = Math.ceil(apiTotal / PAGE_SIZE);
           return (
             <div className="mt-10 flex flex-col items-center gap-3">
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-ink-3">
                 หน้า {page} จาก {totalPages} — {apiTotal} รายการทั้งหมด
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
-                  onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page <= 1}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   «
                 </button>
                 <button
-                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page <= 1}
-                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ← ก่อนหน้า
                 </button>
@@ -536,11 +603,11 @@ function SearchResults() {
                   return (
                     <button
                       key={p}
-                      onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                       className={`h-9 w-9 rounded-lg text-sm font-medium transition ${
                         p === page
-                          ? "bg-white text-black"
-                          : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/15"
+                          ? "bg-ink text-bg"
+                          : "border border-line bg-fill text-ink-2 hover:bg-raised"
                       }`}
                     >
                       {p}
@@ -548,16 +615,16 @@ function SearchResults() {
                   );
                 })}
                 <button
-                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page >= totalPages}
-                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ถัดไป →
                 </button>
                 <button
-                  onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page >= totalPages}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   »
                 </button>
@@ -566,24 +633,47 @@ function SearchResults() {
           );
         })()}
 
+        {/* ── Load error (#911) — a failed search, not an empty one ────── */}
+        {!isLoading && apiFailed && !isMyList && displayed.length === 0 && (
+          <div className="py-12">
+            <LoadError what="ผลการค้นหา" area="search" onRetry={() => setRetry((n) => n + 1)} />
+          </div>
+        )}
+
         {/* ── Empty state ───────────────────────────────────────────── */}
-        {!isLoading && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
-          <div className="flex flex-col items-center gap-4 py-24 text-center text-white/40">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-16 w-16 opacity-30">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+        {!isLoading && !(apiFailed && !isMyList) && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
+          <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
+            <Mascot area="search" size={96} />
             <p className="text-lg font-semibold">
-              {isMyList ? (query ? `ไม่พบรายการที่ตรงกับ "${query}"` : "ยังไม่มีรายการในคลังของคุณ") : `ไม่พบหนังสือที่ตรงกับ "${query}"`}
+              {isMyList
+                ? (query ? `ไม่พบรายการที่ตรงกับ "${query}"` : "ยังไม่มีรายการในคลังของคุณ")
+                : filtersOn
+                  ? `ไม่พบ "${query}" ที่ตรงกับตัวกรองที่เลือก`
+                  : `ไม่พบหนังสือที่ตรงกับ "${query}"`}
             </p>
             <p className="text-sm">
-              {isMyList ? "เพิ่มหนังสือลงรายการของฉัน หรือลองค้นหาจากทั้งหมด" : "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด"}
+              {isMyList
+                ? "เพิ่มหนังสือลงรายการของฉัน หรือลองค้นหาจากทั้งหมด"
+                : filtersOn
+                  ? "ลองล้างตัวกรองเพื่อดูผลทั้งหมด"
+                  : "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด"}
             </p>
+            {/* A filter emptied the list, not the search words: offer the way back (#965) */}
+            {!isMyList && filtersOn && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-xl border border-line bg-fill px-4 py-2 text-sm font-medium text-ink smooth-hover-fast hover:border-ink-3 hover:bg-raised"
+              >
+                ล้างตัวกรอง
+              </button>
+            )}
           </div>
         )}
 
         {/* ── Initial state ─────────────────────────────────────────── */}
         {!query && !isMyList && !isLoading && (
-          <div className="flex flex-col items-center gap-4 py-24 text-center text-white/40">
+          <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-16 w-16 opacity-30">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>

@@ -98,4 +98,60 @@ describe('DiskStorageProvider', () => {
     await provider.ensureDir(dir);
     expect(fs.existsSync(dir)).toBe(true);
   });
+
+  // #1007: a relative key must stay inside the provider's root. The root is a temp dir (process.cwd is mocked), with
+  // a sentinel file in it and beside it, so even a build without the guard can only touch the temp tree.
+  describe('relative keys are contained in the root (#1007)', () => {
+    let root: string;
+    let contained: DiskStorageProvider;
+    let cwdSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      root = path.join(tmp, 'root');
+      fs.mkdirSync(path.join(root, 'uploads'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'sentinel.txt'), 'root');
+      fs.writeFileSync(path.join(tmp, 'outside.txt'), 'outside');
+      cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
+      contained = new DiskStorageProvider();
+    });
+
+    afterEach(() => cwdSpy.mockRestore());
+
+    it.each([
+      ['delete', () => contained.delete('../outside.txt')],
+      ['deleteDir', () => contained.deleteDir('../')],
+      ['deleteDir of the root itself', () => contained.deleteDir('uploads/..')],
+      ['exists', () => contained.exists('../outside.txt')],
+      ['get', () => contained.get('../outside.txt')],
+      ['put', () => contained.put('../outside.txt', Buffer.from('x'))],
+      [
+        'a nested climb',
+        () => contained.delete('uploads/avatars/u1_/../../../../outside.txt'),
+      ],
+    ])('%s refuses a key outside the root', async (_m, call) => {
+      await expect(call()).rejects.toThrow(/outside the storage root/);
+      expect(fs.readFileSync(path.join(tmp, 'outside.txt'), 'utf8')).toBe(
+        'outside',
+      );
+      expect(fs.existsSync(path.join(root, 'sentinel.txt'))).toBe(true);
+    });
+
+    it('a name that merely starts with two dots is not a climb', async () => {
+      await contained.put('..cache.bin', Buffer.from('x'));
+      await expect(contained.exists('..cache.bin')).resolves.toBe(true);
+    });
+
+    it('a relative key inside the root still works', async () => {
+      await contained.put('uploads/a.bin', Buffer.from('x'));
+      await expect(contained.get('uploads/a.bin')).resolves.toEqual(
+        Buffer.from('x'),
+      );
+    });
+
+    it('absolute keys keep their behaviour', async () => {
+      const key = abs('a.txt');
+      await contained.put(key, Buffer.from('ok'));
+      await expect(contained.exists(key)).resolves.toBe(true);
+    });
+  });
 });

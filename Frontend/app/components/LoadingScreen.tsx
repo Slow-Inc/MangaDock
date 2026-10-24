@@ -3,10 +3,12 @@
  * Markup is identical to the early-return blocks previously inlined in
  * studio account/wallet/works pages.
  */
+import Loader from "./ui/Loader";
+
 export default function LoadingScreen() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+    <div className="flex min-h-dvh items-center justify-center bg-bg">
+      <Loader context="page" />
     </div>
   );
 }

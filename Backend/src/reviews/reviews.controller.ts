@@ -12,6 +12,8 @@ import {
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import { ReviewsService } from './reviews.service';
+import { queryInt } from '../common/query-int';
+import { UpsertReviewDto } from './review.dto';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -30,8 +32,8 @@ export class ReviewsController {
   ) {
     return this.reviews.getReviews(
       mangaId,
-      limit ? Math.min(Number(limit), 50) : 20,
-      offset ? Number(offset) : 0,
+      queryInt(limit, 20, { min: 1, max: 50 }),
+      queryInt(offset, 0, { min: 0 }), // never negative or NaN into .range() (#963)
     );
   }
 
@@ -49,7 +51,7 @@ export class ReviewsController {
   upsertReview(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('mangaId') mangaId: string,
-    @Body() body: { mangaTitle: string; rating: number; body: string },
+    @Body() body: UpsertReviewDto,
   ) {
     return this.reviews.upsertReview(req[USER_KEY].uid, mangaId, body);
   }

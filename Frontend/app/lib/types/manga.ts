@@ -6,11 +6,15 @@ export type MangaCover = {
 
 export type MangaDetail = {
   id: string;
+  /** In the API response; omitted when MangaDex returned no title. */
+  title?: string;
   authors: string[];
   artists: string[];
   covers: MangaCover[];
   genres: string[];
   description?: string;
+  /** MangaDex content rating (#1102): erotica/pornographic get an 18+ badge. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 export type MangaPreview = {
@@ -64,6 +68,8 @@ export type LandingBook = {
   categories: string[];
   averageRating: number;
   ratingsCount: number;
+  /** MangaDex content rating (#1102): erotica/pornographic get an 18+ badge. */
+  contentRating?: 'safe' | 'suggestive' | 'erotica' | 'pornographic';
 };
 
 export type LandingRow = {

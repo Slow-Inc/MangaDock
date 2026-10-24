@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
+import OpenAI, { type ClientOptions } from 'openai';
+import { randomUUID } from 'node:crypto';
 
 type LlmProvider = 'gemini' | 'openai' | 'custom';
 
@@ -25,7 +26,13 @@ export class LlmService {
     } else {
       this.openAiClient = new OpenAI({
         apiKey: env.LLM_API_KEY!,
+        // The SDK bundles node-fetch@2, which fails with "Premature close" on Node 26.
+        fetch: globalThis.fetch as unknown as ClientOptions['fetch'],
         ...(env.LLM_BASE_URL ? { baseURL: env.LLM_BASE_URL } : {}),
+        // OpenCode (Zen/Go) answers 400 MissingSessionID without a stable session id.
+        ...(env.LLM_BASE_URL?.includes('opencode.ai')
+          ? { defaultHeaders: { 'x-opencode-session': randomUUID() } }
+          : {}),
       });
     }
   }

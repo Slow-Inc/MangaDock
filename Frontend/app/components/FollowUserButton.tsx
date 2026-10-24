@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 
 type Props = { targetUid: string };
@@ -16,32 +17,49 @@ export default function FollowUserButton({ targetUid }: Props) {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
-
-  const fetchStatus = useCallback(async () => {
-    const token = await getToken();
-    if (!token) { setLoading(false); return; }
-    try {
-      const res = await fetch(`/api/proxy/user-follows/${encodeURIComponent(targetUid)}/is-following`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFollowing(data.following ?? false);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUid]);
+  const togglingRef = useRef(false);
+  const { showToast } = useToast();
+  // The profile a pending toggle belongs to; its rollback must not land on the next profile (#663).
+  const currentTarget = useRef(targetUid);
+  currentTarget.current = targetUid;
 
   useEffect(() => {
-    if (user) fetchStatus();
-    else setLoading(false);
-  }, [user, fetchStatus]);
+    // The instance is reused across /community/profile/[uid] navigations: drop the
+    // previous profile's state and ignore responses that arrive for an old targetUid.
+    let cancelled = false;
+    setFollowing(false);
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    (async () => {
+      let next = false; // unknown (no token / non-ok / network error) → not following
+      try {
+        const token = await getToken();
+        if (token) {
+          const res = await fetch(`/api/proxy/user-follows/${encodeURIComponent(targetUid)}/is-following`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) next = (await res.json()).following ?? false;
+        }
+      } catch { /* keep `next = false`; the button stays usable */ }
+      if (cancelled) return;
+      setFollowing(next);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user, targetUid]);
 
   async function handleToggle() {
     if (!user) { showLoginPrompt(); return; }
-    if (toggling) return;
+    // A ref, not the `toggling` state: two clicks before the re-render would both read the stale `false`.
+    if (togglingRef.current) return;
+    togglingRef.current = true;
     const next = !following;
+    const target = targetUid;
+    const fail = () => {
+      if (currentTarget.current !== target) return;
+      setFollowing(!next);
+      showToast({ type: "error", message: next ? "ติดตามไม่สำเร็จ ลองใหม่อีกครั้ง" : "เลิกติดตามไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+    };
     setFollowing(next);
     setToggling(true);
     try {
@@ -51,15 +69,16 @@ export default function FollowUserButton({ targetUid }: Props) {
         method,
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) setFollowing(!next);
+      if (!res.ok) fail();
     } catch {
-      setFollowing(!next);
+      fail();
     } finally {
+      togglingRef.current = false;
       setToggling(false);
     }
   }
 
-  if (loading) return <div className="h-8 w-24 animate-pulse rounded-full bg-white/10" />;
+  if (loading) return <div className="h-8 w-24 animate-pulse rounded-full bg-fill" />;
 
   return (
     <button
@@ -67,8 +86,8 @@ export default function FollowUserButton({ targetUid }: Props) {
       disabled={toggling}
       className={`flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
         following
-          ? "border-white/20 bg-white/8 text-white/70 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
-          : "border-indigo-500/50 bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/35"
+          ? "border-ink-3 bg-fill text-ink-2 hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
+          : "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
       }`}
     >
       {following ? (

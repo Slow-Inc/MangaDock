@@ -13,7 +13,26 @@ import {
   type LandingRow,
 } from './books.types';
 
-const LANDING_CACHE_KEY = 'landing:full:v5';
+/** How long a landing with a failed row is cached before the next request re-fetches it (#865). */
+const PARTIAL_LANDING_TTL_MS = 2 * 60 * 1000;
+const landingTtl = (p: LandingPayload) =>
+  p.partial ? PARTIAL_LANDING_TTL_MS : CACHE_TTL_MS;
+
+const THAI = /[\u0E00-\u0E7F]/;
+
+/** A line of the translation (not leaked English reasoning): mostly Thai, or a Markdown link/rule line. */
+function isTranslationLine(line: string): boolean {
+  if (line.trim() === '') return true; // paragraph breaks keep the Markdown structure
+  if (/\]\(https?:\/\/[^)]+\)/.test(line)) return true;
+  if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) return true;
+  const thai = (line.match(new RegExp(THAI.source, 'g')) || []).length;
+  return thai > 0 && thai / Math.max(line.trim().length, 1) > 0.2;
+}
+
+/** Longest description we send to a translation provider (MangaDex descriptions are far shorter). */
+const MAX_DESCRIPTION_CHARS = 6000;
+
+const LANDING_CACHE_KEY = 'landing:full:v6'; // v6: rows are safe-only since #1105
 
 /**
  * Landing assembly + Gemini text translation carved out of BooksService (#231,
@@ -209,12 +228,18 @@ export class LandingService {
     };
   }
 
+  /** `model` = the model that actually produced the text (the fallback one if the
+   *  first failed). Absent on untranslated results and on payloads cached before
+   *  the field existed — callers must not guess it. */
   async translateDescription(
     text: string,
-  ): Promise<{ translatedText: string; translated: boolean }> {
+  ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
     if (!this.llmService.isConfigured())
       return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
+    // The endpoint is public: an over-long text is not worth a paid provider call (#801).
+    if (text.length > MAX_DESCRIPTION_CHARS)
+      return { translatedText: text, translated: false };
 
     // Detect if already Thai — skip if >25% Thai chars
     const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
@@ -226,39 +251,36 @@ export class LandingService {
       provider === 'gemini'
         ? await this.geminiCatalog.getDescriptionModels()
         : [this.llmService.getDescriptionModel()];
-    const fingerprint = Buffer.from(text.slice(0, 512))
-      .toString('base64')
-      .slice(0, 64);
-    const cacheKey = `translate:th:v3:${models.join('|')}:${fingerprint}`;
+    // The whole text, hashed: GET /books/translate is public, and a key from only the first bytes let any
+    // text that opens like a book's description overwrite that book's cached translation for everyone.
+    const fingerprint = createHash('sha256').update(text).digest('hex');
+    const cacheKey = `translate:th:v5:${models.join('|')}:${fingerprint}`;
     const cached = await this.cache.get<{
       translatedText: string;
       translated: boolean;
+      model?: string;
     }>(cacheKey);
     if (cached) return cached.data;
 
-    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Just the translated text:\n\n${text}`;
+    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Keep the Markdown formatting exactly: links stay as [text](url) with the URL unchanged, and bold, lists and horizontal rules stay where they are:\n\n${text}`;
 
     for (const modelName of models) {
       try {
         let translatedText = (
           await this.llmService.complete(prompt, modelName)
         ).trim();
-        // Strip THOUGHTS section if model still outputs it (fallback)
-        if (
-          translatedText.includes('THOUGHTS:') ||
-          translatedText.includes('* **')
-        ) {
-          const lines = translatedText.split('\n');
-          const thaiLines = lines.filter((l) => {
-            const thaiCount = (l.match(/[\u0E00-\u0E7F]/g) || []).length;
-            return (
-              thaiCount > 0 && thaiCount / Math.max(l.trim().length, 1) > 0.2
-            );
-          });
-          if (thaiLines.length > 0)
-            translatedText = thaiLines.join('\n').trim();
+        // A leaked reasoning block (fallback): keep the translation's lines - Thai text plus the Markdown
+        // that carries no Thai (link lines, rules) - and drop the English reasoning. Only an explicit
+        // THOUGHTS marker triggers it: '* **' is ordinary Markdown (a bold bullet), not a leak (#802).
+        if (translatedText.includes('THOUGHTS:')) {
+          const kept = translatedText.split('\n').filter(isTranslationLine);
+          if (kept.some((l) => THAI.test(l)))
+            translatedText = kept
+              .join('\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
         }
-        const payload = { translatedText, translated: true };
+        const payload = { translatedText, translated: true, model: modelName };
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);
         return payload;
       } catch (err) {
@@ -306,15 +328,40 @@ export class LandingService {
       return this.serveStale(cacheKey, forceLocal);
     }
 
+    // A row whose MangaDex call failed comes back empty (fetchMangaWithParamsPaged swallows the error), so
+    // "empty" is the failure signal here (#865) — sound while every row is an unfiltered sort over all of
+    // MangaDex (mangaRowDefs); a filtered row that can really be empty would need its own signal. Fill those
+    // rows from the last good landing and cache briefly, so the failed row is retried in minutes rather than
+    // held empty for the full TTL. With no stale copy (cold start) the empty row is cached briefly as is.
+    const partial = rows.some((r) => r.items.length === 0);
+    if (partial) {
+      const staleRows =
+        this.cache.getStale<LandingPayload>(cacheKey)?.data.rows ?? [];
+      this.logger.warn(
+        `Landing rows came back empty: ${rows
+          .filter((r) => r.items.length === 0)
+          .map((r) => r.id)
+          .join(
+            ', ',
+          )} — filling from stale, retrying in ${PARTIAL_LANDING_TTL_MS / 1000}s`,
+      );
+      rows = rows.map((r) =>
+        r.items.length > 0
+          ? r
+          : { ...r, items: staleRows.find((s) => s.id === r.id)?.items ?? [] },
+      );
+    }
+
     const hero = rows.find((r) => r.items.length > 0)?.items[0] ?? null;
     const payload: LandingPayload = {
       hero,
       rows,
       updatedAt: new Date().toISOString(),
+      ...(partial ? { partial: true } : {}),
     };
 
     if (rows.some((r) => r.items.length > 0)) {
-      await this.cache.set(cacheKey, payload, CACHE_TTL_MS);
+      await this.cache.set(cacheKey, payload, landingTtl(payload));
     } else {
       this.logger.warn('No books returned — trying stale cache fallback');
       return this.serveStale(cacheKey, forceLocal);
@@ -401,7 +448,7 @@ export class LandingService {
       `[ImageCache] Patching landing cache — ${newCount} new local thumbnail(s) added`,
     );
     this.cache
-      .set(cacheKey, enhanced, CACHE_TTL_MS)
+      .set(cacheKey, enhanced, landingTtl(original)) // a partial landing keeps its short TTL (#865)
       .catch((err) =>
         this.logger.warn(
           `[ImageCache] Landing cache patch failed: ${String(err)}`,

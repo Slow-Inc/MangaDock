@@ -163,8 +163,12 @@ export class AdminController {
   }
 
   @Patch('content/posts/:id/pin')
-  pinPost(@Param('id') id: string, @Body() body: PinPostDto) {
-    return this.adminService.pinPost(id, body.pinned);
+  pinPost(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: PinPostDto,
+  ) {
+    return this.adminService.pinPost(req.uid, id, body.pinned);
   }
 
   // ── Transactions ─────────────────────────────────────────────────────────────

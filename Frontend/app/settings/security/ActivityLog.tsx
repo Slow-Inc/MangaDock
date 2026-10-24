@@ -39,21 +39,21 @@ export default function ActivityLog() {
       });
   }, [user]);
 
-  if (loading) return <div className="h-24 animate-pulse rounded-xl bg-white/5" />;
+  if (loading) return <div className="h-24 animate-pulse rounded-xl bg-fill" />;
 
   return (
     <div className="space-y-1.5">
       {devices.map((d, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5"
+          className="flex items-center gap-3 rounded-xl border border-line bg-fill px-3 py-2.5"
         >
-          <div className="h-2 w-2 shrink-0 rounded-full bg-green-400/60" />
+          <div className="h-2 w-2 shrink-0 rounded-full bg-ok/60" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-white/70">
+            <p className="text-xs text-ink-2">
               {parseUA(d.user_agent)} · เข้าสู่ระบบ
             </p>
-            <p className="text-[11px] text-white/35">
+            <p className="text-[11px] text-ink-3">
               {new Date(d.last_seen).toLocaleDateString("th-TH", {
                 day: "numeric",
                 month: "short",
@@ -66,7 +66,7 @@ export default function ActivityLog() {
         </div>
       ))}
       {devices.length === 0 && (
-        <p className="text-xs text-white/30">ยังไม่มีประวัติการเข้าสู่ระบบ</p>
+        <p className="text-xs text-ink-3">ยังไม่มีประวัติการเข้าสู่ระบบ</p>
       )}
     </div>
   );

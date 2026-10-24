@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep the vendored QR encoder byte-identical to its recorded upstream hashes.
+Mobile/vendor/qrcode/*.js -text

@@ -3,19 +3,23 @@
 import { useState, useEffect } from "react";
 import { vote } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 
-interface VoteButtonsProps {
-  targetType: 'post' | 'comment';
+/** A comment vote must name its post: that post's cached comment list is cleared after the vote (#992). */
+type VoteTarget = { targetType: 'post'; postId?: never } | { targetType: 'comment'; postId: string };
+
+type VoteButtonsProps = VoteTarget & {
   targetId: string;
   initialUpvotes: number;
   initialDownvotes: number;
   initialUserVote: number;
   externalCounts?: { upvotes: number; downvotes: number };
-}
+};
 
 export default function VoteButtons({
   targetType,
   targetId,
+  postId,
   initialUpvotes,
   initialDownvotes,
   initialUserVote,
@@ -27,6 +31,7 @@ export default function VoteButtons({
   const [loading, setLoading] = useState(false);
 
   const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
 
   // Resync when the target changes (e.g. VoteButtons reused across different posts).
   // Intentionally omits initialUpvotes/Downvotes from deps — those update via externalCounts,
@@ -73,7 +78,7 @@ export default function VoteButtons({
 
     setLoading(true);
     try {
-      const result = await vote({ targetType, targetId, voteValue: value });
+      const result = await vote({ targetType, targetId, voteValue: value, postId });
       // Sync with authoritative server counts
       setUpvotes(result.upvotes);
       setDownvotes(result.downvotes);
@@ -82,6 +87,7 @@ export default function VoteButtons({
       setUpvotes(prevUpvotes);
       setDownvotes(prevDownvotes);
       setUserVote(prevUserVote);
+      showToast({ type: "error", message: "โหวตไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the count jumping back alone reads as a missed click (#987)
     } finally {
       setLoading(false);
     }
@@ -95,8 +101,8 @@ export default function VoteButtons({
         aria-label="โหวตขึ้น"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === 1
-            ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
-            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
+            ? "bg-accent/10 text-accent border-accent/40"
+            : "text-ink-2 border-transparent hover:text-ink hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -105,7 +111,7 @@ export default function VoteButtons({
         <span>{upvotes}</span>
       </button>
 
-      <div className="w-px h-3.5 bg-white/10 shrink-0" />
+      <div className="w-px h-3.5 bg-fill shrink-0" />
 
       <button
         onClick={() => handleVote(-1)}
@@ -113,8 +119,8 @@ export default function VoteButtons({
         aria-label="โหวตลง"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === -1
-            ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/25"
-            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
+            ? "bg-accent/10 text-accent border-accent/40"
+            : "text-ink-2 border-transparent hover:text-ink hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">

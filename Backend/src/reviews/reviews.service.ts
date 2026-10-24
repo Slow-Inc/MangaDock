@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export type ReviewItem = {
@@ -29,7 +24,10 @@ type ReviewRow = {
   rating: number;
   body: string;
   created_at: string;
-  profiles: { display_name: string | null; photo_url: string | null } | null;
+  profiles:
+    | { display_name: string | null; photo_url: string | null }
+    | { display_name: string | null; photo_url: string | null }[]
+    | null;
 };
 
 @Injectable()
@@ -43,6 +41,9 @@ export class ReviewsService {
   }
 
   private mapReview(row: ReviewRow): ReviewItem {
+    const profile = Array.isArray(row.profiles)
+      ? row.profiles[0]
+      : row.profiles;
     return {
       id: row.id,
       uid: row.uid,
@@ -50,15 +51,15 @@ export class ReviewsService {
       rating: row.rating,
       body: row.body ?? '',
       createdAt: row.created_at,
-      displayName: row.profiles?.display_name ?? null,
-      photoUrl: row.profiles?.photo_url ?? null,
+      displayName: profile?.display_name ?? null,
+      photoUrl: profile?.photo_url ?? null,
     };
   }
 
   async upsertReview(
     uid: string,
     mangaId: string,
-    data: { mangaTitle: string; rating: number; body: string },
+    data: { mangaTitle?: string; rating: number; body?: string },
   ): Promise<void> {
     if (!mangaId) throw new BadRequestException('mangaId is required');
     if (data.rating < 1 || data.rating > 5) {
@@ -79,7 +80,9 @@ export class ReviewsService {
     );
 
     if (error) throw new Error(`Failed to upsert review: ${error.message}`);
-    this.logger.log(`User ${uid} reviewed manga ${mangaId} with rating ${data.rating}`);
+    this.logger.log(
+      `User ${uid} reviewed manga ${mangaId} with rating ${data.rating}`,
+    );
   }
 
   async deleteReview(uid: string, mangaId: string): Promise<void> {
@@ -96,10 +99,12 @@ export class ReviewsService {
   async getMyReview(uid: string, mangaId: string): Promise<ReviewItem | null> {
     const { data, error } = await this.db
       .from('manga_reviews')
-      .select('id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)')
+      .select(
+        'id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)',
+      )
       .eq('uid', uid)
       .eq('manga_id', mangaId)
-      .maybeSingle<ReviewRow>();
+      .maybeSingle();
 
     if (error) throw new Error(`Failed to fetch review: ${error.message}`);
     return data ? this.mapReview(data) : null;
@@ -112,13 +117,15 @@ export class ReviewsService {
   ): Promise<ReviewItem[]> {
     const { data, error } = await this.db
       .from('manga_reviews')
-      .select('id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)')
+      .select(
+        'id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)',
+      )
       .eq('manga_id', mangaId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch reviews: ${error.message}`);
-    return (data ?? []).map((row) => this.mapReview(row as ReviewRow));
+    return (data ?? []).map((row) => this.mapReview(row));
   }
 
   async getReviewSummary(mangaId: string): Promise<ReviewSummary> {
@@ -127,12 +134,16 @@ export class ReviewsService {
       .select('rating')
       .eq('manga_id', mangaId);
 
-    if (error) throw new Error(`Failed to fetch review summary: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to fetch review summary: ${error.message}`);
 
     const rows = data ?? [];
     if (rows.length === 0) return { averageRating: 0, count: 0 };
 
-    const sum = rows.reduce((acc, r) => acc + (r as { rating: number }).rating, 0);
+    const sum = rows.reduce(
+      (acc, r) => acc + (r as { rating: number }).rating,
+      0,
+    );
     return {
       averageRating: Math.round((sum / rows.length) * 10) / 10,
       count: rows.length,

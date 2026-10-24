@@ -1,5 +1,482 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-22 — Native Phase 4 integration with current main
+
+[Integration evidence and resume point](../../Mobile/docs/2026-10-22-main-integration.md). Landing status is recorded by the integration PR. / หลักฐานและจุดทำต่ออยู่ในรายงาน สถานะ merge ให้ดู PR รวม
+
+| Field | English | ภาษาไทย |
+| --- | --- | --- |
+| 1. What changed | Native Mobile Phase 4 and #782 integrated with main; three Backend profile joins normalized. | รวม native Phase 4 และ #782 กับ main พร้อมแปลง profiles สาม service |
+| 2. Results | Combined source verified; device/release acceptance remains open. | source รวมผ่านตรวจ ยังเปิดการรับผลอุปกรณ์/release |
+| 3. Performance gain | Not measured; no percentage claimed. | ไม่วัดและไม่อ้างเปอร์เซ็นต์ |
+| 4. Benefits | Native workflows available on the main integration path. | รวม workflows native ในเส้นทาง main |
+| 5. Purpose | Bring reviewed native work into the maintained branch. | นำงาน native ที่ review แล้วเข้าสาขาหลัก |
+| 6. Why / architecture | Keep existing Backend, Supabase and server-side MIT contracts. | ใช้สัญญา Backend, Supabase และ MIT ฝั่ง server เดิม |
+| 7. Before | Native implementation and physical-QA fixes isolated on Phase 4. | native และการแก้ QA อยู่แยกใน Phase 4 |
+| 8. Goals | Preserve current main while integrating reviewed runtime source. | เก็บงาน main ปัจจุบันพร้อมรวม runtime ที่ review แล้ว |
+| 9. Architecture before | Main hybrid shell; native source on feature branch. | main เป็น shell hybrid ส่วน native อยู่ feature branch |
+| 10. Architecture after | Native views call existing services; shared bridge retained. | views native เรียกบริการเดิม เก็บ shared bridge |
+| 11. Refactor list | Join object/array/null normalization; retain native reader/navigation recovery. | แปลง join สามรูปแบบ เก็บ reader/navigation recovery ที่แก้แล้ว |
+| 12. Metrics | Mobile 235; Backend 1,014 in 98 suites; tooling 58; QR hashes 10/10; types/env/build/lint pass. | Mobile 235 Backend 1,014 ใน 98 suites tooling 58 hash QR 10/10 types/env/build/lint ผ่าน |
+| 13. Debt removed | Type-assertion-only joined-profile workaround replaced. | แทน workaround ที่ cast profiles อย่างเดียว |
+| 14. Risk / rollback | Existing tests cover resolved seams; revert integration normally if needed. No DB migration applied. | tests ครอบคลุมจุด conflict ย้อนด้วย revert PR ไม่มี migration |
+| 15. DX | Single integration record separates source proof from acceptance. | รายงานเดียวแยกหลักฐาน source กับการรับผลจริง |
+| 16. Future | Draft #860, broader UX, matching APK and real-service/device acceptance remain. | เหลือ draft #860 UX อื่น APK ที่ตรง revision และรับผลบริการ/เครื่องจริง |
+| 17. Lessons | Preserve both histories; verify immutable vendor bytes in Git index. | เก็บประวัติสองฝั่งและตรวจ bytes vendor ใน Git index |
+| 18. KPI | Automated checks pass; production/visual completion is not claimed. | checks อัตโนมัติผ่าน ยังไม่อ้างพร้อม production/ภาพครบ |
+
+
+## 2026-10-21 — Follow-up fixes after the redesign: #661–#675, #798, #801, #802, #806 (bug / security)
+
+**What & where:** `Backend/src/users` (avatar upload by magic bytes), `Backend/src/books` translate throttle
+guard + text cap, the translate Markdown stripper and its cache key version, `Frontend/app/components/ui/UserAvatar`,
+`Frontend/app/components/PostImage.tsx` (new) and its call sites, `Frontend/app/lib/safeUrl.ts`
+(`safeImageSrc`), plus the audit-bug files listed in PR #800.
+
+**Why:** the feature audit's `ready-for-agent` bugs; two security gaps found on the way (an avatar upload
+typed by client metadata; a translate throttle a single client could exhaust for everyone); broken images
+rendering as grey boxes with alt text.
+
+**Before → After:** avatar type from the client → from the file's bytes; one global translate bucket →
+per-client first, then global; Markdown removed from prompts → kept, only `THOUGHTS:` stripped; raw
+`<img>`/`<Image>` with a missing guard at one site → one guarded component with a fallback.
+
+**Performance Δ:** compact forum thumbnails fetch a 256-px resize instead of a viewport-wide image.
+
+**Validation:** unit/spec tests per change (red → green), CI green, browser checks on production builds.
+
+**Risk / rollback:** each PR reverts on its own. #805 moved the translate cache key to v5; reverting it serves the older v4 entries again.
+
+**Links:** PRs #800 #803 #804 #805 #807; issues #661–#663 #666–#672 #675 #798 #801 #802 #806.
+
+---
+
+## 2026-10-20 — #764 Strata redesign, Epics B/C/D + performance pass (feature / perf)
+
+**What & where:** `Frontend/app/**` (all user areas, Studio, mascot cast/editor, ui primitives
+Coin/CopyButton, hooks useIsScrolling/useThrottledValue/throttle), `Backend/src/studio-stats/*`
+(new), `Backend/src/users` mascot DTO + endpoints, `Backend/migrations/2026-10-20-profiles-mascot.sql`
+(not applied), `DESIGN.md`, ADR 029.
+
+**Why:** one design system instead of per-page classes (light theme becomes possible, no purple),
+a Studio creators can read, and mascots as part of identity — the dev's brief.
+
+**Before → After:** hex/white-alpha/purple classes → tokens across the user routes; Studio list-of-
+cards → shell + ECharts stats from a scoped endpoint; emoji icons → line icons/coin/mascots.
+
+**Performance Δ (production build):** home scroll p95 33 → 16.7 ms; book popup p95 67–117 → 16.7 ms
+(0 frames > 50 ms); /settings scroll slow frames 123/389 → 0; colour drag sync 41 → 4.8 ms/event,
+frames > 50 ms 86 → 15. ECharts loads only on Studio routes (dynamic import).
+
+**Quality:** tokens make the light theme a switch away; a measured rule against blurred repeated
+elements; Studio stats read only the caller's own versions (uid from AuthGuard).
+
+**Validation:** tsc 0; bun tests (studio shellMath, loaderFor, throttle red → green); backend specs for
+aggregate-stats + studio-stats service; browser verification at 1440/390 per area; frame measurements
+before/after in headless Chromium on `next start`.
+
+**Risk / rollback:** visual-only for most files; backend additions are new read endpoints + one guarded
+write; mascot save fails gracefully until the migration is applied. Rollback = revert the PR.
+
+**Links:** #764 #765 #772–#778 #780 #786–#790 #781 #783–#785, ADR 029.
+
+---
+
+## 2026-10-20 — #722: identity-change reset has one owner (refactor)
+
+**What & where:** new `Frontend/app/lib/identityReset.ts` (+ `identityReset.test.ts`);
+`Frontend/app/contexts/AuthContext.tsx` four call sites → one call; `Frontend/tests/oauth-regression.test.cjs`
+import allow-list; ADR 015.
+
+**Why:** the same four cache clears were written out at four sites and had drifted once; a missing
+clear means cross-account data bleed.
+
+**Before → After:** 4 sites × 4 calls → 4 sites × 1 call; the order and the calls themselves are
+unchanged (`clearHistory({syncRemote: false})` as #712 left it).
+
+**Performance Δ:** none — same calls, one extra function frame.
+
+**Quality:** no behaviour change on any path; a forgotten cache is now one missing line in one file,
+pinned by tests over the real cache modules.
+
+**Validation:** 2 tests red → green, 4/4 mutations killed; `test:auth` 12/12; `bun test` 239 pass
+(8 known `app/docs` integration failures); sign-out in the browser issues no history `DELETE`.
+
+**Risk / rollback:** low; rollback = revert. #720 is closed as shipped by #712 rather than by its own branch.
+
+**Links:** #722, #720, #712, ADR 015.
+
+---
+
+## 2026-10-20 — PR #782 scrutiny follow-up / แก้ผล scrutinize
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Mobile API strict/nullable JSON helpers, own-review caller, Reader pinch lifecycle and regressions | แยก helper JSON แก้ caller รีวิวตัวเอง วงจร pinch Reader และ regressions |
+| 2. Results / outcome | Empty required review data yields retryable error; rejoining a finger preserves zoom | ข้อมูลรีวิวที่จำเป็นแต่ว่างแสดง error/ลองใหม่ วางนิ้วกลับไม่ทำ zoom กระโดด |
+| 3. Expected performance gain % | Not measured | ไม่วัด |
+| 4. Benefits | Review-render stability and continuous pinch interaction | รีวิวไม่ render ล้มและ pinch ต่อเนื่อง |
+| 5. Purpose | Resolve two reproducible scrutiny findings in the existing PR | แก้สอง finding ที่มี repro ใน PR เดิม |
+| 6. Why + architectural impact | Optional absence must not change all response contracts; current touch geometry differs from gesture history | ข้อมูล optional ที่ไม่มีไม่ควรเปลี่ยน contract ทั้งหมด และ geometry นิ้วปัจจุบันต่างจากประวัติ gesture |
+| 7. Problems before | Empty summary published null then TypeError; pinch rejoin jumped 2x → 1x | summary ว่าง publish null แล้ว TypeError วางนิ้วกลับทำ zoom2x → 1x |
+| 8. Goals | Keep own-review absence valid and prevent zoom jumps or pinch-triggered page turns | คงกรณีไม่มีรีวิวและป้องกันซูมกระโดด/เปลี่ยนหน้าเมื่อ pinch |
+| 9. Architecture before | Shared API parser allowed every empty body; one pinch flag served two roles | parser อนุญาตทุก body ว่างและใช้ flag pinch เดียวสองหน้าที่ |
+| 10. Architecture after | Explicit nullable parser entry; independent active-baseline and ever-pinched state | แยกเส้นทาง nullable และสถานะ baseline/เคย pinch |
+| 11. Refactor list | Internal parser shared by two typed entry points; reuse touch handler for start/end/move | ใช้ parser ร่วมสอง entry ที่ระบุ type และ handler touch ร่วม start/end/move |
+| 12. Metrics | Two observed RED → GREEN regressions; combined Mobile235/235, tooling58/58; types/env/format and Hermes773 modules/11 assets pass | RED → GREEN สองกรณี Mobile รวม235/235 tooling58/58 types/env/format และ Hermes773 modules/11 assets ผ่าน |
+| 13. Technical debt removed | Implicit optional-response semantics and stale pinch baseline | ลด nullable ที่ไม่ระบุชัดและ baseline pinch เก่า |
+| 14. Risk reduction / rollback | Required and optional bodies tested separately; revert follow-up code commit, retaining chapter-list work | ทดสอบ body แยกประเภท ย้อน commit แก้นี้โดยคงงานรายการตอน |
+| 15. Developer experience impact | Typed optional helper and tests reproduce the user-facing failures | helper optional ระบุ type และ tests จำลองอาการผู้ใช้ |
+| 16. Future opportunities | Build a fresh APK and repeat two scenarios on physical devices | สร้าง APK ใหม่และทดสอบสองกรณีซ้ำบนเครื่องจริง |
+| 17. Lessons learned | Preserve concurrent commits; verify export entry when dependencies are junction-linked | คง commit ที่เพิ่มระหว่างทำและตรวจ entry export เมื่อใช้ junction |
+| 18. KPI | Retryable required-body error; stable2x after rejoin; no new physical acceptance claim | ข้อมูลจำเป็นว่างลองใหม่ได้ วางนิ้วกลับคง2x ไม่อ้างรับเครื่องจริงเพิ่ม |
+
+Repro, root cause, fix, why previous tests missed it, validation and limits: [follow-up report](../../Mobile/docs/2026-10-20-review-fixes.md), [PR #782](https://github.com/Slow-Inc/MangaDock/pull/782). No Backend/Frontend/MIT, provider, schema or dependency change; no performance or production acceptance claim.
+
+ภาษาไทย: ดู repro สาเหตุ วิธีแก้ ช่องว่าง tests เดิม การตรวจและข้อจำกัดในรายงานกับ PR ด้านบน ไม่แก้ Backend/Frontend/MIT/provider/schema/dependency และไม่อ้างผลประสิทธิภาพหรือ production acceptance
+
+## 2026-10-20 — Native chapter list web alignment / รายการตอน Native ใกล้เว็บ
+
+| Field | Change / การเปลี่ยนแปลง |
+| --- | --- |
+| 1. What/where | NativeChapterList, detail wiring, catalog counts and tests / componentรายการตอน, wiring, จำนวนหน้าและtests |
+| 2. Outcome | Bounded chapter scrolling with reviews reachable / เลื่อนตอนในกรอบและเข้าถึงรีวิวง่าย |
+| 3. Performance gain | Not measured / ไม่วัด |
+| 4. Benefits | Pages/price visible,83 chapters accessible / เห็นจำนวนหน้าหรือราคาและเข้าถึง83ตอน |
+| 5. Purpose | User-approved alignment with web / ปรับตามเว็บที่ผู้ใช้อนุมัติ |
+| 6. Why/impact | Small presentational component, existing reader boundary / แยกcomponentแสดงผล คงขอบเขตReader |
+| 7. Before | Every chapter extended outer page; no page counts / รายการยืดหน้าหลักและไม่มีจำนวนหน้า |
+| 8. Goal | Preserve all selection/access behavior with compact UI / คงการเลือกและสิทธิ์ด้วยUIกระชับ |
+| 9. Architecture before | Detail-owned chapter rows / แถวตอนในรายละเอียด |
+| 10. Architecture after | Bounded child ScrollView; existing API metadata / ScrollViewภายในที่จำกัดสูง ใช้metadataเดิม |
+| 11. Refactor | Extract chapter view and remove orphan styles / แยกviewและลบstylesที่ไม่ใช้ |
+| 12. Metrics |234tests;320dp viewport;316build tasks/39s / tests234 กรอบ320dp build316tasks/39s |
+| 13. Debt removed | Missing typed page count and mixed detail rendering / เพิ่มชนิดจำนวนหน้าและแยกหน้าที่แสดงตอน |
+| 14. Risk/rollback | Physical nested-scroll/access check; revert UX commit / ตรวจscrollและอ่านจริง ย้อนcommitUXได้ |
+| 15. Developer experience | Focused component tests and tracked screenshots / testsเฉพาะcomponentและภาพในrepo |
+| 16. Future | Optional web language filters/grouping / ตัวกรองภาษาและกลุ่มเวอร์ชันเพิ่มเติม |
+| 17. Lesson | Verify native inner/outer gestures physically / ตรวจgestureสองชั้นบนเครื่องจริง |
+| 18. KPI |234pass, types/build pass, last chapter and150% font verified / checksผ่านพร้อมตอนสุดท้ายและฟอนต์150% |
+
+Evidence / หลักฐาน: [report, artifact hash and screenshots](../../Mobile/docs/2026-10-20-native-chapter-list-parity.md). No backend/schema/dependency change, no performance percentage claim, debug/LAN QA only; all prior release gates remain separate. / ไม่แก้backend/schema/dependency ไม่อ้างความเร็วเพิ่ม เป็นdebug/LAN และแยกrelease gatesเดิม
+
+## 2026-10-20 — Native physical-review fixes B1–B6 / แก้บั๊กจากรีวิวบนเครื่องจริง
+
+| Field | Change record / บันทึกการเปลี่ยนแปลง |
+| --- | --- |
+| 1. What/where | Mobile API, catalog, Reader, modal sheets, translation state and regression tests / API/catalog/Reader/modal/สถานะแปลและ tests ฝั่ง Mobile |
+| 2. Outcome | Six reported paths corrected, verified within stated coverage / แก้หกเส้นทางตามขอบเขตที่ตรวจ |
+| 3. Performance gain | Not benchmarked; no percentage claim / ไม่ benchmark ไม่อ้างเปอร์เซ็นต์ |
+| 4. Benefits | Reviews load, resume returns to selected page, Back preserves related-book history, swipes work, controls accessible, counters truthful / รีวิวและอ่านต่อใช้ได้ Back/ปัดหน้า/ปุ่มและตัวนับถูกต้อง |
+| 5. Purpose | Resolve physical QA B1–B6 from443dc80 / แก้ปัญหาจาก QA เครื่องจริง |
+| 6. Why/impact | Share list/image geometry and maintain local successful-detail stack in existing stores / ใช้ geometry ร่วมและ stack ใน stores เดิม |
+| 7. Before | Empty JSON parse, average-height restore, one book slot, no swipe, unsafe modals, chapter-wide pending counter / parseว่าง/คืนหน้าจากความสูงเฉลี่ย/เก็บเรื่องเดียว/ไม่มีswipe/modalทับ/นับรอทั้งตอน |
+| 8. Goals | Correct six defects without changing service/business contracts / แก้หกข้อโดยคงสัญญาบริการและธุรกิจ |
+| 9. Architecture before | Existing native stores + variable image-local ratios / storesเดิมและอัตราส่วนภาพแยกภายในแต่ละภาพ |
+| 10. Architecture after | Same stores with shared geometry, detail snapshots and requested translation indices / storesเดิมเพิ่มgeometryร่วม/snapshots/หน้าที่ร้องขอ |
+| 11. Refactor list | Reader removes measured-cell/average-retry machinery; no dependency / ลบ cell measurement/average retries ไม่เพิ่มdependency |
+| 12. Metrics | Tests220→230; final build316 tasks/37s; ARM64 hash in report / tests220→230 build316tasks/37s hashตามรายงาน |
+| 13. Debt removed | Parallel geometry sources and unscoped pending calculation / ลบgeometryสองแหล่งและการนับpendingไม่ตรงscope |
+| 14. Risk/rollback | Native response arbitration tested physically; revert Mobile batch together; preserve data / ทดสอบgestureจริง ย้อนMobileชุดนี้ร่วมกัน คงข้อมูล |
+| 15. Developer experience | Reproducible red/green cases and device evidence / มีred-greenและหลักฐานเครื่องจริง |
+| 16. Future opportunities | Broader UX/filter requests, other devices and release acceptance / UX/filterเพิ่มเติม เครื่องอื่นและรับrelease |
+| 17. Lessons | Real native ScrollView can steal JS swipes; pinch transitions need independent geometry / native scrollแย่งgestureได้ ต้องตั้งgeometryเมื่อเพิ่มนิ้ว |
+| 18. KPI | 230tests/types/env/build pass; device resume40&20, LTR/RTL, modal clearance and pending0 / checksผ่านพร้อมผลเครื่องจริงตามที่ระบุ |
+
+Evidence and limitations: [fix report](../../Mobile/docs/2026-10-20-review-fixes.md), [ADR031](../adr/031-mobile-reader-geometry-and-review-recovery.md). Final installed APK matches SHA256 `d4b36ecdbe2e8514ab62bf97534d6044f8daf1065ecd0b969db2d385c00a4a2e`. Internal LAN/debug signing; no production MIT success, payment/account mutation, fold/offline/long-session acceptance inferred. Subsequent user authorization covers commit/push/PR into the Phase4 branch; deployment is excluded.
+
+ภาษาไทย: รายงานมีขั้นตอนและข้อจำกัด APK ที่ติดตั้ง hash ตรง เป็น LAN/debug ภายใน ไม่อนุมาน MITสำเร็จ/เงิน/แก้บัญชี/จอพับ/offline/sessionยาว ผู้ใช้อนุญาต commit/push/PR เข้า branch Phase4 ภายหลัง ไม่รวม deploy
+
+## 2026-10-20 — Public HTTPS APK delivery / ส่ง APK ผ่านอินเทอร์เน็ต
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Dedicated Cloudflare tunnel, scoped API DNS target, new download hostname and HTTPS-origin APK | เพิ่ม tunnel แยก เปลี่ยน target DNS API เฉพาะจุด เพิ่มโดเมนดาวน์โหลดและ APK ฝัง HTTPS |
+| 2. Results / outcome | Public API/Reader/image and full APK GET/hash pass from host; tunnel healthy | API/Reader/ภาพและดาวน์โหลด APK ครบ/hash ผ่านจากเครื่องโฮสต์ tunnel healthy |
+| 3. Expected performance gain % | Not measured; connectivity recovery | ไม่วัด เป็นการกู้การเชื่อมต่อ |
+| 4. Benefits | Testers can use an internet origin across networks | ผู้ทดสอบใช้ API สาธารณะต่างเครือข่ายได้ |
+| 5. Purpose | Fulfil request to enable remote APK testing | รองรับคำขอทดสอบ APK คนละสถานที่ |
+| 6. Why + architectural impact | Old public tunnel disconnected; dedicated edge routing to existing Backend, no application redesign | Tunnel สาธารณะเดิมขาด connection จึงแยกเส้นทาง edge ไป Backend เดิม ไม่ออกแบบแอปใหม่ |
+| 7. Problems before | Public HTTP 530/1033; existing APK embedded LAN IP | API สาธารณะ 530/1033 และ APK เดิมฝัง IP LAN |
+| 8. Goals | Verified downloadable HTTPS artifact and explicit host requirements | มีไฟล์ HTTPS ที่ตรวจแล้วพร้อมข้อกำหนดเครื่องโฮสต์ |
+| 9. Architecture before | Native → LAN Backend; public shared tunnel down | Native → Backend LAN และ tunnel ร่วมสาธารณะหยุด |
+| 10. Architecture after | Native → public HTTPS → dedicated tunnel → same Backend; separate loopback file server | Native → HTTPS → tunnel แยก → Backend เดิม และ file server loopback แยก |
+| 11. Refactor list | None; source/contracts/dependencies/private app env unchanged | ไม่มี refactor คง source/contracts/dependencies/private env แอป |
+| 12. Metrics | APK 27760053 bytes; SHA-256 verified over GET; Reader 30 pages; build 2m11s, 316 tasks | APK 27760053 bytes ตรวจ hash จาก GET Reader 30 หน้า build 2m11s 316 tasks |
+| 13. Technical debt removed | None; the route was restored, not refactored; the artifact is still debug-signed | ไม่มี เป็นการกู้ route ไม่ใช่ refactor และไฟล์ยังใช้ลายเซ็นทดสอบ |
+| 14. Risk reduction / rollback | Verified binary digest, private-token exclusion/ACL, dedicated routes; restore only old API CNAME target | ตรวจ digest/ไม่มี private token/ACL แยก routes ย้อนโดยคืนเฉพาะ target CNAME API เดิม |
+| 15. Developer experience impact | Bilingual runtime/download/rollback guide; no Metro for installed APK | คู่มือเปิดระบบ/ดาวน์โหลด/ย้อนกลับสองภาษา ติดตั้งแล้วไม่ต้องเปิด Metro |
+| 16. Future opportunities | Real-device cross-network acceptance, always-on hosting, production signing/CAPTCHA, MIT readiness | รับเครื่องจริงต่างเครือข่าย จัดโฮสต์ถาวร signing/CAPTCHA production และ MIT |
+| 17. Lessons learned | Connected accounts differ; verify authoritative zone; DNS convergence and artifact cache need evidence | Account ที่เชื่อมต่างกัน ต้องตรวจ zone จริง รอ DNS และตรวจค่าฝังโดยไม่เชื่อ cache |
+| 18. KPI | One-off checks only: API 200 and artifact hash; no device or production KPI claimed | ตรวจครั้งเดียว: API 200 และ hash ของไฟล์ ไม่อ้าง KPI เครื่องจริงหรือ production |
+
+Evidence, commands and open acceptance: [public HTTPS report](../../Mobile/docs/2026-10-20-public-https-apk.md). Earlier same-day source suites remain historical evidence; this follow-up reran the native build and public HTTP checks. No source change accompanied it.
+
+ภาษาไทย: ดูหลักฐาน คำสั่ง และ acceptance ที่ค้างในรายงาน HTTPS ผล source suites วันเดียวกันเป็นหลักฐานเดิม รอบนี้ตรวจ build/artifact และ HTTP สาธารณะใหม่ โดยไม่มีการแก้ source ไปพร้อมกัน
+
+Correction — 2026-10-22: after review of #878, fields 13 and 18 above were corrected (the route was restored, not debt removed; the checks were one-off, not a KPI), and the Cloudflare identifier table moved off the public page. No other value changed.
+
+ภาษาไทย: แก้ไข — 2026-10-22: หลังรีวิว #878 แก้ช่อง 13 และ 18 ข้างต้น (เป็นการกู้ route ไม่ได้ลบ debt และการตรวจเป็นครั้งเดียว ไม่ใช่ KPI) และย้ายตารางรหัส Cloudflare ออกจากหน้าสาธารณะ ไม่เปลี่ยนค่าอื่น
+
+## 2026-10-20 — Downloadable ARM64 test APK / APK ARM64 สำหรับโหลดทดสอบ
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | New local ARM64 test APK and directory-only LAN download server | สร้าง APK ทดสอบ ARM64 และ download server เฉพาะโฟลเดอร์ใน LAN |
+| 2. Results / outcome | Native build/vital lint, 220 tests, types/env, signature and download hash pass | Native build/vital lint, 220 tests, types/env, ลายเซ็นและ hash ดาวน์โหลดผ่าน |
+| 3. Expected performance gain % | Not measured | ไม่วัด |
+| 4. Benefits | Phone-installable artifact with embedded JS, no Metro packaging dependency | มีไฟล์ติดตั้งมือถือที่ฝัง JS ไม่พึ่ง Metro ในการแพ็ก |
+| 5. Purpose | Deliver APK file first as explicitly selected | ส่งไฟล์ APK ก่อนตามที่ผู้ใช้เลือก |
+| 6. Why + architectural impact | Old APK was emulator-only; public API returned 530; existing native/server architecture retained | APK เดิมเฉพาะ emulator และ API public ตอบ 530 คงสถาปัตยกรรมเดิม |
+| 7. Problems before | No current ARM64 downloadable artifact | ไม่มี artifact ARM64 ปัจจุบันให้โหลด |
+| 8. Goals | Inspectable internal APK and practical installation/test steps | APK ทดสอบที่ตรวจสอบได้และวิธีติดตั้ง/ทดสอบชัดเจน |
+| 9. Architecture before | Native client calls existing Backend/Auth/MIT | Native เรียก Backend/Auth/MIT เดิม |
+| 10. Architecture after | Same; build-only LAN origin override, standard-library file server | เดิม ใช้ override URL LAN ตอน build และ file server standard library |
+| 11. Refactor list | None; no application source/dependency changes | ไม่มี refactor หรือแก้ app source/dependency |
+| 12. Metrics | APK 27760069 bytes; 2490896-byte Hermes; 1119 ZIP entries read; 220/220 tests | APK 27760069 bytes; Hermes 2490896 bytes; อ่าน ZIP 1119 entries; tests 220/220 |
+| 13. Technical debt removed | Current emulator-only delivery gap | ปิดช่องว่างการส่งไฟล์ที่เดิมใช้ได้เฉพาะ emulator |
+| 14. Risk reduction / rollback | Debug-signed test label, private-value scan, hash and no device reset; stop only owned services to withdraw LAN delivery | ระบุเซ็นทดสอบ ตรวจ private values/hash ไม่ล้างเครื่อง ยุติการส่ง LAN โดยหยุดเฉพาะบริการที่เปิดเอง |
+| 15. Developer experience impact | Reproducible build command and bilingual installation guide | มีคำสั่ง build และคู่มือติดตั้งสองภาษา |
+| 16. Future opportunities | Physical acceptance and reachable HTTPS/production signing later | รับบนเครื่องจริงและจัด HTTPS/production signing ภายหลัง |
+| 17. Lessons learned | Quote dotted Gradle properties in PowerShell; explicit ABI/origin and low-memory limits | Quote property Gradle ที่มีจุดใน PowerShell ระบุ ABI/origin และจำกัดทรัพยากรเมื่อ RAM ต่ำ |
+| 18. KPI | Artifact/download checks pass; install and replacement release remain unaccepted | ตรวจ artifact/download ผ่าน ยังไม่รับ install/replacement release |
+
+Evidence: [APK identity, SHA-256, commands, initial failure and limits](../../Mobile/docs/2026-10-20-test-apk.md). Fresh native build includes release vital lint; no checks suppressed. No Frontend/Backend/MIT source or private env changed; no production key/project, website button or public deployment created. LAN download was verified from the computer; phone networking/install remains user-operated and unobserved. No commit/push/issue mutation.
+
+หลักฐาน: รายงานด้านบนมี identity/hash/commands/error แรกและข้อจำกัด Native build ใหม่รวม vital lint ไม่ปิด checks ไม่แก้ source Frontend/Backend/MIT/private env ไม่สร้าง production key/project/ปุ่มเว็บ/public deployment ตรวจ LAN download จากคอมเท่านั้น ยังต้องให้ผู้ใช้ตรวจ networking/install บนมือถือ ไม่ commit/push/เปลี่ยน issue
+
+Subsequent user-authorized commit preparation: `.gitattributes` now preserves the vendored QR JavaScript as raw bytes. Automatic LF normalization changed index digests from the working-copy 10/10 to 0/10; the narrow `-text` rule restores index **10/10**, with QR tests **2/2** and unchanged runtime source. Vendor provenance records why upstream whitespace remains; non-vendor staged whitespace checks pass. This changes Git packaging only, not the APK or server architecture; no performance gain claimed.
+
+ภาษาไทย: ช่วงเตรียม commit ที่ผู้ใช้อนุญาตภายหลัง เพิ่ม `.gitattributes` คงไบต์ vendor QR เดิม เพราะ normalize LF ทำให้ working copies ตรง 10/10 แต่ index 0/10 ใช้ `-text` เฉพาะไฟล์ให้ index กลับตรง **10/10** tests QR **2/2** โดยไม่เปลี่ยน runtime source บันทึกเหตุผลคง upstream whitespace ใน provenance ตรวจ staged whitespace ส่วนอื่นผ่าน เป็น Git packaging ไม่เปลี่ยน APK/server architecture และไม่อ้างความเร็วเพิ่ม
+## 2026-10-16 — Native acceptance recovery and empty Reader guard / กู้บริการและกัน Reader ตอนว่าง
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Restored existing Supabase, started Backend/Metro; Mobile rejects empty MangaDex/Studio pages before a new ready state | กู้ Supabase เปิด Backend/Metro และกัน Mobile ประกาศพร้อมอ่านเมื่อไม่มีภาพ |
+| 2. Results / outcome | 220/220 Mobile tests, types/env/export pass; live controller gets 30 pages with simulated browser | Mobile 220/220 types/env/export ผ่าน controller จริงได้ 30 หน้าโดยจำลอง browser |
+| 3. Expected performance gain % | Not measured | ไม่วัด |
+| 4. Benefits | Actionable empty-content error and reachable existing services | แจ้งตอนว่างตรงจริงและเข้าถึงบริการเดิม |
+| 5. Purpose | Progress approved acceptance plan without new product scope | ทำแผน acceptance ที่อนุมัติโดยไม่เพิ่ม scope |
+| 6. Why + architectural impact | HTTP success did not imply readable content; preserve existing client/server architecture | HTTP สำเร็จไม่ได้แปลว่ามีภาพ คงสถาปัตยกรรม client/server เดิม |
+| 7. Problems before | Inactive project and empty ready Reader | Project หยุดและ Reader พร้อมแต่ไม่มีภาพ |
+| 8. Goals | Restore prerequisites and reject demonstrably empty ready results | กู้ prerequisites และกัน ready ที่พิสูจน์ว่าไม่มีภาพ |
+| 9. Architecture before | Native controllers call existing Backend/Auth/MIT | Controllers native ใช้ Backend/Auth/MIT เดิม |
+| 10. Architecture after | Same architecture; current-request page validation after Studio entitlement | สถาปัตยกรรมเดิม เพิ่มตรวจภาพคำขอปัจจุบันหลัง entitlement Studio |
+| 11. Refactor list | None; two guards and two behavioral regressions | ไม่ refactor เพิ่มสอง guards และสอง behavior tests |
+| 12. Metrics | Suite 218 → 220; 7/7 destination probes; 30-page API fixture; JPEG 811875 bytes | Suite 218 → 220 ปลายทาง 7/7 fixture API 30 หน้า JPEG 811875 bytes |
+| 13. Technical debt removed | Empty response treated as fresh reading success | แก้การถือ response ว่างเป็นการเปิดอ่านสำเร็จใหม่ |
+| 14. Risk reduction / rollback | Entitlement/generation guards preserved; rollback only new page checks/tests if needed; no destructive cloud rollback | คง entitlement/generation ย้อนเฉพาะ page checks/tests ที่เพิ่มหากจำเป็น ไม่ rollback cloud แบบทำลาย |
+| 15. Developer experience impact | Repro and per-level evidence distinguish source, API, device and release | มี repro/หลักฐานแยก source API device release |
+| 16. Future opportunities | MIT deployment, real account/device/visual/payment and signed internal acceptance | เตรียม MIT และรับ account/device/ภาพ/payment/signed internal จริง |
+| 17. Lessons learned | Provider 404/empty content and status HTTP success require independent checks | ต้องแยก provider 404/เนื้อหาว่าง และ HTTP status ออกจาก dependency พร้อม |
+| 18. KPI | Verified source/API checks pass; replacement release remains unaccepted | Source/API ที่ตรวจผ่าน ยังไม่รับ replacement release |
+
+Evidence and limits: [bilingual execution report](../../Mobile/docs/2026-10-16-native-acceptance-progress.md). Supabase restore retained project identity; no Auth settings/schema changes. Actual provider login, device browser/gestures, MIT/payment/roles and production CAPTCHA remain open. No Frontend/Backend/MIT source changed by this fix, no commit/issue closure. The inspected APK remains x86_64/debug-signed; fresh export is not an APK.
+
+ภาษาไทย: รายงานด้านบนมีหลักฐาน/ข้อจำกัด กู้ project เดิมไม่แก้ Auth settings/schema ยังไม่รับ login/browser/gestures/MIT/payment/roles/production CAPTCHA จริง ไม่แก้ source Frontend/Backend/MIT ด้วย fix นี้ ไม่ commit/ปิด issue APK เดิมยังเป็น x86_64/debug ส่วน export ใหม่ไม่ใช่ APK
+
+## 2026-10-05 — Native Reader development CAPTCHA / ตั้ง CAPTCHA Reader สำหรับพัฒนา
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Dedicated Pages deployment of three existing CAPTCHA assets; ignored Mobile public env assignments | Deploy Pages สำหรับ CAPTCHA เดิมสาม assets และตั้ง public env Mobile ที่ถูก ignore |
+| 2. Results / outcome | HTTPS page and env ready; fresh Metro bundle has all four required public values | หน้า HTTPS/env พร้อม bundle Metro ใหม่มี public values จำเป็นครบสี่ค่า |
+| 3. Expected performance gain % | Not measured; no speed claim | ไม่วัด ไม่อ้างเร็วขึ้น |
+| 4. Benefits | Reader can receive a configured browser challenge URL | Reader มี URL เปิด challenge ผ่าน browser |
+| 5. Purpose | Unblock local native Reader verification setup | ให้การตั้งตรวจ Reader native ในเครื่องพร้อม |
+| 6. Why + architectural impact | Missing URL failed before browser; Frontend env aliases were not Expo names; existing browser/Backend architecture retained | URL ขาดทำให้หยุดก่อน browser aliases Frontend ไม่ใช่ชื่อ Expo คง browser/Backend architecture เดิม |
+| 7. Problems before | No CAPTCHA URL; blank source site key; local Mobile missing Expo API/Auth names; stale Metro env | ไม่มี URL CAPTCHA source site key ว่าง Mobile env ขาดชื่อ Expo API/Auth และ Metro ใช้ env เก่า |
+| 8. Goals | Configure owned HTTPS development host and matched existing services without source changes | ตั้ง HTTPS development host ที่เป็นเจ้าของและบริการเดิมตรงกันโดยไม่แก้ source |
+| 9. Architecture before | Native browser adapter → missing URL; existing Backend clearance | Native browser adapter → URL ขาด พร้อม Backend clearance เดิม |
+| 10. Architecture after | Native browser → hosted development Turnstile page → same Backend clearance | Native browser → หน้า Turnstile development ที่ host → Backend clearance เดิม |
+| 11. Refactor list | None; no app/dependency/Frontend/Backend/MIT source modification | ไม่มี refactor ไม่แก้ app/dependency/Frontend/Backend/MIT source |
+| 12. Metrics | 3/3 hosted bodies match; state preserved; env validation 0; fresh bundle HTTP 200/all public values; 19/19 tests; Auth 200/CAPTCHA 201 | เนื้อหา host ตรง 3/3 คง state env validation 0 bundle ใหม่ HTTP 200/ค่าครบ tests 19/19 Auth 200/CAPTCHA 201 |
+| 13. Technical debt removed | Local deployment/env gap and misnamed public aliases | แก้ช่องว่าง deploy/env ในเครื่องและชื่อ aliases public |
+| 14. Risk reduction | Upload only three public assets; preserve old env/resources; restore prior CAPTCHA URL to roll back | Upload เพียงสาม public assets คง env/resources เดิม ย้อนกลับโดยคืน URL CAPTCHA เดิม |
+| 15. Developer experience impact | Local app can reload using deployed challenge page; repeatable redeploy recorded | แอป reload เพื่อใช้หน้า challenge ที่ deploy แล้ว บันทึก redeploy ซ้ำได้ |
+| 16. Future opportunities | Actual OS return acceptance and real matched widget keys/hostname for production | รับรองกลับผ่าน OS จริงและใช้ keys/hostname ของ widget จริงสำหรับ production |
+| 17. Lessons learned | Wrangler new-project delegation needs verified direct Pages mode; NEXT_PUBLIC aliases do not configure Expo; restart stale env process | ตรวจ direct Pages mode เมื่อ Wrangler delegate โครงการใหม่ aliases NEXT_PUBLIC ไม่ตั้ง Expo และ restart process ที่มี env เก่า |
+| 18. KPI | Setup checks pass; no production security/browser-device acceptance claim | Checks การตั้งค่าผ่าน ไม่อ้าง production security หรือ browser-device acceptance |
+
+Evidence and rollback: [full EN/TH setup record](../../Mobile/docs/2026-10-05-reader-captcha-setup.md), with initial authentication/JSON parsing failure, Workers delegation failure, stale bundle, wrong dependency paths and unused Backend root 404 documented. Existing test keys passed both dummy and invalid-token controls, so validation is development-only. CUA inventory had no browser/app surface; challenge rendering and real app return remain open. No other deployment was modified; removing this new development project, if requested later, must leave other resources intact. ADR 030 records this operational configuration without a new architecture decision.
+
+หลักฐาน/ย้อนกลับ: รายงาน EN/TH ด้านบนบันทึก auth/JSON parsing แรก Workers delegation ไม่ผ่าน bundle เก่า path dependencies ผิดและ root Backend 404 คู่ test keys ยอมรับทั้ง dummy/invalid controls จึงเป็นหลักฐาน development เท่านั้น CUA ไม่มี browser/app surface จึงยังเปิด acceptance render challenge/กลับแอปจริง ไม่เปลี่ยน deployment อื่น หากขอลบ project development นี้ภายหลังต้องคง resources อื่น บันทึกใน ADR 030 โดยไม่มี architecture decision ใหม่
+
+## 2026-10-05 — Hosted native Auth redirects / ตั้งค่า Auth redirects มือถือ
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Added five native URLs to hosted Auth additional redirects | เพิ่ม native URL ห้าค่าใน Auth redirect settings |
+| 2. Results / outcome | Push exit 0; 7/7 live destination probes passed | Push exit 0 ตรวจปลายทางจริงผ่าน 7/7 |
+| 3. Expected performance gain % | Not measured; no speed claim | ไม่วัด ไม่อ้างว่าเร็วขึ้น |
+| 4. Benefits | Native callbacks accepted; existing web destinations preserved | ยอมรับ callback แอป คงปลายทางเว็บ |
+| 5. Purpose | Return existing Auth flows to native app | ให้ Auth เดิมกลับเข้าแอป native |
+| 6. Why + architectural impact | Rejected native URLs fell back to localhost; existing shared Auth architecture retained | URL แอปถูกปฏิเสธและ fallback ไป localhost คงสถาปัตยกรรม Auth เดิม |
+| 7. Problems before | Native diagnostic callback returned web Site URL | diagnostic callback native กลับไป Site URL เว็บ |
+| 8. Goals | Accept exact native URLs without replacing web configuration | ยอมรับ URL แอปตรงค่าและคง config เว็บ |
+| 9. Architecture before | Same hosted Auth with ten web redirects | Auth hosted เดิมมี redirects เว็บสิบค่า |
+| 10. Architecture after | Same Auth with ten web and five native redirects | Auth เดิมพร้อมเว็บสิบและ native ห้าค่า |
+| 11. Refactor list | None; cloud configuration and documentation only | ไม่มี refactor แก้ cloud config และเอกสาร |
+| 12. Metrics | Reviewed updates 1 → 0; 17 other remote properties identical; 7/7 destinations | Updates 1 → 0 ค่า remote อื่น 17 ค่าเท่าเดิม ปลายทางผ่าน 7/7 |
+| 13. Technical debt removed | Missing native redirect registration | แก้การลงทะเบียน redirect แอปที่ขาด |
+| 14. Risk reduction | Sparse declaration, old ten retained, before/after comparison; refresh config and remove only five additions to roll back | Sparse config คงสิบค่าเดิม ตรวจก่อน/หลัง ย้อนกลับโดย pull ล่าสุดและลบห้าค่าที่เพิ่มเท่านั้น |
+| 15. Developer experience impact | Retry login without rebuilding for this cloud change | ลอง login ใหม่ได้โดยไม่ build สำหรับ cloud change นี้ |
+| 16. Future opportunities | Actual Google/Facebook login, OS return and session acceptance | ตรวจ login Google/Facebook จริง กลับเข้าแอปและ session |
+| 17. Lessons learned | Initialize isolated workdir before pull; parse CLI JSON record after text prefix | Init workdir ก่อน pull อ่าน JSON แยกข้อความนำหน้าของ CLI |
+| 18. KPI | All requested destinations accepted; no actual provider login claimed | ยอมรับปลายทางครบ ยังไม่อ้าง login บัญชีจริง |
+
+Evidence: [diagnostics, configuration scope, private artifact handling and rollback](../../Mobile/docs/2026-10-05-native-auth-redirects.md). Diagnostic flows were cancelled before provider sign-in/account creation/token exchange. No new app source, dependency or architecture decision; earlier source test/build evidence was not rerun for this cloud-only change. ADR 030 records the operational follow-up.
+
+หลักฐาน: รายงานด้านบนระบุขอบเขต การตรวจและย้อนกลับ ใช้ flow ที่ยกเลิกก่อน login/สร้างบัญชี/แลก token ไม่เปลี่ยน source dependency หรือสถาปัตยกรรม ไม่อ้าง checks source เดิมเป็นการตรวจใหม่ของ cloud change นี้ บันทึกติดตามใน ADR 030
+
+## 2026-10-04 — Native account, Community, Studio and staff implementation / Native บัญชี Community Studio และทีมงาน
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Mobile controllers/native views for remaining approved account/social/Community/creator/staff flows, media/share modules and product links | Controllers/views native Mobile สำหรับบัญชี/social/Community/creator/staff ที่อนุมัติ modules media/share และ product links |
+| 2. Results / outcome | Source locally implemented, final review corrections verified; live/visual/release acceptance open | มี source ในเครื่อง ตรวจการแก้ final review แล้ว; ยังเปิด acceptance live/visual/release |
+| 3. Expected performance gain % | Not measured; no runtime improvement claimed | ไม่วัด; ไม่อ้าง runtime เร็วขึ้น |
+| 4. Benefits | Existing accounts/content/permissions exposed in native workflows with late-response guards | บัญชี/เนื้อหา/สิทธิ์เดิมใช้ผ่าน native พร้อมกันผลล่าช้า |
+| 5. Purpose | Complete approved migration using original responsive mobile reference and existing services | ทำ migration ที่อนุมัติตาม responsive mobile เดิมและบริการเดิม |
+| 6. Why / architectural impact | Identity/view generations, authoritative ACK reconciliation, public SDK recovery/AAL2, ordered upload uncertainty; ADR 030 | รุ่น identity/view ตรวจ ACK จริง recovery/AAL2 public SDK และลำดับ/ความไม่แน่ชัด uploads; ADR 030 |
+| 7. Problems before | Most later-phase native actions absent; private caches/race and device-runtime verification gaps | ขาด actions native phase ภายหลังส่วนใหญ่ และช่องว่าง cache/race/runtime อุปกรณ์ |
+| 8. Goals | Preserve contracts/roles/data/design and truthful error/acceptance states | คง contracts/roles/ข้อมูล/design และ error/acceptance ที่ตรงจริง |
+| 9. Architecture Before | Phase 1 native controllers plus initial discovery/library/read-only Community | Controllers Phase 1 native พร้อม discovery/library/Community อ่านอย่างเดียวเริ่มต้น |
+| 10. Architecture After | Same server/Auth/MIT with Mobile-owned private stores, native forms/media and creator/staff clients | Server/Auth/MIT เดิมกับ private stores/forms/media/client creator/staff ที่อยู่ Mobile |
+| 11. Refactor list | Shared native QR, multipart header handling, navigation destinations, private request cancellation | QR native ร่วม multipart headers ปลายทาง navigation และยกเลิกคำขอส่วนตัว |
+| 12. Metrics / validation | Post-fix 218/218 tests, typecheck and Hermes 772 modules/~3MB/11 assets; debug assembly 204 tasks passed; six Important findings and Reader preferences corrected with observed RED→GREEN | หลังแก้ 218/218 tests/typecheck/Hermes 772 modules/~3MB/assets 11 ผ่าน; debug assembly 204 tasks ผ่าน; แก้ Important หกข้อและ preferences Reader ด้วย RED→GREEN ที่พบจริง |
+| 13. Trade-offs | Native modules require rebuild; latest-50 baseline lists; no invented unsupported APIs or exactly-once guarantees | Modules native ต้อง rebuild; lists ล่าสุด 50 ตามเดิม; ไม่สร้าง APIs ที่ไม่มีหรือรับประกัน exactly-once |
+| 14. Debt Before → After | Missing later-phase source → local flows with tests; live/visual/signed acceptance still open, invalid initial tracer RED evidence disclosed | ขาด source phase ภายหลัง → flows ในเครื่องพร้อม tests; ยังเปิด live/visual/signed acceptance และเปิดเผย tracer RED แรกที่ไม่ถูกต้อง |
+| 15. Developer Experience Impact | Real SDK external-boundary tests, feature/source matrix and completion ledger | Tests SDK จริง/mock ขอบภายนอก mapping ฟีเจอร์/source และ ledger |
+| 16. Future Debt / accepted limits | Correct public env, compare populated native/web mobile and accept signed device release; real React component tests substitute OS and cannot prove device interactions | จัด public env เทียบ native/web mobile populated และรับ signed release บนอุปกรณ์; Tests components React จริงจำลอง OS ไม่ยืนยัน interactions อุปกรณ์ |
+| 17. ADR | [ADR 030](../adr/030-mobile-native-account-community-and-creator-contracts.md) | [ADR 030](../adr/030-mobile-native-account-community-and-creator-contracts.md) |
+| 18. References | [Feature/acceptance mapping](../../Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](../../Mobile/docs/2026-10-03-native-completion-ledger.md), PRD #724 | [Mapping ฟีเจอร์/acceptance](../../Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](../../Mobile/docs/2026-10-03-native-completion-ledger.md), PRD #724 |
+
+Scope: no additional Backend/Frontend/MIT migration source or schema changes; previously present Backend profile-join fixes are separate. No commit, push, merge or issue closure. No performance/translation benchmark is claimed.
+
+ขอบเขต: ไม่เพิ่ม source/schema changes Backend/Frontend/MIT สำหรับ migration งาน Backend profile joins ที่มีเดิมแยกต่างหาก ไม่มี commit/push/merge/ปิด issue ไม่อ้าง benchmark performance/translation
+
+## 2026-10-03 — Native Phase 2 first delivery / ส่งมอบ Native Phase 2 ชุดแรก
+
+**What & where / อะไรและที่ไหน:** Mobile discovery/navigation/personal/community controllers and native views, history resume through existing Reader, four artwork assets, CLI publisher and bilingual plan/ledgers. Controllers และ native views discovery/navigation/personal/community ใน Mobile, กู้ประวัติผ่าน Reader เดิม, artwork สี่ไฟล์, CLI publisher และแผน/ledgers สองภาษา
+
+**Why / เหตุผล:** User approved Home and the existing responsive mobile navigation as the next native priority while preserving services. ผู้ใช้อนุมัติ Home และ navigation responsive mobile เดิมเป็นลำดับ native ถัดไปโดยคงบริการเดิม
+
+**Before → After / ก่อน → หลัง:** Phase 1 search/Reader shell and unpublished native backlog → Home with six actual native destinations, discovery APIs, initial library/history save/resume and read-only feed/post flows; PRD #724 and 29 slices published. Shell ค้นหา/Reader Phase 1 และ backlog native ที่ยังไม่เผยแพร่ → Home พร้อมหกปลายทาง native จริง, discovery APIs, library/history save/resume เริ่มต้นและเปิดดู feed/post; เผยแพร่ PRD #724 กับ slices 29 งาน
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Added native discovery, tab/filter Back state, initial personal/Community flows and resumable issue publication; source scoped to Mobile | เพิ่ม discovery native, state Back ของ tabs/filters, flows ข้อมูลส่วนตัว/Community เริ่มต้นและเผยแพร่ issues ที่ทำต่อได้; source อยู่ใน Mobile |
+| 2. Results / outcome | Home/discovery and guarded history flow implemented locally; full Phase 2 and visual/live acceptance remain open | มี Home/discovery และ history flow ที่ผ่าน gates ในเครื่อง; ยังเปิด Phase 2 ครบและ acceptance ภาพ/บริการจริง |
+| 3. Expected performance gain % | Not measured; no runtime percentage claimed | ยังไม่วัด; ไม่อ้างเปอร์เซ็นต์ runtime |
+| 4. Benefits | Existing mobile navigation/content accessible natively with shared account data and no service changes | ใช้ navigation/เนื้อหา mobile เดิมแบบ native พร้อมข้อมูลบัญชีร่วมโดยไม่เปลี่ยนบริการ |
+| 5. Purpose | Port existing workflows and mobile design; start approved discovery priority | Port workflows/design mobile เดิมและเริ่ม discovery ตามลำดับที่อนุมัติ |
+| 6. Why / architectural impact | Small Mobile stores isolate request generations and account ownership; ADR 014 browser proxy unchanged | Stores Mobile ขนาดเล็กแยกรุ่นคำขอและเจ้าของบัญชี; ไม่เปลี่ยน browser proxy ADR 014 |
+| 7. Problems before | Native Home/remaining destinations absent; backlog not published; no native shared Chapter/Page resume | ขาด Home/ปลายทาง native ที่เหลือ; backlog ยังไม่เผยแพร่; ไม่มีการกู้ Chapter/Page ร่วมแบบ native |
+| 8. Goals | Same services/rules, original responsive mobile reference, truthful error/acceptance states | บริการ/กติกาเดิม, responsive mobile เดิมและ states error/acceptance ที่ตรงจริง |
+| 9. Architecture Before | Phase 1 native views over auth/catalog/Reader/translation/Wallet controllers | Views native Phase 1 บน controllers auth/catalog/Reader/translation/Wallet |
+| 10. Architecture After | Same services plus native navigation/discovery/personal/Community stores; existing Reader gate used for history | บริการเดิมเพิ่ม stores navigation/discovery/personal/Community native; ใช้ Reader gate เดิมกับประวัติ |
+| 11. Refactor list | Native root/tab routing, shared portrait cards/navigation artwork, history position at first ready render; no Backend schema/rule edits | Routing root/tabs native, การ์ดปก/artwork navigation ร่วม, history position ตั้งแต่ ready render แรก; ไม่แก้ schema/กติกา Backend |
+| 12. Metrics / validation | 88 → 121 tests (+33), typecheck passed, Hermes 697 → 709 modules / 2.6MB / 10 assets; no LOC or app-performance measurement | Tests 88 → 121 (+33), typecheck ผ่าน, Hermes 697 → 709 modules / 2.6MB / 10 assets; ไม่วัด LOC หรือ performance แอป |
+| 13. Technical Debt Removed | Missing native first destinations and unpublished plan; full library mutations/rich Community remain debt tracked by S12/S20 | เติมปลายทาง native ชุดแรกและเผยแพร่แผน; mutations library/rich Community ครบยังติดตามใน S12/S20 |
+| 14. Risk Reduction / rollback | Tests cover account/race isolation and ordered acknowledged writes. Revert Mobile store/view wiring together; no server deletion. Pending: visual fidelity, process-kill and cross-device durability | Tests ครอบคลุมการแยกบัญชี/races และ writes เรียงลำดับที่รอ acknowledgement ย้อน store/view wiring Mobile พร้อมกันโดยไม่ลบ server; ยังต้องตรวจภาพ ความคงทนเมื่อ process ปิด/ข้ามอุปกรณ์ |
+| 15. Developer Experience Impact | Resumable Node publisher, actual issue URLs, evidence/resume ledger and Mobile-only controller seams | Node publisher ทำต่อได้, issue URLs จริง, ledger หลักฐาน/จุดทำต่อและขอบ controllers เฉพาะ Mobile |
+| 16. Future Opportunities | Finish S11 device comparisons, S12/S20 remaining criteria, later social/account/Studio/staff slices | ตรวจอุปกรณ์/ภาพ S11, เกณฑ์ที่เหลือ S12/S20 และ slices social/account/Studio/staff ถัดไป |
+| 17. Lessons Learned | Delayed reads/writes require identity/order guards; source export cannot substitute for live/visual acceptance | Reads/writes ช้าต้องมี guards บัญชี/ลำดับ; source export แทน acceptance ภาพ/บริการจริงไม่ได้ |
+| 18. KPI | 121/121 tests and export pass; all 30 issues published/open. No claim of complete Phase 2, signed beta, runtime initialization or visual parity | Tests 121/121 และ export ผ่าน; เผยแพร่/เปิด issues ทั้ง 30 งาน ไม่อ้าง Phase 2 ครบ, signed beta, runtime initialization หรือ visual parity |
+
+**Operational finding / ข้อค้นพบ:** Mobile environment validation fails because required `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are absent; the file contains Backend configuration keys. No secret values were copied or overwritten. A temporary-credential Metro startup was rejected by automatic approval review with only “blocked by policy”; no bypass. Native visual/live checks remain pending. Validation env Mobile ล้มเพราะขาด public variables API/Supabase สามตัวและไฟล์มีชื่อ config Backend ไม่คัดลอกหรือเขียนทับ secrets การเปิด Metro ด้วย credentials ชั่วคราวถูก automatic approval review ปฏิเสธโดยแจ้งเพียง “blocked by policy” และไม่ได้เลี่ยง ยังรอตรวจภาพ/บริการจริง native
+
+**Links / ลิงก์:** [PRD #724](https://github.com/Slow-Inc/MangaDock/issues/724), [S11 #735](https://github.com/Slow-Inc/MangaDock/issues/735), [S12 #736](https://github.com/Slow-Inc/MangaDock/issues/736), [S20 #744](https://github.com/Slow-Inc/MangaDock/issues/744), [ADR 029](../adr/029-mobile-native-discovery-navigation-and-history.md), [execution ledger / ledger การทำงาน](../../Mobile/docs/2026-10-03-native-phase2-implementation.md). Uncommitted; no PR/merge/issue closure. ยังไม่ commit; ไม่มี PR/merge/ปิด issue
+
+## 2026-10-03 — Android SDK local configuration / ตั้งค่า SDK เฉพาะเครื่อง
+
+**What & where / อะไรและที่ไหน:** Added ignored `Mobile/android/local.properties` with the installed SDK path; updated [Mobile setup](../../Mobile/README.md#android-sdk-location-on-windows). เพิ่มไฟล์ local ที่ Git ignore ให้ชี้ SDK ที่ติดตั้งแล้ว และอัปเดตวิธีตั้งค่า Mobile
+
+**Why / สาเหตุ:** SDK exists but both SDK environment variables are unset and local properties was absent. SDK มีอยู่จริง แต่ environment SDK ทั้งสองตัวยังว่างและไม่มีไฟล์ local properties
+
+**Before → After / ก่อน → หลัง:** `gradlew.bat help` reproduced root-project configuration failure → original x86_64 `app:assembleDebug` succeeded with `sdk.dir`. ทำซ้ำ error ตอน configure root project ได้ → คำสั่ง build x86_64 เดิมผ่านหลังเพิ่ม `sdk.dir`
+
+**Performance Δ / ประสิทธิภาพ:** Not measured; application runtime unchanged. ไม่ได้วัด; runtime แอปไม่เปลี่ยน
+
+**Quality & validation / คุณภาพและการตรวจ:** Build exit 0, 204 tasks, 5 executed / 199 up-to-date. This verifies SDK discovery and debug assembly, not physical-device/live-service acceptance. Build exit 0 จำนวน 204 tasks รัน 5 / up-to-date 199 ยืนยันการหา SDK และ debug assembly แต่ยังไม่ยืนยันเครื่องจริงหรือบริการจริง
+
+**Risk / rollback / ความเสี่ยงและย้อนกลับ:** Machine-specific path, ignored by Git; clean prebuild can remove it. Recreate for the actual SDK or set `ANDROID_HOME`; remove this local file to revert. No dependency/source change. Path เฉพาะเครื่อง ไม่เก็บใน Git และ clean prebuild อาจลบได้ ให้สร้างใหม่ตาม SDK จริงหรือตั้ง `ANDROID_HOME`; ลบไฟล์ local เพื่อย้อนกลับ ไม่แก้ dependencies/source
+
+**Links / ลิงก์:** [History / ประวัติ](../../DONE.md). Uncommitted; no new issue/PR. ยังไม่ได้ commit; ไม่มี issue/PR ใหม่
+
+## 2026-10-02 — Native port of the existing responsive mobile UI
+
+**What & where / อะไรและที่ไหน:** `Mobile/App.tsx`, five native view/chrome modules, `design.ts`, optional catalog display metadata, six PNG assets and a development generator; Mobile PRD/slice/ledger notes. [Source mapping and captures / Mapping และภาพ](../../Mobile/docs/2026-10-02-native-responsive-design-parity.md).
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Original artwork/palette, cover grid/detail hierarchy, sign-in order, wallet presets and compact Reader controls | Artwork/สีเดิม, grid ปก/ลำดับรายละเอียด, ลำดับ Login, presets เติมเงินและ controls Reader กระชับ |
+| 2. Results / outcome | Native presentation follows the existing mobile reference; all-screen visual equality remains open | การแสดงผล native อิงต้นแบบ mobile เดิม; ยังไม่ยืนยันว่าตรงทุกหน้า |
+| 3. Expected performance gain | Not measured; no performance percentage claimed | ยังไม่ได้วัด; ไม่อ้างเปอร์เซ็นต์ประสิทธิภาพ |
+| 4. Benefits | Preserves the existing product identity and familiar screen hierarchy | รักษาอัตลักษณ์และลำดับหน้าจอที่ผู้ใช้คุ้นเคย |
+| 5. Purpose | Port the existing mobile design to native components | Port design mobile เดิมเป็น native components |
+| 6. Why / architectural impact | User clarified the baseline; controller/service boundaries remain unchanged | ผู้ใช้ชี้แจงต้นแบบ; ขอบ controllers/services คงเดิม |
+| 7. Before | Temporary purple shell, horizontal search rows, crowded Reader controls | Shell ม่วงชั่วคราว, ผลค้นหาแนวนอน, controls Reader แน่น |
+| 8. Goals | Reuse original mobile identity without redesigning the product | ใช้อัตลักษณ์ mobile เดิมโดยไม่ออกแบบผลิตภัณฑ์ใหม่ |
+| 9. Architecture before | Native views over Mobile controllers and existing services | Native views บน Mobile controllers และบริการเดิม |
+| 10. Architecture after | Same boundaries; shared native tokens/chrome and local image assets | ขอบเดิม; ใช้ native tokens/chrome ร่วมและ image assets ในแอป |
+| 11. Refactor list | Presentation-only screen styles/layout and shared artwork; API queries unchanged | Styles/layout และ artwork ฝั่งแสดงผล; API queries คงเดิม |
+| 12. Metrics / validation | 88 tests passed, typecheck passed, 697-module / 2.5MB Hermes export; emulator sign-in render inspected | 88 tests ผ่าน, typecheck ผ่าน, Hermes export 697 modules / 2.5MB; ตรวจภาพ Login จริงบน emulator |
+| 13. Debt removed | Unrelated native palette and missing original logo; exact bundled font metrics still pending | สี native ที่ไม่ตรงและโลโก้เดิมที่ขาด; metrics ฟอนต์ที่ bundle ยังรอตรวจ |
+| 14. Risk / rollback | UI density and font-scale checks remain; revert views/assets independently of controller logic | ยังต้องตรวจความหนาแน่น UI/text scale; ย้อน views/assets แยกจาก logic controllers ได้ |
+| 15. Developer experience | Explicit source-to-native mapping and repeatable asset generation | มี mapping แหล่งเดิมกับ native และสร้าง assets ซ้ำได้ |
+| 16. Future opportunities | Port Phase 2 destinations with the original six-item mobile navigation | Port หน้าปลายทาง Phase 2 พร้อม navigation mobile หกเมนูเดิม |
+| 17. Lessons learned | Functional parity tests do not establish visual parity; read actual mobile branches alongside DESIGN.md | Tests ฟังก์ชันไม่ยืนยันภาพ; อ่าน mobile branches จริงคู่ DESIGN.md |
+| 18. KPI | Visual acceptance open; no signed APK or live account/payment/translation acceptance claimed | ยังเปิด visual acceptance; ไม่อ้าง signed APK หรือ acceptance บัญชี/ชำระ/แปลจริง |
+
+**Quality / คุณภาพ:** new sign-in hierarchy/artwork were inspected on the already-installed emulator app; offline search reports connection failure instead of a false zero-results success. Populated detail, Wallet and Reader visuals require a configured reachable Backend. / ตรวจลำดับ Login และ artwork ใหม่ในแอป emulator ที่ติดตั้งแล้ว; ค้นหา offline แสดงปัญหาการเชื่อมต่อแทนผลสำเร็จศูนย์เรื่อง ยังต้องตรวจรายละเอียดที่มีข้อมูล Wallet และ Reader กับ Backend ที่พร้อม
+
+**Operational limit / ข้อจำกัด:** port 4001 was unreachable. Agent-started Backend failed environment validation for missing Supabase URL/service-role configuration and was stopped; credentials and Backend source were unchanged. / Port 4001 เข้าถึงไม่ได้; Backend ที่ agent เปิดเองล้มจาก environment Supabase URL/service-role ที่ขาดและหยุดแล้ว ไม่แก้ credentials หรือ source Backend
+
+**Links / status / ลิงก์และสถานะ:** [Mobile decision and evidence / การตัดสินใจและหลักฐาน](../../Mobile/docs/2026-10-02-native-responsive-design-parity.md), [history / ประวัติ](../../DONE.md). Local uncommitted changes; no issue/PR published. / แก้ในเครื่อง ยังไม่ commit และไม่มี issue/PR ที่เผยแพร่
+
+## 2026-10-02 — Android Gradle wrapper compatibility
+
+**What & where:** restored generated `Mobile/android/gradle/wrapper/gradle-wrapper.properties` to Gradle 9.3.1; updated Mobile README and execution ledger. **Why:** 9.4.1 embeds Kotlin 2.3.0, rejected by the installed RN/Expo settings-plugin compiler; both installed reference wrappers use 9.3.1. **Before → After:** wrapper selected incompatible metadata → wrapper matches the SDK template (embedded Kotlin 2.2.21). Full APK outcome remains unverified.
+
+**Performance Δ:** not measured. **Quality:** restores the template's toolchain without modifying plugin code or suppressing checks. **Validation:** user's failed build is the reproduction; inspected installed Expo template and RN wrapper, plus Gradle 9.3.1 `--version`. Agent assemble remains blocked by Java real-path `AccessDeniedException`, reproduced separately on a readable workspace JAR. No successful APK or settings-plugin compilation claimed. **Risk / rollback:** generated native directory is ignored; fresh prebuild already selects 9.3.1. Restoring 9.4.1 restores the known mismatch. **Links / status:** [Mobile ledger](../../Mobile/docs/2026-10-02-native-phase1-implementation.md), [Gradle matrix](https://docs.gradle.org/current/userguide/compatibility.html#kotlin); local uncommitted change, no issue/PR. Next verification is `npm.cmd run android` in the user's normal terminal.
+
+**ภาษาไทย — อะไรและที่ไหน:** คืน wrapper ที่สร้างอัตโนมัติใน `Mobile/android/gradle/wrapper/gradle-wrapper.properties` เป็น Gradle 9.3.1 และอัปเดต Mobile README/ledger **เหตุผล:** Kotlin 2.3.0 ใน 9.4.1 ใหม่เกิน compiler ของ RN/Expo settings plugins; wrappers อ้างอิงที่ติดตั้งทั้งสองใช้ 9.3.1 **ก่อน → หลัง:** เลือก metadata ที่ไม่เข้ากัน → เลือก toolchain ตรง SDK template (Kotlin 2.2.21) ยังไม่ยืนยันผล APK
+
+**ประสิทธิภาพ:** ยังไม่ได้วัด **คุณภาพ:** คืน toolchain ตาม template โดยไม่แก้ plugin หรือปิดการตรวจ **ตรวจสอบ:** log build ที่ล้มของผู้ใช้เป็นตัวทำซ้ำ; ตรวจ template Expo, wrapper RN และ `--version` ของ Gradle 9.3.1 การ assemble ของ agent ยังติด Java หา real path แล้วได้ `AccessDeniedException` ซึ่งทำซ้ำแยกได้กับ JAR ใน workspace ที่อ่านได้ ไม่อ้างว่า APK หรือ settings plugin compile ผ่าน **ความเสี่ยง / ย้อนกลับ:** native directory ไม่เก็บใน Git; prebuild ใหม่ใช้ 9.3.1 อยู่แล้ว การคืน 9.4.1 จะกลับไปชนปัญหาเดิม **ลิงก์ / สถานะ:** [Mobile ledger](../../Mobile/docs/2026-10-02-native-phase1-implementation.md), [ตาราง Gradle](https://docs.gradle.org/current/userguide/compatibility.html#kotlin); แก้ในเครื่อง ยังไม่ได้ commit และไม่มี issue/PR ขั้นต่อไปคือ `npm.cmd run android` ใน terminal ปกติของผู้ใช้
+
+## 2026-10-02 — Backend profile-join compilation and mapping fix
+
+2026-10-20 commit preparation: focused lint normalized only these three services and their three SDK-boundary regression files. Test fetch handlers now return explicit Promises with typed inputs and read `Request.url` correctly; removed an unused review import. No profile/API behavior changed. Fresh Backend build and full CI suite **90/960**, final focused regressions **12/12** and focused ESLint verify this follow-up; no performance improvement claimed.
+
+ภาษาไทย: เตรียม commit วันที่ 2026-10-20 จัด lint เฉพาะสาม services และสาม regression files ที่ใช้ SDK boundaries ให้ fetch คืน Promise ชัดเจน มี input types และอ่าน `Request.url` ถูกต้อง ลบ import review ที่ไม่ใช้ ไม่เปลี่ยน profile/API behavior ตรวจ Backend build/CI **90 suites/960 tests**, regressions เฉพาะ **12/12** และ ESLint ไม่อ้างความเร็วเพิ่ม
+
+**What & where:** `Backend/src/reader-comments/reader-comments.service.ts`, `reviews/reviews.service.ts`, and `user-follows/user-follows.service.ts`; three new adjacent regression specs.
+
+**Why:** five TS2352 errors blocked compilation: the untyped Supabase client inferred joined `profiles` as an array, while the service DTOs and casts required a single object. Controlled SDK responses also reproduced missing author details and undefined follow fields for arrays.
+
+**Before → After:** compilation failed and array joins lost profile data → build passes; mappers accept object/array/null, selecting the related profile and handling absent joins. Existing queries and API response fields remain unchanged.
+
+**Performance Δ:** not measured; no new query or dependency. **Quality:** author details survive either populated join shape; absent profiles preserve null author fields or are excluded from follow lists.
+
+**Validation:** TDD failures on public service methods through the real Supabase SDK with mocked HTTP, then 12 new passing regression tests. `npm.cmd run build` passed; full Backend suite: 90 suites / 960 tests passed. Live database connectivity was not exercised.
+
+**Risk / rollback:** array handling assumes one profile per user and selects the first entry. No schema/auth/payment change. Rollback is confined to these three services and specs, but restores the reported compile errors. **Links / status:** [history](../../DONE.md); local uncommitted change, no issue/PR published.
+
+### ภาษาไทย
+
+**อะไรและที่ไหน:** `Backend/src/reader-comments/reader-comments.service.ts`, `reviews/reviews.service.ts` และ `user-follows/user-follows.service.ts` พร้อม regression specs ใหม่ข้างไฟล์ทั้งสาม
+
+**เหตุผล:** TS2352 ห้าจุดทำให้ compile ไม่ผ่าน: Supabase client ที่ไม่มี type ของ schema อนุมาน `profiles` ที่ join เป็น array แต่ DTO และ cast ใน service รับเพียง object เดี่ยว ทดสอบผ่าน SDK ด้วย response ที่ควบคุมได้ยังพบว่ารูปแบบ array ทำให้ชื่อ/รูปหายและฟิลด์ follow เป็น undefined
+
+**ก่อน → หลัง:** compile ไม่ผ่านและ array join ทำข้อมูล profile หาย → build ผ่าน; ตัวแปลงรองรับ object/array/null เลือก profile ที่เกี่ยวข้องและจัดการ join ว่าง โดยคง query และฟิลด์ response API เดิม
+
+**ผลต่อประสิทธิภาพ:** ยังไม่ได้วัด; ไม่มี query หรือ dependency เพิ่ม **คุณภาพ:** ชื่อ/รูปถูกส่งคืนทั้งสองรูปแบบที่มีข้อมูล; profile ว่างคงชื่อ/รูปเป็น null หรือถูกข้ามในรายการ follow
+
+**ตรวจสอบ:** TDD พบข้อผิดพลาดจาก public service methods ผ่าน Supabase SDK จริงและ HTTP จำลอง ก่อนแก้จน regression tests ใหม่ 12 เคสผ่าน `npm.cmd run build` ผ่าน; ชุดทดสอบ Backend ทั้งหมด 90 suites / 960 tests ผ่าน ยังไม่ได้ทดสอบการเชื่อมต่อฐานข้อมูลจริง
+
+**ความเสี่ยง / ย้อนกลับ:** รูปแบบ array สมมติว่าผู้ใช้มีหนึ่ง profile และเลือกตัวแรก ไม่มีการเปลี่ยน schema/auth/payment สามารถย้อนเฉพาะสาม services และ specs แต่จะกลับไปพบ compile errors เดิม **ลิงก์ / สถานะ:** [history](../../DONE.md); แก้ในเครื่อง ยังไม่ได้ commit และไม่มี issue/PR ที่เผยแพร่
 ## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
 
 **What & where:** `MIT/manga_translator/manga_translator.py` (rescue call site), removed

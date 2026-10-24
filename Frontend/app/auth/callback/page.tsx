@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import { postOAuthCallbackMessage } from "../../lib/oauthCallback";
+import Loader from "../../components/ui/Loader";
 
 function postOAuthCallback(payload: Record<string, string | null>) {
   let delivered = false;
@@ -95,11 +96,13 @@ export default function AuthCallbackPage() {
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0f0f0f] px-6 text-white">
-      <div className="max-w-md text-center" role="status" aria-live="polite">
-        <p className="text-sm text-white/60">{state.message}</p>
+    <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-ink">
+      <div className="flex max-w-md flex-col items-center text-center" role="status" aria-live="polite">
+        {/* the page-level loader while the sign-in completes (#776); the message carries the words */}
+        {state.status === "pending" && <Loader context="page" label="" className="mb-5" />}
+        <p className="text-sm text-ink-2">{state.message}</p>
         {state.status !== "pending" && (
-          <Link className="mt-6 inline-block rounded-lg bg-white px-5 py-3 text-sm text-black" href="/">
+          <Link className="mt-6 inline-block rounded-lg bg-ink px-5 py-3 text-sm text-bg hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))]" href="/">
             กลับไปยัง MangaDock
           </Link>
         )}

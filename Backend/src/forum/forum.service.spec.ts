@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { fileTypeFromFile } from 'file-type';
 import { ForumService } from './forum.service';
 
@@ -62,6 +62,11 @@ describe('ForumService.vote', () => {
 
   beforeEach(() => {
     mockChain = buildMockChain();
+    // the target exists and is not deleted (checked before the RPC, #1019)
+    mockChain.maybeSingle.mockResolvedValue({
+      data: { id: 'p1', post_id: 'p9' },
+      error: null,
+    });
     mockRpc = jest
       .fn()
       .mockResolvedValue({ data: [{ upvotes: 5, downvotes: 2 }], error: null });
@@ -138,7 +143,7 @@ describe('ForumService.vote', () => {
       targetId: 'c1',
       voteValue: 1 as const,
     };
-    mockChain.single.mockResolvedValue({
+    mockChain.maybeSingle.mockResolvedValue({
       data: { post_id: 'p9' },
       error: null,
     });
@@ -157,6 +162,90 @@ describe('ForumService.vote', () => {
         targetId: 'c1',
       }),
     );
+  });
+
+  // #1019: forum_votes has no foreign key, so a vote on a missing or deleted target was stored as an orphan
+  it.each(['post', 'comment'] as const)(
+    'a vote on a missing or deleted %s is a 404 and is not cast',
+    async (targetType) => {
+      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      await expect(
+        service.vote('u1', { targetType, targetId: 'gone', voteValue: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockChain.is).toHaveBeenCalledWith('deleted_at', null);
+    },
+  );
+});
+
+describe('ForumService.vote — a comment of a deleted post (#1020)', () => {
+  it('is a 404 and is not cast, though the comment row itself is live', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: { post_id: 'p-deleted' }, error: null }) // the live comment
+      .mockResolvedValueOnce({ data: null, error: null }); // its post is soft-deleted
+    const rpc = jest.fn();
+    const from = jest.fn(() => chain);
+    const service = makeService(from, rpc);
+    await expect(
+      service.vote('u1', {
+        targetType: 'comment',
+        targetId: 'c1',
+        voteValue: 1,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(rpc).not.toHaveBeenCalled();
+    // the second lookup is the comment's own post, filtered on deleted_at
+    expect(from).toHaveBeenLastCalledWith('forum_posts');
+    expect(chain.eq).toHaveBeenLastCalledWith('id', 'p-deleted');
+    expect(chain.is).toHaveBeenLastCalledWith('deleted_at', null);
+  });
+
+  it('a comment of a live post is cast', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: { post_id: 'p1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'p1' }, error: null });
+    const rpc = jest
+      .fn()
+      .mockResolvedValue({ data: [{ upvotes: 1, downvotes: 0 }], error: null });
+    const service = makeService(() => chain, rpc);
+    await expect(
+      service.vote('u1', {
+        targetType: 'comment',
+        targetId: 'c1',
+        voteValue: 1,
+      }),
+    ).resolves.toEqual({ upvotes: 1, downvotes: 0 });
+  });
+});
+
+describe('ForumService.createComment — the post must exist (#1019)', () => {
+  it('a comment on a missing or deleted post is a 404 and is not inserted', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const service = makeService(() => chain);
+    await expect(
+      service.createComment('u1', { postId: 'p-gone', content: 'hi' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.insert).not.toHaveBeenCalled();
+    expect(chain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('a comment on a live post is inserted', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'p1' }, error: null });
+    chain.single.mockResolvedValue({
+      data: { id: 'c1', post_id: 'p1', author_uid: 'u1', content: 'hi' },
+      error: null,
+    });
+    const service = makeService(() => chain);
+    const created = await service.createComment('u1', {
+      postId: 'p1',
+      content: 'hi',
+    } as any);
+    expect(chain.insert).toHaveBeenCalled();
+    expect(created.postId).toBe('p1');
   });
 });
 
@@ -473,13 +562,24 @@ describe('ForumService.getTrendingManga', () => {
     expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 3 });
   });
 
-  it('returns empty array on Supabase error without throwing', async () => {
+  // #978: an empty list read as "nothing is trending" and hid the trending page's load-error state (#911); a database
+  // error is the database-down signal (an Error naming Supabase → 503 SUPABASE_OFFLINE), not an empty answer.
+  it('a Supabase error rejects as a Supabase failure instead of answering an empty list', async () => {
     const rpc = jest
       .fn()
       .mockResolvedValue({ data: null, error: { message: 'DB failure' } });
     const service = makeService(() => ({}), rpc);
 
-    await expect(service.getTrendingManga()).resolves.toEqual([]);
+    await expect(service.getTrendingManga()).rejects.toThrow(
+      /Supabase.*DB failure/,
+    );
+  });
+
+  it('a failed RPC call (network) rejects too', async () => {
+    const rpc = jest.fn().mockRejectedValue(new TypeError('fetch failed'));
+    const service = makeService(() => ({}), rpc);
+
+    await expect(service.getTrendingManga()).rejects.toThrow('fetch failed');
   });
 });
 
@@ -613,5 +713,87 @@ describe('ForumService.getPublicProfile', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('posts'));
     // Only the failing 'posts' query should warn — healthy secondary queries stay quiet.
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #1023: edits and deletes looked their row up without a deleted_at filter, so they wrote to already-deleted content
+describe('ForumService — writes on already-deleted content (#1023)', () => {
+  // A deleted row, as the database answers it: found only when the query does not exclude deleted rows
+  function deletedRowChain() {
+    let excludesDeleted = false;
+    const chain = buildMockChain();
+    chain.is.mockImplementation((col: string, val: unknown) => {
+      if (col === 'deleted_at' && val === null) excludesDeleted = true;
+      return chain;
+    });
+    chain.single.mockImplementation(() =>
+      Promise.resolve(
+        excludesDeleted
+          ? { data: null, error: { code: 'PGRST116', message: '0 rows' } }
+          : { data: { author_uid: 'u1', post_id: 'p1' }, error: null },
+      ),
+    );
+    return chain;
+  }
+
+  it.each([
+    [
+      'updatePost',
+      (s: ForumService) => s.updatePost('u1', 'p1', { content: 'x' } as any),
+    ],
+    [
+      'updateComment',
+      (s: ForumService) => s.updateComment('u1', 'c1', { content: 'x' } as any),
+    ],
+    ['deletePost', (s: ForumService) => s.deletePost('u1', 'p1')],
+    ['deleteComment', (s: ForumService) => s.deleteComment('u1', 'c1')],
+  ])('%s is a 404 with no write and no broadcast', async (_name, call) => {
+    const chain = deletedRowChain();
+    const service = makeService(() => chain);
+    mockForumEvents.broadcastPostEvent.mockClear();
+    await expect(call(service)).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.update).not.toHaveBeenCalled();
+    expect(mockForumEvents.broadcastPostEvent).not.toHaveBeenCalled();
+  });
+});
+
+// #1023 (review): a live comment of a deleted post — editing or deleting it is a 404 too, like voting (#1020)
+describe('ForumService — comment writes when the post is deleted (#1023)', () => {
+  function chainFor(postLive: boolean) {
+    const chain = buildMockChain();
+    chain.single.mockResolvedValue({
+      data: { author_uid: 'u1', post_id: 'p1', id: 'c1', content: 'x' },
+      error: null,
+    });
+    chain.maybeSingle.mockResolvedValue({
+      data: postLive ? { id: 'p1' } : null,
+      error: null,
+    });
+    return chain;
+  }
+
+  it.each([
+    [
+      'updateComment',
+      (s: ForumService) => s.updateComment('u1', 'c1', { content: 'x' } as any),
+    ],
+    ['deleteComment', (s: ForumService) => s.deleteComment('u1', 'c1')],
+  ])('%s is a 404 with no write and no broadcast', async (_name, call) => {
+    const chain = chainFor(false);
+    const from = jest.fn(() => chain);
+    const service = makeService(from);
+    mockForumEvents.broadcastPostEvent.mockClear();
+    await expect(call(service)).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.update).not.toHaveBeenCalled();
+    expect(mockForumEvents.broadcastPostEvent).not.toHaveBeenCalled();
+    expect(from).toHaveBeenLastCalledWith('forum_posts');
+    expect(chain.eq).toHaveBeenLastCalledWith('id', 'p1');
+  });
+
+  it('deleteComment of a live post still deletes', async () => {
+    const chain = chainFor(true);
+    const service = makeService(() => chain);
+    await service.deleteComment('u1', 'c1');
+    expect(chain.update).toHaveBeenCalled();
   });
 });
