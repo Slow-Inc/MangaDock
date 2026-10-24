@@ -126,7 +126,7 @@ Status is based on code in the default branch, dated engineering reports, and ou
 **Audit (2026-10-22):** Current user_follows APIs and the in-app notifications service are not the planned personalized Following/ranked feed or OS-level push delivery. Existing favorites, followed series and reading history are not custom public/shareable collections. No end-to-end delivery of the new Phase 5 scope is claimed.
 
 
-**Goal:** Improve reader retention and community engagement by reusing the existing NestJS, Supabase/PostgreSQL, Redis, and multi-node infrastructure. Avoid building a custom ML recommendation service or a new message broker.
+**Goal:** Improve reader retention and community engagement by reusing NestJS, Supabase/PostgreSQL (Realtime, Queues/pgmq, and Edge Functions), and the existing Redis/multi-node infrastructure. Avoid custom ML recommenders, a separate notification WebSocket server, a new Redis notification queue, or a new message broker.
 
 1. **Lightweight Social Graph & Personalized Feed:**
    - Follow/unfollow users, translators, and creators.
@@ -137,16 +137,19 @@ Status is based on code in the default branch, dated engineering reports, and ou
    - Create, edit, and delete personal manga collections.
    - Support public/private visibility and sharing via URL or mobile deep link.
    - Store collection data and enforce access controls through existing Supabase/PostgreSQL infrastructure.
-3. **Multi-Node Push Notification Framework:**
-   - Notify readers about new chapters and new followers on Android/iOS through Expo Push Service (FCM/APNs).
-   - Use a dedicated Redis notification queue with multi-node workers, bounded retries, deduplication, and a dead-letter queue.
-   - Reuse existing leader-election patterns only for singleton scheduling/coordination tasks; notification delivery must not depend on the cache leader or share the cache write-behind queue.
-   - Use a PostgreSQL transactional outbox for durable notification events, with device-token lifecycle management, notification preferences, delivery receipts, and monitoring.
-   - Treat push delivery as best-effort/at-least-once, not guaranteed exactly-once delivery.
+3. **Unified Realtime & Push Notification System (Supabase-first):**
+   - **Durable notification inbox:** Reuse the existing `notifications` table and read/unread APIs. Persist relevant domain events with a PostgreSQL transactional outbox in the same transaction as the originating change; use stable event/deduplication IDs. Retain notification preferences and a per-device push-token registry.
+   - **In-app realtime (Web + foreground Mobile):** Use Supabase Realtime **private Broadcast** from trusted PostgreSQL notification triggers (INSERT/UPDATE) to user-scoped topics. Authenticate subscriptions with Supabase Auth and enforce UID-scoped RLS on `realtime.messages` and user-facing data; never expose privileged server keys to clients. On initial load or reconnect, refetch missed notifications via the existing API—Broadcast is not the durable inbox.
+   - **OS push (background/closed Mobile):** Use a Supabase Edge Function to send through **Expo Push Service → FCM/APNs**. Integrate `expo-notifications`, configure Android/iOS credentials, register multiple device tokens securely, handle token rotation/invalid tokens, notification preferences, permission prompts and notification deep links.
+   - **Reliable push queue:** Use **Supabase Queues (`pgmq`)** instead of a dedicated Redis notification queue. Dispatch outbox events to durable queue jobs; run bounded Edge Function consumers (invoked by a scheduler) or NestJS workers. Use visibility timeouts, retry/backoff budgets, idempotent consumers, deduplication and failed-job archive/dead-letter handling. Do not assume exactly-once push delivery.
+   - **Multi-node separation:** Multiple notification consumers can claim independent jobs without relying on the cache leader; reuse leader election only if true singleton coordination is required. Keep the existing Redis cache, invalidation, and write-behind queues unchanged and isolated from notification delivery.
+   - **Observability & release acceptance:** Monitor queue depth/outbox lag, delivery attempts, Expo tickets/receipts, invalid tokens, and dead letters. Test cross-user authorization, reconnect/offline catch-up, duplicate events, worker crashes, and foreground/background/terminated-app delivery on physical Android/iOS devices. OS push remains subject to FCM/APNs availability and device settings.
 
-**Suggested Implementation Order:** Collections Sharing → Social Graph & Feed → Push Notification integration.
+**Suggested Implementation Order:** Collections Sharing → Social Graph & Feed → Supabase in-app Realtime → Queued Mobile Push & reliability hardening.
 
-**Exit Criteria:** Users can follow creators, browse their Following Feed, share manga collections, and receive relevant mobile push notifications, without a custom recommendation ML service or additional message broker.
+**Exit Criteria:** Users can follow creators, browse their Following Feed, share collections, receive secure user-specific live notifications on Web/foreground Mobile, and receive relevant Android/iOS OS push while the app is in the background or closed. The notification inbox recovers missed events, failed push jobs are retried/observable, and no custom notification message broker is required.
+
+**Implementation references:** [Realtime Broadcast](https://supabase.com/docs/guides/realtime/broadcast) · [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization) · [Supabase Queues](https://supabase.com/docs/guides/queues/pgmq) · [Edge Function + Expo Push](https://supabase.com/docs/guides/functions/examples/push-notifications)
 
 <!-- lang:end -->
 
@@ -279,7 +282,7 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **ผลตรวจ (2026-10-22):** มี user_follows API และ In-app Notifications จริง แต่ไม่ใช่ Personalized Following/Ranked Feed หรือ OS Push Notifications และ Favorites/Series Follows/Reading History ที่มีอยู่ไม่ใช่ Custom Collections ที่แชร์ Public Link ได้ตาม Phase 5 จึงยังไม่อ้างว่าส่งมอบ Phase 5 สำเร็จ
 
 
-**เป้าหมาย:** เพิ่มการมีส่วนร่วมและการกลับมาใช้งานของผู้อ่าน โดยใช้ NestJS, Supabase/PostgreSQL, Redis และระบบ Multi-Node ที่มีอยู่แล้วให้มากที่สุด ไม่สร้าง ML Recommendation Service หรือ Message Broker ใหม่โดยไม่จำเป็น
+**เป้าหมาย:** เพิ่มการมีส่วนร่วมและการกลับมาใช้งานของผู้อ่าน โดยใช้ NestJS, Supabase/PostgreSQL (Realtime, Queues/pgmq และ Edge Functions) ร่วมกับ Redis และระบบ Multi-Node เดิม ไม่สร้าง ML Recommendation Service, Notification WebSocket Server, Redis Notification Queue หรือ Message Broker ใหม่โดยไม่จำเป็น
 
 1. **Lightweight Social Graph & Personalized Feed:**
    - ระบบ Follow/Unfollow ผู้ใช้ นักแปล และ Creator
@@ -290,15 +293,18 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
    - สร้าง แก้ไข และลบคอลเลกชันมังงะส่วนตัว
    - กำหนดการมองเห็นแบบ Public/Private และแชร์ผ่าน URL หรือ Mobile Deep Link
    - จัดเก็บข้อมูลและควบคุมสิทธิ์ด้วย Supabase/PostgreSQL ที่มีอยู่แล้ว
-3. **Multi-Node Push Notification Framework:**
-   - แจ้งเตือน New Chapter และ New Follower บน Android/iOS ผ่าน Expo Push Service (FCM/APNs)
-   - ใช้ Redis Notification Queue แยกจาก Cache Queue พร้อม Multi-Node Workers, Retry Budget, Deduplication และ Dead-letter Queue
-   - Reuse รูปแบบ Leader Election เดิมเฉพาะงาน Scheduler/Coordination ที่ต้องมีตัวทำงานเพียงตัวเดียว โดยไม่ผูกการส่ง Notification กับ Cache Leader
-   - ใช้ PostgreSQL Transactional Outbox บันทึก Event อย่างทนทาน พร้อมจัดการ Device Token Lifecycle, Notification Preferences, Delivery Receipts และ Monitoring
-   - ออกแบบการส่งให้รองรับการส่งซ้ำและความล้มเหลวของบริการภายนอก ไม่สมมติว่าจะส่งถึงแบบ Exactly-once
+3. **Unified Realtime & Push Notification System (Supabase-first):**
+   - **Durable Notification Inbox:** Reuse ตาราง `notifications` และ API อ่าน/ทำเครื่องหมายว่าอ่านแล้วที่มีอยู่ บันทึก Domain Event ลง PostgreSQL Transactional Outbox ภายใน Transaction เดียวกับการเปลี่ยนข้อมูลต้นทาง ใช้ Event/Deduplication ID ที่คงที่ พร้อมจัดเก็บ Notification Preferences และ Push Token แยกตามอุปกรณ์
+   - **In-app Realtime (Web + Mobile ที่เปิดใช้งาน):** ใช้ Supabase Realtime **Private Broadcast** จาก PostgreSQL Trigger ที่เชื่อถือได้เมื่อ `notifications` ถูก INSERT/UPDATE ส่งไปยัง Channel เฉพาะผู้ใช้ ตรวจสอบ Supabase Auth และบังคับ UID-scoped RLS บน `realtime.messages` และข้อมูลที่เปิดให้ Client เข้าถึง ห้ามเปิดเผย Server Secret Key เมื่อเปิดแอปหรือเชื่อมต่อใหม่ต้อง Fetch แจ้งเตือนที่อาจพลาดผ่าน API เดิม เพราะ Broadcast ไม่ใช่ Durable Inbox
+   - **OS Push (Mobile ขณะทำงานเบื้องหลัง/ปิดแอป):** ใช้ Supabase Edge Functions ส่งผ่าน **Expo Push Service → FCM/APNs** เพิ่ม `expo-notifications` และตั้งค่า Credentials ของ Android/iOS รองรับการลงทะเบียน Push Token หลายอุปกรณ์ การเปลี่ยน/ยกเลิก Token, Notification Preferences, การขอ Permission และ Deep Link เมื่อแตะ Notification
+   - **Reliable Push Queue:** ใช้ **Supabase Queues (`pgmq`)** แทนการสร้าง Redis Notification Queue แยก ส่งงานจาก Transactional Outbox ไปยัง Durable Queue และประมวลผลด้วย Edge Function Consumers ที่มี Scheduler เรียกใช้งาน หรือ NestJS Workers รองรับ Visibility Timeout, Retry/Backoff Budget, Idempotent Consumers, Deduplication และ Failed-job Archive/Dead-letter Handling โดยไม่สมมติว่า OS Push จะส่งถึงแบบ Exactly-once
+   - **Multi-Node Separation:** Notification Consumers หลายตัวสามารถรับงานแยกกันผ่าน Queue ได้โดยไม่ต้องผูกกับ Cache Leader; Reuse Leader Election เฉพาะงาน Singleton Coordination ที่จำเป็น และคงระบบ Redis Cache, Cross-node Invalidation และ Cache Write-behind Queue เดิมไว้โดยแยกจาก Notification Pipeline
+   - **Observability & Release Acceptance:** ตรวจ Queue Depth/Outbox Lag, Delivery Attempts, Expo Tickets/Receipts, Invalid Tokens และ Dead Letters ทดสอบสิทธิ์ข้ามบัญชี, Reconnect/Offline Catch-up, Event ซ้ำ, Worker Crash และการแจ้งเตือนบนเครื่อง Android/iOS จริงทั้ง Foreground/Background/ปิดแอป โดยตระหนักว่า FCM/APNs และการตั้งค่าอุปกรณ์อาจทำให้ Push ไม่ถึงผู้ใช้
 
-**ลำดับการพัฒนาที่แนะนำ:** Collections Sharing → Social Graph & Feed → Push Notification Integration
+**ลำดับการพัฒนาที่แนะนำ:** Collections Sharing → Social Graph & Feed → Supabase In-app Realtime → Queued Mobile Push และ Reliability Hardening
 
-**เกณฑ์เสร็จสิ้น:** ผู้ใช้ติดตาม Creator ดู Following Feed แชร์คอลเลกชัน และรับ Push Notification บนมือถือได้ โดยไม่ต้องสร้าง Recommendation ML Service หรือ Message Broker ใหม่
+**เกณฑ์เสร็จสิ้น:** ผู้ใช้ติดตาม Creator ดู Following Feed แชร์คอลเลกชัน รับ Live Notification เฉพาะบัญชีบน Web/Mobile ที่เปิดอยู่ และรับ OS Push บน Android/iOS ขณะอยู่เบื้องหลังหรือปิดแอปได้ ระบบต้องดึง Event ที่พลาดกลับมาได้ มี Retry/Monitoring สำหรับ Push ที่ล้มเหลว และไม่ต้องสร้าง Notification Message Broker เอง
+
+**เอกสารอ้างอิงสำหรับ Implementation:** [Realtime Broadcast](https://supabase.com/docs/guides/realtime/broadcast) · [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization) · [Supabase Queues](https://supabase.com/docs/guides/queues/pgmq) · [Edge Function + Expo Push](https://supabase.com/docs/guides/functions/examples/push-notifications)
 
 <!-- lang:end -->
