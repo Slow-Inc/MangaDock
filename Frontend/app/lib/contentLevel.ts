@@ -9,7 +9,8 @@
 import { useSyncExternalStore } from "react";
 import { clearAllApiCache } from "./apiCache";
 
-export type ContentLevel = "off" | "erotica" | "all";
+export type ContentLevel = "off" | "suggestive" | "erotica" | "all";
+export type ContentRating = "safe" | "suggestive" | "erotica" | "pornographic";
 
 let current: ContentLevel = "off";
 const listeners = new Set<() => void>();
@@ -50,4 +51,30 @@ export function isCatalogUrl(url: string): boolean {
 
 export function isAdultRating(rating: string | undefined): boolean {
   return rating === "erotica" || rating === "pornographic";
+}
+
+/** The ratings a level shows — mirrors the server's ratingsFor (#1105: `off` is safe only). */
+export function ratingsFor(level: ContentLevel): ContentRating[] {
+  if (level === "all") return ["safe", "suggestive", "erotica", "pornographic"];
+  if (level === "erotica") return ["safe", "suggestive", "erotica"];
+  if (level === "suggestive") return ["safe", "suggestive"];
+  return ["safe"];
+}
+
+/** Whether the level includes 18+ ratings (the search page's "เฉพาะ 18+" filter is shown then). */
+export function allowsAdult(level: ContentLevel): boolean {
+  return level === "erotica" || level === "all";
+}
+
+/**
+ * History lists keep a title unless its known rating is above the level (#1105). A title MangaDex does not know
+ * (our own Studio uploads) has no rating here and stays.
+ */
+export function filterByLevel<T extends { id: string }>(
+  items: T[],
+  ratings: Record<string, string>,
+  level: ContentLevel,
+): T[] {
+  const allowed = ratingsFor(level) as string[];
+  return items.filter((b) => !(b.id in ratings) || allowed.includes(ratings[b.id]));
 }

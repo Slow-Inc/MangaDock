@@ -601,6 +601,45 @@ export class MangaDexService {
     );
   }
 
+  /**
+   * The MangaDex content rating of titles known only by id (reading history), so their lists can respect the 18+
+   * level (#1105). Cached per title for a day; one MangaDex request for the uncached ones (≤ 100 ids). An id
+   * MangaDex does not return is left out — unknown, never guessed safe.
+   */
+  async getContentRatings(
+    ids: string[],
+  ): Promise<Record<string, ContentRating>> {
+    const out: Record<string, ContentRating> = {};
+    const missing: string[] = [];
+    const hits = await Promise.all(
+      ids.map((id) => this.cache.get<ContentRating>(`manga:rating:${id}`)),
+    );
+    ids.forEach((id, i) => {
+      const hit = hits[i];
+      if (hit) out[id] = hit.data;
+      else missing.push(id);
+    });
+    if (!missing.length) return out;
+    const params = new URLSearchParams();
+    for (const id of missing) params.append('ids[]', id);
+    params.set('limit', String(missing.length));
+    for (const r of ['safe', 'suggestive', 'erotica', 'pornographic'])
+      params.append('contentRating[]', r);
+    const res = await this.mangadexFetch(
+      `https://api.mangadex.org/manga?${params.toString()}`,
+    );
+    if (!res.ok)
+      throw new ServiceUnavailableException('MangaDex ratings unavailable');
+    const data = (await res.json()) as { data?: MangaDexManga[] };
+    for (const m of data.data ?? []) {
+      const rating = m.attributes?.contentRating;
+      if (!m.id || !rating) continue;
+      out[m.id] = rating;
+      await this.cache.set(`manga:rating:${m.id}`, rating, 24 * 60 * 60 * 1000);
+    }
+    return out;
+  }
+
   /** Fetch specific manga by IDs and return as LandingBook[]. */
   async fetchMangaByIds(
     ids: string[],

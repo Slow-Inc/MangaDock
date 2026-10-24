@@ -418,6 +418,27 @@ export class BooksController {
     );
   }
 
+  /**
+   * Content ratings of up to 100 titles by id (#1105): reading-history lists hide 18+ titles at the `off` level.
+   * Ids that are not MangaDex UUIDs are dropped.
+   */
+  @Get('ratings')
+  getContentRatings(@Query('ids') ids?: string) {
+    const list = [
+      ...new Set(
+        (ids ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              s,
+            ),
+          ),
+      ),
+    ].slice(0, 100);
+    return this.booksService.getContentRatings(list);
+  }
+
   @Get(':id/related')
   getRelated(@Param('id') id: string, @Query('limit') limit?: string) {
     return this.booksService.getRelated(

@@ -13,7 +13,7 @@ import CoverPlaceholder from "../components/ui/CoverPlaceholder";
 import AdultBadge from "../components/ui/AdultBadge";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { apiFetch } from "../lib/apiFetch";
-import { levelKey, useContentLevel } from "../lib/contentLevel";
+import { allowsAdult, levelKey, useContentLevel } from "../lib/contentLevel";
 import { inputClass } from "../components/ui/Input";
 import Pill from "../components/ui/Pill";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
@@ -231,7 +231,7 @@ function SearchResults() {
   // 18+ (#1102): the level decides what the server returns; "เฉพาะ 18+" narrows to it (shown only above off)
   const level = useContentLevel();
   const [adultOnlyChoice, setAdultOnly] = useState(false);
-  const adultOnly = adultOnlyChoice && level !== 'off';
+  const adultOnly = adultOnlyChoice && allowsAdult(level);
   const [yearFrom, setYearFrom]           = useState('');
   const [yearTo, setYearTo]               = useState('');
   // What is typed in the year boxes; it applies once it is a whole year (#965)
@@ -472,7 +472,7 @@ function SearchResults() {
               </div>
 
               {/* เรต: only when the account allows 18+ (#1102) */}
-              {level !== 'off' && (
+              {allowsAdult(level) && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-14 shrink-0 text-xs font-medium text-ink-3">เรต</span>
                   <FilterChip active={!adultOnly} onClick={() => setAdultOnly(false)}>ทั้งหมด</FilterChip>

@@ -77,6 +77,39 @@
 
 ---
 
+## #1105 Content level "ชวนคิด" (suggestive) + reading history respects the level (2026-10-24)
+
+**Why:** "อ่านต่อ" showed Tanaka-kun wa Mite Iru. at level "ปิด". MangaDex rates it `suggestive` (tags Romance/Drama/
+School Life only), and `off` used to include suggestive. History lists were also never filtered at all.
+**What (the developer chose this over an override list):**
+- **Levels are now off → suggestive → erotica → all.** `off` (and every anonymous caller) is `safe` only. The new
+  "ชวนคิด" level adds `suggestive` and needs nothing. 18+ and "ทั้งหมด" keep the age / Terms gates.
+  DB check constraint migrated (`content_level_suggestive`).
+- **Cache keys:** `suggestive` keeps the old unsuffixed keys (they held exactly safe + suggestive). `off` gets
+  `:r=off`. Landing cache bumped to `landing:full:v6` because the home rows are now safe only.
+- **`GET /books/ratings?ids=`** returns the MangaDex rating of up to 100 UUIDs. One MangaDex request for the
+  uncached ones; each rating is cached for 24 h; unknown ids are left out.
+- **`useLevelFiltered`** (`lib/historyRatings.ts`) filters the "อ่านต่อ" row and the history tab by level.
+  - The list is held empty until the ratings arrive, so a hidden cover never flashes.
+  - The result is memoized.
+  - If the ratings call fails, the whole list is shown (it is the user's own history).
+- **Search:** the "เรต" filter is shown only at 18+ / ทั้งหมด.
+
+**Validated:**
+- Backend 1221/1221 tests, frontend 511/511, tsc and eslint clean on the changed lines.
+- Live backend:
+  - an anonymous search returns `safe` only;
+  - `/books/ratings` returns Tanaka-kun as `suggestive`.
+- Production-build E2E against the real `/books/ratings`:
+  - signed out, "อ่านต่อ" hides Tanaka and keeps Frieren;
+  - at "ชวนคิด", both show on home and in the history tab;
+  - back at "ปิด", the tab hides Tanaka;
+  - choosing "ชวนคิด" opens no dialog;
+  - no "เฉพาะ 18+" chip at suggestive.
+- The #1102 probe still passes.
+
+---
+
 ## #1102 Frontend: 18+ content settings tab, badges, search rating filter (PRD #1100) (2026-10-24)
 
 **What:** the client half of #1101.

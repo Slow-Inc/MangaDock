@@ -68,16 +68,16 @@ describe('MangaDexService ratings (#1101)', () => {
     expect(items.map((b) => b.contentRating)).toEqual(['safe', 'erotica']);
   });
 
-  it('the default (anonymous) scope is safe + suggestive', async () => {
+  it('the default (anonymous) scope is safe only (#1105)', async () => {
     const { service, urls } = makeService();
     await service.searchManga('q');
-    expect(ratingsIn(urls[0])).toEqual(['safe', 'suggestive']);
+    expect(ratingsIn(urls[0])).toEqual(['safe']);
   });
 
   it('fetchMangaByIds no longer adds erotica for everyone (the search leak)', async () => {
     const { service, urls } = makeService();
     await service.fetchMangaByIds(['x']);
-    expect(ratingsIn(urls[0])).toEqual(['safe', 'suggestive']);
+    expect(ratingsIn(urls[0])).toEqual(['safe']);
     await service.fetchMangaByIds(['x'], ratingScope('erotica'));
     expect(ratingsIn(urls[1])).toEqual(['safe', 'suggestive', 'erotica']);
   });
@@ -87,7 +87,7 @@ describe('MangaDexService ratings (#1101)', () => {
     await service.getGenreManga('romance', 1, 28, OFF_SCOPE);
     await service.getGenreManga('romance', 1, 28, ratingScope('erotica', true));
     expect(keys).toEqual([
-      'genre:romance:1:28',
+      'genre:romance:1:28:r=off',
       'genre:romance:1:28:r=erotica:adult',
     ]);
     expect(ratingsIn(urls[1])).toEqual(['erotica']);

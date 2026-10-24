@@ -9,10 +9,11 @@ import {
 
 // #1101 (PRD #1100): which MangaDex ratings a caller's level allows, and the gate for raising it.
 describe('ratingsFor', () => {
-  test('off (and every anonymous caller) is safe + suggestive only', () => {
-    expect(ratingsFor('off')).toEqual(['safe', 'suggestive']);
+  test('off (and every anonymous caller) is safe only (#1105)', () => {
+    expect(ratingsFor('off')).toEqual(['safe']);
   });
-  test('erotica adds erotica; all adds pornographic too', () => {
+  test('suggestive adds suggestive; erotica adds erotica; all adds pornographic too', () => {
+    expect(ratingsFor('suggestive')).toEqual(['safe', 'suggestive']);
     expect(ratingsFor('erotica')).toEqual(['safe', 'suggestive', 'erotica']);
     expect(ratingsFor('all')).toEqual([
       'safe',
@@ -28,8 +29,9 @@ describe('searchRatings (the "เฉพาะ 18+" filter)', () => {
     expect(searchRatings('erotica', true)).toEqual(['erotica']);
     expect(searchRatings('all', true)).toEqual(['erotica', 'pornographic']);
   });
-  test('ignored at off: a client cannot ask for more than its level', () => {
-    expect(searchRatings('off', true)).toEqual(['safe', 'suggestive']);
+  test('ignored below erotica: a client cannot ask for more than its level', () => {
+    expect(searchRatings('off', true)).toEqual(['safe']);
+    expect(searchRatings('suggestive', true)).toEqual(['safe', 'suggestive']);
   });
   test('without the filter it is the level', () => {
     expect(searchRatings('all', false)).toEqual(ratingsFor('all'));
@@ -37,8 +39,9 @@ describe('searchRatings (the "เฉพาะ 18+" filter)', () => {
 });
 
 describe('levelCacheSuffix', () => {
-  test('off keeps the existing cache keys; other levels get their own', () => {
-    expect(levelCacheSuffix('off')).toBe('');
+  test('suggestive keeps the keys that held safe + suggestive before #1105; every other level has its own', () => {
+    expect(levelCacheSuffix('suggestive')).toBe('');
+    expect(levelCacheSuffix('off')).toBe(':r=off');
     expect(levelCacheSuffix('erotica')).toBe(':r=erotica');
     expect(levelCacheSuffix('all')).toBe(':r=all');
   });
@@ -81,6 +84,14 @@ describe('applyLevelChange: the gate for raising a level', () => {
       level: 'all',
       ageConfirmedAt: now,
       tosAcceptedAt: now,
+    });
+  });
+  test('suggestive needs nothing: it is not 18+', () => {
+    expect(applyLevelChange('suggestive', none, {}, now)).toEqual({
+      ok: true,
+      level: 'suggestive',
+      ageConfirmedAt: null,
+      tosAcceptedAt: null,
     });
   });
   test('lowering is always allowed and keeps the records', () => {
