@@ -15,6 +15,7 @@ from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL,
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
+from ..runtime_options import resolve_reasoning_effort
 
 
 class EmptyContentError(Exception):
@@ -335,6 +336,11 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # burns the whole max_tokens budget on <think> and returns empty content on
         # dense pages (verified: dense group 2048-tok exhausted → None; thinking off → 86 tok).
         _extra = thinking_extra_body(resolve_enable_thinking())
+        # Optional reasoning budget for OpenAI-style reasoning models (OpenCode Go accepts it).
+        _effort = resolve_reasoning_effort()
+        if _effort:
+            _extra = dict(_extra or {})
+            _extra['reasoning_effort'] = _effort
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
         response = await self.client.chat.completions.create(**create_kwargs)
