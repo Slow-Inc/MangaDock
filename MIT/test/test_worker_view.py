@@ -8,7 +8,7 @@ from server.worker_view import worker_view, workers_detail
 def test_worker_view_derives_uptime_from_registered_at():
     raw = {"ip": "127.0.0.1", "port": 5004, "pid": 12345, "busy": True, "registered_at": 100.0}
     assert worker_view(raw, now=160.0) == {
-        "ip": "127.0.0.1", "port": 5004, "pid": 12345, "busy": True, "uptime_s": 60,
+        "ip": "127.0.0.1", "port": 5004, "pid": 12345, "busy": True, "device": None, "uptime_s": 60,
     }
 
 

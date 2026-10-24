@@ -16,6 +16,7 @@ def worker_view(raw: dict, now: float) -> dict:
         "port": raw.get("port"),
         "pid": raw.get("pid"),
         "busy": bool(raw.get("busy")),
+        "device": raw.get("device"),
         "uptime_s": round(now - reg) if reg is not None else None,
     }
 

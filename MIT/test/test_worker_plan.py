@@ -38,3 +38,30 @@ def test_env_settings():
     assert gpus == ["1", "0"]
     assert worker_settings_from_env({}) == (1, [])
     assert parse_worker_gpus("") == []
+
+
+# --- #1119: GPU-aware dispatch (Strata replicas.Router: lowest load wins) -----------------
+
+from server.worker_plan import pick_free_worker
+
+
+def test_pick_free_worker_returns_none_when_every_worker_is_busy():
+    assert pick_free_worker([(True, '1'), (True, '0')]) is None
+
+
+def test_pick_free_worker_keeps_registration_order_on_one_device():
+    # Same device everywhere (or unknown) -> first free worker, exactly as before #1119.
+    assert pick_free_worker([(True, None), (False, None), (False, None)]) == 1
+    assert pick_free_worker([(False, '1'), (False, '1')]) == 0
+
+
+def test_pick_free_worker_prefers_the_gpu_with_fewest_busy_workers():
+    # Workers 0-2 on GPU1, worker 3 on GPU0; worker 0 is busy -> GPU0 is idle, so worker 3.
+    workers = [(True, '1'), (False, '1'), (False, '1'), (False, '0')]
+    assert pick_free_worker(workers) == 3
+
+
+def test_pick_free_worker_ties_go_to_registration_order():
+    # Both GPUs have one busy worker -> first free worker in list order.
+    workers = [(True, '1'), (False, '1'), (True, '0'), (False, '0')]
+    assert pick_free_worker(workers) == 1
