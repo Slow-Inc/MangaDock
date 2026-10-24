@@ -32,7 +32,7 @@ function isTranslationLine(line: string): boolean {
 /** Longest description we send to a translation provider (MangaDex descriptions are far shorter). */
 const MAX_DESCRIPTION_CHARS = 6000;
 
-const LANDING_CACHE_KEY = 'landing:full:v5';
+const LANDING_CACHE_KEY = 'landing:full:v6'; // v6: rows are safe-only since #1105
 
 /**
  * Landing assembly + Gemini text translation carved out of BooksService (#231,

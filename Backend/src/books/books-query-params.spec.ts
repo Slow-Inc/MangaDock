@@ -133,3 +133,24 @@ describe('BooksController — 18+ ratings come from the stored level, not the re
     expect(calls.searchBooks.at(-1)).toEqual(OFF_SCOPE);
   });
 });
+
+describe('BooksController — /books/ratings ids (#1105)', () => {
+  it('keeps only MangaDex UUIDs, de-duplicated, at most 100', () => {
+    const calls: unknown[][] = [];
+    const controller = new BooksController(
+      { getContentRatings: (...a: unknown[]) => calls.push(a) } as never,
+      {} as never,
+      {} as never,
+    );
+    const id = (n: number) =>
+      `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    void controller.getContentRatings(`${id(1)},${id(1)}, nope ,../x,${id(2)}`);
+    expect(calls[0][0]).toEqual([id(1), id(2)]);
+    void controller.getContentRatings(
+      Array.from({ length: 150 }, (_, i) => id(i)).join(','),
+    );
+    expect((calls[1][0] as string[]).length).toBe(100);
+    void controller.getContentRatings(undefined);
+    expect(calls[2][0]).toEqual([]);
+  });
+});

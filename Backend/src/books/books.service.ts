@@ -527,4 +527,8 @@ export class BooksService {
   getRelated(id: string, limit = 10): Promise<LandingBook[]> {
     return this.catalog.getRelated(id, limit);
   }
+
+  getContentRatings(ids: string[]) {
+    return this.catalog.getContentRatings(ids);
+  }
 }

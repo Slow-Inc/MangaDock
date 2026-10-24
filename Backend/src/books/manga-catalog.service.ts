@@ -82,6 +82,10 @@ export class MangaCatalogService {
     return this.mangaDex.getGenreManga(slug, page, limit, scope);
   }
 
+  getContentRatings(ids: string[]) {
+    return this.mangaDex.getContentRatings(ids);
+  }
+
   async getRelated(id: string, limit = 10): Promise<LandingBook[]> {
     let genres: string[];
     try {

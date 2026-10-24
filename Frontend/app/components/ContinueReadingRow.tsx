@@ -14,6 +14,7 @@ import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import { translateDescription } from "../lib/translateDescription";
 import { stripMarkdown } from "../lib/markdownText";
+import { useLevelFiltered } from "../lib/historyRatings";
 
 const truncate = (text: string, length: number) => {
   if (!text) return "ค้นพบหนังสือใหม่ที่น่าอ่านในทุกวัน";
@@ -280,7 +281,9 @@ function HistoryCard({
 }
 
 export default function ContinueReadingRow() {
-  const [history, setHistory] = useState<HistoryBook[]>([]);
+  const [allHistory, setHistory] = useState<HistoryBook[]>([]);
+  // titles above the content level stay in the history but are not shown (#1105); held until their ratings load
+  const history = useLevelFiltered(allHistory);
   const [newBookId, setNewBookId] = useState<string | null>(null);
   // sectionVisible drives the height animation
   // Always start false so SSR and client first-render agree (hydration safety)
@@ -347,7 +350,7 @@ export default function ContinueReadingRow() {
     // Grid trick: animates height smoothly without knowing actual height
     <div
       className="continue-reading-shell"
-      data-open={sectionVisible}
+      data-open={sectionVisible && history.length > 0}
     >
       <div className="overflow-hidden">
         {/* Padding bottom so cards do not clip during collapse */}

@@ -30,6 +30,7 @@ import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePageTitle } from "../hooks/pageTitle";
 import LoadError from "../components/ui/LoadError";
 import { useToast } from "../contexts/ToastContext";
+import { useLevelFiltered } from "../lib/historyRatings";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -266,7 +267,9 @@ function MyListContent() {
   const [followsFailed, setFollowsFailed] = useState(false);
   const { showToast } = useToast();
   const [likedBooks, setLikedBooks] = useState<GridBook[]>([]);
-  const [history, setHistory]       = useState<GridBook[]>([]);
+  const [allHistory, setHistory]    = useState<GridBook[]>([]);
+  // titles above the content level stay in the history but are not listed (#1105)
+  const history = useLevelFiltered(allHistory);
   const [visible, setVisible] = useState(true);
   const fadeOutStartRef = useRef<number>(0);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

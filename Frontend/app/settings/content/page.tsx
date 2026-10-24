@@ -16,11 +16,12 @@ import Loader from "../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../components/ui/Button";
 
 const OPTIONS: { level: ContentLevel; title: string; detail: string }[] = [
-  { level: "off", title: "ปิด", detail: "แสดงเฉพาะเนื้อหาทั่วไป (ค่าเริ่มต้น)" },
+  { level: "off", title: "ปิด", detail: "แสดงเฉพาะเนื้อหาทั่วไป (safe) — ค่าเริ่มต้น" },
+  { level: "suggestive", title: "ชวนคิด", detail: "รวมเนื้อหาที่มี fan service หรือฉากวาบหวิวเล็กน้อย (suggestive) — ยังไม่ใช่ 18+" },
   { level: "erotica", title: "18+", detail: "รวมเนื้อหาสำหรับผู้ใหญ่ (erotica)" },
   { level: "all", title: "ทั้งหมด", detail: "รวมเนื้อหาลามกอนาจาร (pornographic) — ต้องยอมรับข้อตกลง" },
 ];
-const RANK: Record<ContentLevel, number> = { off: 0, erotica: 1, all: 2 };
+const RANK: Record<ContentLevel, number> = { off: 0, suggestive: 1, erotica: 2, all: 3 };
 
 function ConfirmDialog({
   target, needAge, needTos, saving, onCancel, onConfirm,
@@ -113,7 +114,7 @@ export default function ContentSettingsPage() {
 
   const choose = (level: ContentLevel) => {
     if (!settings || level === settings.level) return;
-    const needAge = level !== "off" && !settings.ageConfirmedAt;
+    const needAge = (level === "erotica" || level === "all") && !settings.ageConfirmedAt;
     const needTos = level === "all" && !settings.tosAcceptedAt;
     if (RANK[level] > RANK[settings.level] && (needAge || needTos)) setPending(level);
     else void save(level);
@@ -123,7 +124,7 @@ export default function ContentSettingsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-base font-semibold text-ink">เนื้อหา</h2>
-        <p className="mt-1 text-xs text-ink-3">เลือกระดับเนื้อหาที่แสดงในการค้นหา หมวดหมู่ และรายการตอน หน้าแรกแสดงเฉพาะเนื้อหาทั่วไปเสมอ</p>
+        <p className="mt-1 text-xs text-ink-3">เลือกระดับเนื้อหาที่แสดงในการค้นหา หมวดหมู่ รายการตอน และ “อ่านต่อ” หน้าแรกแสดงเฉพาะเนื้อหาทั่วไป (safe) เสมอ</p>
       </div>
 
       {failed ? (
@@ -150,12 +151,12 @@ export default function ContentSettingsPage() {
       {pending && settings && (
         <ConfirmDialog
           target={pending}
-          needAge={pending !== "off" && !settings.ageConfirmedAt}
+          needAge={(pending === "erotica" || pending === "all") && !settings.ageConfirmedAt}
           needTos={pending === "all" && !settings.tosAcceptedAt}
           saving={saving}
           onCancel={() => setPending(null)}
           onConfirm={() => void save(pending, {
-            confirmAge: pending !== "off" ? true : undefined,
+            confirmAge: pending === "erotica" || pending === "all" ? true : undefined,
             acceptTos: pending === "all" ? true : undefined,
           })}
         />
