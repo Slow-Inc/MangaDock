@@ -52,4 +52,7 @@ TOGETHER_VL_MODEL = os.getenv('TOGETHER_VL_MODEL', 'Qwen/Qwen2.5-VL-72B-Instruct
 CUSTOM_OPENAI_API_KEY = os.getenv('CUSTOM_OPENAI_API_KEY', 'ollama') # Unsed for ollama, but maybe useful for other LLM tools.
 CUSTOM_OPENAI_API_BASE = os.getenv('CUSTOM_OPENAI_API_BASE', 'http://localhost:11434/v1') # Use OLLAMA_HOST env to change binding IP and Port.
 CUSTOM_OPENAI_MODEL = os.getenv('CUSTOM_OPENAI_MODEL', '') # e.g "qwen2.5:7b". Make sure to pull and run it before use.
+# Extra HTTP headers for the OpenAI-compatible client, as a JSON object string. Some gateways need them,
+# e.g. OpenCode Go requires `{"x-opencode-session": "<stable uuid>"}` (400 MissingSessionID otherwise).
+CUSTOM_OPENAI_EXTRA_HEADERS = os.getenv('CUSTOM_OPENAI_EXTRA_HEADERS', '')
 CUSTOM_OPENAI_MODEL_CONF = os.getenv('CUSTOM_OPENAI_MODEL_CONF', '') # e.g "qwen2".
