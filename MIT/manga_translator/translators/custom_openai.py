@@ -360,9 +360,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # not populate these fields; log 'n/a' rather than raise if absent.
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
+        details = getattr(response.usage, 'completion_tokens_details', None)
+        reasoning_tokens = getattr(details, 'reasoning_tokens', None) if details is not None else None
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
-            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
+            f'reasoning={reasoning_tokens if reasoning_tokens is not None else "n/a"} '
+            f'content_chars={len(response.choices[0].message.content or "")} '
+            f'finish={getattr(response.choices[0], "finish_reason", "?")}'
         )
 
         content = response.choices[0].message.content
