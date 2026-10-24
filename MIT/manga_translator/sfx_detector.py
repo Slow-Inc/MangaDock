@@ -62,6 +62,22 @@ def detect_sfx_boxes(img_rgb, device: str = "cuda", imgsz: int = 1024,
         return []
 
 
+def preload(device: str = "cuda") -> bool:
+    """Load the AnimeText YOLO onto `device` so the first page does not pay for it.
+
+    Best-effort: gated-repo download or GPU failures only log; the lazy path stays.
+    """
+    try:
+        import numpy as np
+        model = _load()
+        model.predict(np.zeros((64, 64, 3), dtype=np.uint8), imgsz=64, conf=0.99, device=device, verbose=False)
+        logger.info(f"[SFXDetect] preloaded on {device}")
+        return True
+    except Exception:
+        logger.warning("[SFXDetect] preload failed - it will lazy-load on the first page", exc_info=True)
+        return False
+
+
 def unload() -> None:
     """Drop the model so its VRAM can be reclaimed."""
     global _model
