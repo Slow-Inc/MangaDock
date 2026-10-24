@@ -219,13 +219,6 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         translations = []
         self.logger.debug(f'Temperature: {self.temperature}, TopP: {self.top_p}')
 
-        # #1119: opt-in hedge (MIT_TRANSLATE_HEDGE_S) cuts the long tail of one slow generation.
-        from server.translate_hedge import hedge_after_from_env, hedged
-        hedge_after = hedge_after_from_env()
-
-        def on_hedge():
-            self.logger.info(f'[hedge] no answer after {hedge_after:g}s - started a second identical request')
-
         for prompt, query_size in self._assemble_prompts(from_lang, to_lang, queries):
             self.logger.debug('-- GPT Prompt --\n' + self._format_prompt_log(to_lang, prompt))
 
@@ -234,7 +227,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             timeout_attempt = 0
             contract_attempt = 0
             while True:
-                request_task = asyncio.create_task(hedged(lambda: self._request_translation(to_lang, prompt), hedge_after, on_hedge))
+                request_task = asyncio.create_task(self._request_translation(to_lang, prompt))
                 started = time.time()
                 while not request_task.done():
                     await asyncio.sleep(0.1)
@@ -256,7 +249,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         timeout_attempt += 1
                         self.logger.warning(f'Restarting request due to timeout. Attempt: {timeout_attempt}')
                         request_task.cancel()
-                        request_task = asyncio.create_task(hedged(lambda: self._request_translation(to_lang, prompt), hedge_after, on_hedge))
+                        request_task = asyncio.create_task(self._request_translation(to_lang, prompt))
                         started = time.time()
                 try:
                     response = await request_task
