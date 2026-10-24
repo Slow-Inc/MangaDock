@@ -51,3 +51,20 @@ def worker_settings_from_env(env=None):
     """(count, gpu_ids) for the current process environment."""
     env = env if env is not None else os.environ
     return parse_worker_count(env.get(ENV_WORKERS)), parse_worker_gpus(env.get(ENV_GPUS))
+
+
+def pick_free_worker(workers):
+    """Index of the free worker to dispatch to, or None when all are busy (#1119).
+
+    ``workers`` = [(busy, device), ...] in registration order. Strata's replica router sends a
+    request to the lowest-load replica; here load = busy workers on the same GPU, so concurrent
+    pages spread over both cards instead of stacking on the first-registered one. Ties keep
+    registration order, so a single-device setup dispatches exactly as before.
+    """
+    busy_per_device = {}
+    for busy, device in workers:
+        busy_per_device[device] = busy_per_device.get(device, 0) + (1 if busy else 0)
+    free = [i for i, (busy, _) in enumerate(workers) if not busy]
+    if not free:
+        return None
+    return min(free, key=lambda i: busy_per_device[workers[i][1]])
