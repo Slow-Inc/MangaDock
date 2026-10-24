@@ -38,6 +38,7 @@ from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
+from server.worker_plan import plan_extra_workers, worker_settings_from_env
 from server.path_utils import safe_result_folder
 from server import metrics, diagnostics, auth as dev_auth
 from server.status_snapshot import build_snapshot, to_messages
@@ -565,7 +566,38 @@ def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
     return cmds
 
 
-def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+_WORKER_PROCS = []
+_SIGNAL_HANDLERS_INSTALLED = False
+
+
+def _terminate_all_workers():
+    for proc in list(_WORKER_PROCS):
+        terminate_process(proc)
+
+
+def _install_worker_cleanup():
+    """Stop every worker this front spawned on process exit (idempotent registration).
+
+    uvicorn installs its own SIGINT/SIGTERM handlers when it runs, overriding any we set
+    earlier, so the signal path alone leaks a worker on Ctrl+C — atexit (plus the
+    __main__ finally) is the reliable backstop. terminate_process is idempotent, so the
+    overlap is safe.
+    """
+    global _SIGNAL_HANDLERS_INSTALLED
+    atexit.register(_terminate_all_workers)
+    if _SIGNAL_HANDLERS_INSTALLED:
+        return
+    _SIGNAL_HANDLERS_INSTALLED = True
+
+    def handle_exit_signals(signum, frame):
+        _terminate_all_workers()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, handle_exit_signals)
+    signal.signal(signal.SIGTERM, handle_exit_signals)
+
+
+def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=None):
     # Fail loudly if the worker port is taken (usually an orphaned worker) instead
     # of letting the subprocess fail to bind and the front hang on /register (#193).
     ensure_worker_port_free('127.0.0.1', port, params.port)
@@ -573,25 +605,38 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     cmds = _build_worker_cmd(params, port, nonce)
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
-    proc = subprocess.Popen(cmds, cwd=parent)
-    print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} "
-          f"(front pid={os.getpid()} on {host}:{params.port})")
+    env = None
+    if device is not None:
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = str(device)
+    proc = subprocess.Popen(cmds, cwd=parent, env=env)
+    _WORKER_PROCS.append(proc)
+    where = f"GPU {device}" if device is not None else "front GPU"
+    print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} ({where}; "
+          f"front pid={os.getpid()} on {host}:{params.port})")
     executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
-
-    # Clean up the worker on every exit path. uvicorn installs its own SIGINT/
-    # SIGTERM handlers when it runs, overriding the ones below, so the signal path
-    # alone leaks the worker on Ctrl+C — atexit (plus the __main__ finally) is the
-    # reliable backstop. terminate_process is idempotent, so the overlap is safe.
-    atexit.register(terminate_process, proc)
-
-    def handle_exit_signals(signum, frame):
-        terminate_process(proc)
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_exit_signals)
-    signal.signal(signal.SIGTERM, handle_exit_signals)
-
+    _install_worker_cleanup()
     return proc
+
+
+def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    return _spawn_worker(host, port, nonce, params)
+
+
+def spawn_extra_workers(host: str, nonce: str, params: Namespace):
+    """Strata-style batch slots: MIT_WORKERS + MIT_WORKER_GPUS start extra workers on this front.
+
+    Optional and best-effort — a taken port or a failed spawn must never stop the primary
+    worker, so each plan entry is attempted independently and logged.
+    """
+    count, gpu_ids = worker_settings_from_env()
+    spawned = []
+    for spec in plan_extra_workers(params.port, count, gpu_ids):
+        try:
+            spawned.append(_spawn_worker(host, spec['port'], nonce, params, device=spec['device']))
+        except Exception as exc:  # noqa: BLE001 - an extra worker is an optimisation
+            print(f"MIT extra worker skipped on 127.0.0.1:{spec['port']}: {exc}")
+    return spawned
 
 def prepare(args):
     global nonce
@@ -600,7 +645,9 @@ def prepare(args):
     else:
         nonce = args.nonce
     if args.start_instance:
-        return start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        proc = start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        spawn_extra_workers('127.0.0.1', nonce, args)
+        return proc
     folder_name= "upload-cache"
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
