@@ -92,6 +92,18 @@ RuntimeError: MIT worker port 5004 is already in use - ... a restart must free B
 
 > เช็คความพร้อมด้วย `http://127.0.0.1:5003/ready` (worker พร้อมจริง) ไม่ใช่ `/health` (แค่ front ขึ้น)
 
+### หลาย worker (batch slots) — `MIT_WORKERS` / `MIT_WORKER_GPUS`
+
+หลักการ batch slots ของ Strata: front เดียวรับงานได้หลายหน้าถ้ามี worker มากกว่าหนึ่งตัว แต่ละตัวรับงานหน้าเดียวและลงทะเบียนกับ front อัตโนมัติ (เดิมต้องใส่ `--report` เอง):
+
+    MIT_WORKERS=2          # จำนวน worker ทั้งหมด (1..8), default 1 = พฤติกรรมเดิม
+    MIT_WORKER_GPUS=1,0    # การ์ดของแต่ละ worker (worker 1 ใช้ CUDA_VISIBLE_DEVICES ของ front)
+
+- worker หลักยังอยู่ที่ `port+1` (5004) และ worker เพิ่มเติมใช้ `port+2`, `port+3`, ... (5005, 5006)
+- front spawn + register ให้เอง และ **kill worker ทั้งหมด** เมื่อปิด front (atexit/signal); force-kill ยังต้องปิดพอร์ตเอง
+- วัดแล้ว: 2 หน้า concurrent 24.7s vs 33.0s sequential (1.34x, การ์ดเดียวกัน) / 25.3s vs 30.1s (คนละการ์ด) — กำไรจำกัดถ้าคอขวดคือ translation gateway; VRAM ~5-6 GB/worker
+- ถ้าพอร์ตใดถูกใช้อยู่ จะข้าม worker ตัวนั้นพร้อม log (ไม่ทำให้ front ล้ม)
+
 ### Docker
 
 ```bash
