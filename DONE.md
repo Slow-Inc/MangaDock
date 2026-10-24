@@ -77,6 +77,31 @@
 
 ---
 
+## #1112 Home page no longer offers titles with nothing to read (2026-10-24)
+
+**Why:** a friend opened the home hero, Sousou no Frieren (`b0b721ff`), and saw "ไม่มีตอนให้อ่าน", while search
+showed a similarly named entry that has chapters.
+- MangaDex still lists `th`/`en` in that title's `availableTranslatedLanguages`.
+- Its feed is empty for every rating and every include flag.
+- `hasAvailableChapters` does not filter it out either.
+- The content level and the caches were ruled out: the backend log and a production E2E run of the level switch
+  both returned chapters for every other home title.
+
+**What:**
+- `MangaDexService.findUnreadable(ids)` checks each title with one `feed?limit=1` request (th + en, every rating),
+  five at a time.
+- Each answer is cached for 24 h (`manga:readable:v1:<id>`). A failed check is neither reported nor cached.
+- `LandingService` drops the reported titles from every row before choosing the hero.
+- The landing key moves to `landing:full:v7`.
+
+**Validated:**
+- jest: 4 new tests for `findUnreadable` and 1 for the landing, red first. Backend 1231/1231.
+- Live: the landing was rebuilt in about 3 s.
+  - Frieren is gone, and the hero is Akuyaku Reijou (48 chapters).
+  - All 63 remaining home titles return chapters.
+
+---
+
 ## #674 Security settings: the device list says what it is, sign-out-others reports its result (2026-10-24)
 
 **Why:**
