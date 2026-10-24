@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
@@ -14,6 +13,7 @@ import NotificationBell from "./NotificationBell";
 import ThemeToggle, { ThemeMenuRow } from "./ThemeToggle";
 import Coin from "./ui/Coin";
 import { UidMascot } from "./mascot/Mascot";
+import UserAvatar from "./ui/UserAvatar";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
 
 export default function NavbarActions() {
@@ -90,17 +90,9 @@ export default function NavbarActions() {
               className="flex items-center gap-2 rounded-full border border-line bg-fill px-2 py-1 text-xs text-ink backdrop-blur-xl smooth-hover-fast hover:bg-raised hover:text-ink md:text-sm"
             >
               {user.photoURL ? (
-                <div className="relative h-6.5 w-6.5 shrink-0 overflow-hidden rounded-full">
-                  <Image
-                    src={user.photoURL}
-                    alt={user.displayName ?? "User"}
-                    fill
-                    sizes="26px"
-                    className="object-cover"
-                    // GIFs cannot be optimized; graph.facebook.com URLs are redirects
-                    unoptimized={user.photoURL.toLowerCase().endsWith('.gif') || user.photoURL.includes('graph.facebook.com')}
-                  />
-                </div>
+                // not next/image: an expired OAuth CDN photo made /_next/image answer a typeless 404 that download
+                // managers offered to save as image.bin (#1107)
+                <UserAvatar uid={user.uid} photoUrl={user.photoURL} size={26} />
               ) : (
                 <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center">
                   <UidMascot uid={user.uid} size={24} paused={!chipLive} />

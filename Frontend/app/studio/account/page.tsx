@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
@@ -15,6 +14,7 @@ import { StudioSelect } from "../components/StudioSelect";
 import { CountrySelect } from "../components/CountrySelect";
 import { getAccountProfileCompleteness } from "../lib/dashboardAnalytics";
 import Loader from "../../components/ui/Loader";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { PRIMARY_FILL } from "../../components/ui/Button";
 import { User } from "lucide-react";
 
@@ -216,7 +216,7 @@ export default function StudioAccountPage() {
             <div className="flex items-center gap-4 rounded-2xl border border-line bg-fill p-5">
               <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-raised">
                 {user?.photoURL ? (
-                  <Image src={user.photoURL} alt="" fill className="object-cover" />
+                  <UserAvatar uid={user.uid} photoUrl={user.photoURL} size={56} />
                 ) : (
                   <User aria-hidden className="h-6 w-6 text-ink-3" strokeWidth={1.5} />
                 )}

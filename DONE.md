@@ -77,6 +77,24 @@
 
 ---
 
+## #1107 Expired Facebook avatar no longer makes download managers offer image.bin (2026-10-24)
+
+**Why:** a download manager kept offering to save `image.bin` from `/_next/image?url=…platform-lookaside…`.
+**Root cause (reproduced):**
+- The navbar chip and `/studio/account` rendered the user photo with `next/image`.
+- When a signed Facebook CDN URL expires, the optimizer answers **404 with no `Content-Type`**.
+- A response with no type looks like a file download.
+
+**Fix:** both now use the shared `UserAvatar`. It is a plain `<img>`, and falls back to the uid mascot when the photo fails.
+
+**Validated:** production build, fake session.
+- Expired `fbsbx` avatar, before the fix: `/` and `/studio/account` each made a `/_next/image` request (404, type `null`).
+- After the fix: 0 such requests, and the chip shows the mascot.
+- A working photo still renders (`naturalWidth` 380).
+- `tsc` is clean. eslint shows only the existing `set-state-in-effect` at `NavbarActions.tsx:35`, which is untouched.
+
+---
+
 ## #1105 Content level "ชวนคิด" (suggestive) + reading history respects the level (2026-10-24)
 
 **Why:** "อ่านต่อ" showed Tanaka-kun wa Mite Iru. at level "ปิด". MangaDex rates it `suggestive` (tags Romance/Drama/
