@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from manga_translator import Config
 from server.sent_data_internal import fetch_batch_data, fetch_data_stream, NotifyType, fetch_data
+from server.worker_plan import pick_free_worker
 
 class ExecutorInstance(BaseModel):
     ip: str
@@ -16,6 +17,8 @@ class ExecutorInstance(BaseModel):
     # stamps registered_at so the /status snapshot can show real worker PID + uptime.
     pid: int | None = None
     registered_at: float | None = None
+    # #1119: the worker's CUDA_VISIBLE_DEVICES, so dispatch can spread pages over GPUs.
+    device: str | None = None
 
     def free_executor(self):
         self.busy = False
@@ -48,7 +51,7 @@ class Executors:
     def detail_raws(self) -> List[dict]:
         """Plain dicts for server.worker_view (keeps the pure transform import-light)."""
         return [{"ip": i.ip, "port": i.port, "pid": i.pid, "busy": i.busy,
-                 "registered_at": i.registered_at} for i in self.list]
+                 "registered_at": i.registered_at, "device": i.device} for i in self.list]
 
     def free_executors(self) -> int:
         return len([item for item in self.list if not item.busy])
@@ -56,8 +59,9 @@ class Executors:
     async def find_executor(self) -> ExecutorInstance:
         while True:
             async with self.lock:
-                instance = next((x for x in self.list if not x.busy), None)
-                if instance is not None:
+                index = pick_free_worker([(x.busy, x.device) for x in self.list])
+                if index is not None:
+                    instance = self.list[index]
                     instance.busy = True
                     return instance
             # Release lock before waiting — concurrent callers must not
