@@ -77,6 +77,29 @@
 
 ---
 
+## #674 Security settings: the device list says what it is, sign-out-others reports its result (2026-10-24)
+
+**Why:**
+- The list on /settings/security is a device **history** (`user_known_devices`, by hwid).
+- The button revokes every other Supabase session (`signOut({scope:"others"})`). Nothing on the page said so.
+- The button showed only when the history had rows.
+- The result was ignored, so a failed call looked identical to a successful one.
+
+**What:**
+- The heading is now "อุปกรณ์ที่เคยเข้าสู่ระบบ".
+- The row matching this browser's hwid (`getHardwareId`, the id AuthContext records) carries an "อุปกรณ์นี้" pill.
+- A line explains that the rows are a history and stay after signing out.
+- The button ("ออกจากระบบในอุปกรณ์อื่นทั้งหมด") is always shown.
+- The button reads the `error` and toasts success ("อุปกรณ์นี้ยังเข้าสู่ระบบอยู่") or failure.
+- The list is not re-fetched: signing out does not change a history.
+
+**Validated:** production build, fake session; Supabase answered by Playwright.
+- Before the fix: no "this device" mark and no feedback.
+- After the fix: the mark is on the right row, `logout?scope=others` is called, the success toast shows, and a 500 shows the failure toast.
+- tsc and eslint are clean.
+
+---
+
 ## #1107 Expired Facebook avatar no longer makes download managers offer image.bin (2026-10-24)
 
 **Why:** a download manager kept offering to save `image.bin` from `/_next/image?url=…platform-lookaside…`.

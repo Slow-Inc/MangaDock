@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
+import { getHardwareId } from "../../lib/fingerprint";
 
 interface Device {
   id: string;
@@ -26,6 +28,9 @@ export default function SessionList() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  // the hwid this browser reports (AuthContext records it on sign-in), so its row can say "this device"
+  const [currentHwid, setCurrentHwid] = useState("");
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!user) return;
@@ -36,14 +41,20 @@ export default function SessionList() {
       .order("last_seen", { ascending: false })
       .then(({ data }) => {
         setDevices((data as Device[]) ?? []);
+        setCurrentHwid(getHardwareId());
         setLoading(false);
       });
   }, [user]);
 
+  // The list is a device history (by hwid); this revokes every other Supabase session, so the rows stay (#674).
   const handleSignOutOthers = async () => {
     setSigningOut(true);
     try {
-      await supabase.auth.signOut({ scope: "others" });
+      const { error } = await supabase.auth.signOut({ scope: "others" });
+      if (error) throw error;
+      showToast({ type: "success", message: "ออกจากระบบในอุปกรณ์อื่นแล้ว อุปกรณ์นี้ยังเข้าสู่ระบบอยู่" });
+    } catch {
+      showToast({ type: "error", message: "ออกจากระบบในอุปกรณ์อื่นไม่สำเร็จ ลองอีกครั้ง" });
     } finally {
       setSigningOut(false);
     }
@@ -62,7 +73,12 @@ export default function SessionList() {
           className="flex items-center justify-between rounded-xl border border-line bg-fill px-4 py-3"
         >
           <div>
-            <p className="text-sm font-medium text-ink">{parseUA(d.user_agent)}</p>
+            <p className="flex items-center gap-2 text-sm font-medium text-ink">
+              {parseUA(d.user_agent)}
+              {currentHwid !== "" && d.hwid === currentHwid && (
+                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">อุปกรณ์นี้</span>
+              )}
+            </p>
             <p className="text-xs text-ink-3">
               ล่าสุด:{" "}
               {new Date(d.last_seen).toLocaleDateString("th-TH", {
@@ -76,15 +92,16 @@ export default function SessionList() {
           </div>
         </div>
       ))}
-      {devices.length > 0 && (
-        <button
-          onClick={handleSignOutOthers}
-          disabled={signingOut}
-          className="mt-1 w-full rounded-xl border border-danger/20 bg-danger/10 py-2 text-xs font-medium text-danger transition hover:bg-danger/15 disabled:opacity-50"
-        >
-          {signingOut ? "กำลังออกจากระบบ…" : "ออกจากระบบทุกอุปกรณ์อื่น"}
-        </button>
-      )}
+      <p className="text-xs text-ink-3">
+        รายการนี้เป็นประวัติอุปกรณ์ที่เคยเข้าสู่ระบบ ออกจากระบบแล้วรายการก็ยังอยู่
+      </p>
+      <button
+        onClick={handleSignOutOthers}
+        disabled={signingOut}
+        className="mt-1 w-full rounded-xl border border-danger/20 bg-danger/10 py-2 text-xs font-medium text-danger transition hover:bg-danger/15 disabled:opacity-50"
+      >
+        {signingOut ? "กำลังออกจากระบบ…" : "ออกจากระบบในอุปกรณ์อื่นทั้งหมด"}
+      </button>
     </div>
   );
 }
