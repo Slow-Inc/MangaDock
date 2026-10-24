@@ -34,6 +34,23 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
 
 # ---- #535 empty-balloon rescue: a balloon with INK but no textline = missed text ----
 
+def _ink_map(values):
+    """ink_of_box stub: exact-match boxes get their value; clipped sub-boxes get a
+    proportional share of the containing balloon's ink (uniform-ink approximation)."""
+    def ink(box):
+        box = tuple(float(v) for v in box)
+        if box in values:
+            return values[box]
+        # proportional share of the smallest registered box containing it
+        for b, v in values.items():
+            if box[0] >= b[0] and box[1] >= b[1] and box[2] <= b[2] and box[3] <= b[3]:
+                area_b = max(1.0, (b[2]-b[0])*(b[3]-b[1]))
+                area = max(0.0, (box[2]-box[0])*(box[3]-box[1]))
+                return v * area / area_b
+        return 0
+    return ink
+
+
 def test_normal_bubble_with_textline_over_its_ink_is_covered():
     # a speech bubble's text covers only ~15% of the balloon AREA but ~all of its INK
     # — must NOT be rescued (v6 live: duplicated every dialogue bubble).
@@ -173,6 +190,9 @@ def test_no_white_boxes_leaves_mask_unchanged():
 def test_white_box_containing_line_art_character_is_skipped():
     # One-Punch HUH panel regression #2: a bright PANEL containing a line-art
     # character passed the white-box test (ink 8%) and the erase wiped the figure.
+    # A connected ink component large in BOTH dims (an absolute, page-scaled cap —
+    # a character's hair mass) marks the box as containing ART -> skip it entirely.
+    # A text line is wide but THIN, so captions still get cleaned.
     import numpy as np, cv2
     from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
     img = np.full((700, 700), 120, np.uint8)
@@ -199,9 +219,11 @@ def test_caption_with_long_bold_text_line_still_cleaned():
 # ---- LaMa ghost in white captions: flat paper needs a direct fill, not a GAN ----
 
 def test_flatten_white_captions_replaces_lama_ghost_with_paper():
-    # User-confirmed root: the erase mask covered ALL caption ink yet lama_large
-    # reconstructed a faint squiggle of the source text ("AGAIN?") from the stroke
-    # stubs. A white caption box is UNIFORM PAPER — fill the ink pixels directly.
+    # User-confirmed root: the erase mask covered ALL caption ink (631/631 px) yet
+    # lama_large reconstructed a faint squiggle of the source text ("AGAIN?") from
+    # the stroke stubs around the tight mask. A white caption box is UNIFORM PAPER —
+    # fill the source-ink pixels directly with the box's paper colour instead of
+    # trusting the GAN.
     import numpy as np, cv2
     from manga_translator.detection_postproc import flatten_white_captions
     orig = np.full((700, 700), 120, np.uint8)

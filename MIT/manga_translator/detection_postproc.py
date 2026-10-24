@@ -37,10 +37,6 @@ def merge_sfx_detections(ctx, result, device):
     return (textlines, mask_raw, mask)
 
 
-# --- #535 white-caption / empty-balloon rescue family (ported from landing render stack,
-# --- Stage C #548). Pure numpy/cv2; the pipeline wiring (merge_empty_balloons + call sites)
-# --- lands in a follow-up slice. ---
-
 def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int = 150):
     """#535 empty-balloon rescue (Otome "STARTING WITH…" box): DBNet can be blind to a
     clean typeset caption while the balloon detector still sees its BOX. A balloon that
@@ -68,6 +64,70 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
             continue
         out.append(tuple(b))
     return out
+
+
+def merge_empty_balloons(ctx, result, device):
+    """#535: append an empty textline for every inked balloon DBNet left uncovered —
+    it then flows OCR → vlm_rescue → translate → render exactly like a rescued SFX.
+    Best-effort: any failure returns ``result`` unchanged."""
+    try:
+        from .bubble_detector import detect_bubbles
+        from .utils.generic import Quadrilateral
+        textlines, mask_raw, mask = result
+        polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda'))
+        if not polygons:
+            return result
+        img = ctx.img_rgb
+
+        def _aabb(poly):
+            xs = [p[0] for p in poly]
+            ys = [p[1] for p in poly]
+            return (float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys)))
+
+        def _ink(box):
+            x1, y1, x2, y2 = (max(0, int(v)) for v in box)
+            crop = img[y1:y2, x1:x2]
+            if crop.size == 0:
+                return 0
+            gray = crop.mean(axis=2) if crop.ndim == 3 else crop
+            return int((gray < 128).sum())
+
+        def _shrink(b, f=0.10):
+            # the balloon's black BORDER counts as ink and dilutes the coverage
+            # fraction below threshold (live v7 duplicated every bubble) — measure
+            # the interior only.
+            w, h = b[2] - b[0], b[3] - b[1]
+            return (b[0] + w * f, b[1] + h * f, b[2] - w * f, b[3] - h * f)
+
+        balloons = [_shrink(_aabb(p)) for p in polygons]
+        # #535: square white caption boxes are not speech balloons — the YOLO never
+        # proposes them (the "STARTING WITH…" box) — but their bright interiors are
+        # trivially detectable; give them the same ink-coverage rescue.
+        gray_pre = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        balloons += [_shrink(b) for b in white_box_candidates(gray_pre)]
+        existing = [textline_aabb(t) for t in textlines]
+        fresh = empty_balloon_boxes(balloons, existing, _ink)
+        for (x1, y1, x2, y2) in fresh:
+            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+            textlines.append(Quadrilateral(pts, '', 1.0))
+        if fresh:
+            logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
+
+        # #535 ink-cluster completeness: text-like ink on a LIGHT background that
+        # neither DBNet nor the balloon YOLO covered (a square panel caption, a
+        # stray sentence line) — the last net under everything.
+        gray = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        covered = [textline_aabb(t) for t in textlines] + list(balloons)
+        clusters = uncovered_text_clusters(gray, covered)
+        for (x1, y1, x2, y2) in clusters:
+            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+            textlines.append(Quadrilateral(pts, '', 1.0))
+        if clusters:
+            logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
+        return (textlines, mask_raw, mask)
+    except Exception:
+        logger.warning("[EmptyBalloon] rescue failed — continuing without", exc_info=True)
+        return result
 
 
 def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,

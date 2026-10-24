@@ -4,18 +4,10 @@ One-Punch benchmark narration group: 6502 chars of reasoning → completion=2048
 cap hit → empty content → translate 500s the whole page). The fix disables the
 model's native thinking via `chat_template_kwargs.enable_thinking=false`, gated
 by `CUSTOM_OPENAI_ENABLE_THINKING` (.env, default OFF)."""
-import asyncio
-from types import SimpleNamespace
-from unittest import mock
-
-import openai
-import pytest
-
-from _torch_free_import import load_custom_openai
-
-_co = load_custom_openai()
-resolve_enable_thinking = _co.resolve_enable_thinking
-thinking_extra_body = _co.thinking_extra_body
+from manga_translator.translators.custom_openai import (
+    resolve_enable_thinking,
+    thinking_extra_body,
+)
 
 
 def test_thinking_disabled_by_default():
@@ -45,27 +37,31 @@ def test_extra_body_none_when_thinking_enabled():
     assert thinking_extra_body(True) is None
 
 
-def _none_content_response():
-    return SimpleNamespace(
-        choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content=None))],
-        usage=SimpleNamespace(total_tokens=1, prompt_tokens=1, completion_tokens=0),
-    )
-
-
+# Wiring (ported from main's #706 test): the helpers above only matter if
+# _request_translation actually hands their result to chat.completions.create.
+# content=None ends the call with EmptyContentError (#631), so one call is enough.
 def _extra_body_sent_by_request(monkeypatch, env_value):
-    # Wiring: the helpers above only matter if _request_translation actually hands their
-    # result to chat.completions.create. content=None ends the call with an APIError
-    # (#631), so one call is enough and nothing retries.
+    import asyncio
+    from types import SimpleNamespace
+    from unittest import mock
+
+    import pytest
+
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator, EmptyContentError
+
     if env_value is None:
         monkeypatch.delenv('CUSTOM_OPENAI_ENABLE_THINKING', raising=False)
     else:
         monkeypatch.setenv('CUSTOM_OPENAI_ENABLE_THINKING', env_value)
-    t = _co.CustomOpenAiTranslator()
-    create = mock.AsyncMock(return_value=_none_content_response())
+    t = CustomOpenAiTranslator()
+    create = mock.AsyncMock(return_value=SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content=None))],
+        usage=SimpleNamespace(total_tokens=1, prompt_tokens=1, completion_tokens=0),
+    ))
     t.client.chat.completions.create = create
-    with pytest.raises(openai.APIError):
+    with pytest.raises(EmptyContentError):
         asyncio.run(t._request_translation('ENG', 'hello'))
-    return create.call_args.kwargs['extra_body']
+    return create.call_args.kwargs.get('extra_body')
 
 
 def test_request_sends_thinking_off_body_by_default(monkeypatch):

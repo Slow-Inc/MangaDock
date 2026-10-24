@@ -90,3 +90,24 @@ real data (table above). Flux is the only lever that reconstructs texture (B), n
 - **Follow-up:** if the one-time encoder download/footprint is unwanted, a pre-exported embedding
   could ship so the encoder is never fetched; per-region (vs whole-page) Flux passes if whole-page
   drift is ever measured to leak through a mask edge.
+
+---
+## Addendum (2026-07-05, #421) — selective per-region routing to Flux
+
+ADR 003 established Flux Klein as an optional VRAM-neutral inpainter. #421 decides WHEN to use it: not
+whole-page (every page would pay diffusion cost) but **only on erase-mask components that sit over textured
+art**, where LaMa leaves a gray smear it cannot synthesise (text over a character's hair). Decisions:
+
+- **LaMa-first, Flux-repairs.** The full-page LaMa inpaint always runs (fail-open base + single `full_inpainted`
+  provenance for patch slicing); Flux re-inpaints only the routed crops of the ORIGINAL image and is pasted
+  mask-only into the LaMa result. Flux never sees LaMa's smear as input.
+- **Data-grounded discriminator, not a guessed threshold.** Route iff the ring outside a mask component is
+  textured (std ≥ 18) AND contains dark ink (dark_frac ≥ 0.15). The 0.15 boundary came from measuring the real
+  per-component ring dark_frac on both a hair page (0.20) and a flat dialogue page (≤0.11) — a clean gap. A
+  single earlier guess over-routed flat pages (0.05) or under-repaired hair (0.25).
+- **Sequential model lifecycle (reaffirms the VRAM constraint).** LaMa is explicitly unloaded (+empty_cache)
+  before Flux loads; the pass is serialised by an instance lock so two `batch_concurrent` pages cannot load
+  Flux at once (12GB OOM); try/finally always unloads Flux. Gated `MIT_SELECTIVE_FLUX`, off → byte-identical.
+
+**Consequence:** the text-over-art quality gap is closed with Flux firing on ~1-2 regions/page, steady-state
+VRAM unchanged, flat pages paying nothing — the cost profile ADR 003 promised, now realised selectively.

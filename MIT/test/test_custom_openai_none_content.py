@@ -1,80 +1,101 @@
-"""#631 — custom_openai: a None message.content must be a failed attempt, not a TypeError.
-
-On dense pages the OpenAI-compatible gateway returns `choices[0].message.content = None`
-(the model spent its token budget). Before the fix that None flowed into
-`extract_capture_groups` -> `re.findall(pattern, None)` -> TypeError -> the whole page
-failed with HTTP 500. After the fix, a None (or non-string) content raises
-`openai.APIError` from `_request_translation`, which the existing retry loop
-(`custom_openai.py`, the `except openai.APIError` branch) treats like any other server
-error: retried `_RETRY_ATTEMPTS` times, then re-raised.
-
-Torch-free: the module under test is loaded through `_torch_free_import.load_custom_openai`
-(same rationale as conftest.py #359).
-"""
+"""#631: the 9arm gateway intermittently returns a completion whose message.content is
+None (the #623 dense-page failure mode, NOT fully prevented by thinking-off). The
+translator must treat that as a RETRYABLE failure — never pass None into
+extract_capture_groups (re.findall(None) → TypeError → whole page 500s in prod)."""
 import asyncio
 from types import SimpleNamespace
-from unittest import mock
 
 import pytest
 
-import openai
+from manga_translator.translators.custom_openai import (
+    CustomOpenAiTranslator,
+    EmptyContentError,
+)
 
 
-from _torch_free_import import load_custom_openai
-
-
-custom_openai = load_custom_openai()
-
-
-def _fake_response(content, finish_reason='length', total_tokens=100):
-    # finish_reason lives on the choice, not the message (openai SDK: Choice has
-    # finish_reason/index/logprobs/message; ChatCompletionMessage does not).
+def _resp(content, total=10):
     return SimpleNamespace(
-        choices=[SimpleNamespace(
-            finish_reason=finish_reason,
-            message=SimpleNamespace(content=content),
-        )],
-        usage=SimpleNamespace(total_tokens=total_tokens, prompt_tokens=10, completion_tokens=90),
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content),
+                                 finish_reason='stop')],
+        usage=SimpleNamespace(total_tokens=total, prompt_tokens=5, completion_tokens=5),
     )
 
 
-def _make_translator():
-    return custom_openai.CustomOpenAiTranslator()
+class _FakeCompletions:
+    def __init__(self, contents):
+        self._contents = list(contents)
+        self.calls = 0
+
+    async def create(self, **kwargs):
+        self.calls += 1
+        return _resp(self._contents.pop(0))
 
 
-def test_none_content_every_attempt_fails_via_api_error_path():
-    """A None reply on every attempt -> no TypeError; the translator fails through the
-    existing server-error path: openai.APIError re-raised after _RETRY_ATTEMPTS retries."""
-    t = _make_translator()
-    t.client.chat.completions.create = mock.AsyncMock(
-        return_value=_fake_response(None, finish_reason='length'))
-    with pytest.raises(openai.APIError):
-        asyncio.run(t.translate('auto', 'ENG', ['hello']))
-    # went through the existing retry branch, not a TypeError crash
-    assert t.client.chat.completions.create.call_count == t._RETRY_ATTEMPTS
+def _translator(contents):
+    t = CustomOpenAiTranslator()
+    fake = _FakeCompletions(contents)
+    t.client = SimpleNamespace(chat=SimpleNamespace(completions=fake), base_url='http://fake')
+    return t, fake
 
 
-def test_none_content_then_valid_reply_returns_translation():
-    """A None reply first, then a valid reply -> the valid translation is returned
-    (proves None is retried, not fatal)."""
-    t = _make_translator()
-    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
-        _fake_response(None, finish_reason='length'),
-        _fake_response('<|1|>hello world', finish_reason='stop'),
-    ])
-    result = asyncio.run(t.translate('auto', 'ENG', ['hello']))
-    assert result == ['hello world']
-    assert t.client.chat.completions.create.call_count == 2
+def test_none_content_raises_retryable_not_typeerror():
+    # _request_translation must raise the retryable error, not return None.
+    t, _ = _translator([None])
+    with pytest.raises(EmptyContentError):
+        asyncio.run(t._request_translation('ENG', '<|1|>こんにちは'))
 
 
-def test_none_content_logs_warning_naming_finish_reason(caplog):
-    """One warning per None reply, naming finish_reason when the response carries it."""
-    t = _make_translator()
-    t.client.chat.completions.create = mock.AsyncMock(
-        return_value=_fake_response(None, finish_reason='length'))
-    with caplog.at_level('WARNING'):
-        with pytest.raises(openai.APIError):
-            asyncio.run(t.translate('auto', 'ENG', ['hello']))
-    warnings = [r for r in caplog.records
-                if r.levelname == 'WARNING' and 'finish_reason=length' in r.getMessage()]
-    assert len(warnings) == t._RETRY_ATTEMPTS
+def test_translate_retries_none_then_succeeds():
+    # 1st attempt content=None → retry → 2nd attempt real text → translations returned.
+    t, fake = _translator([None, '<|1|>HELLO'])
+    out = asyncio.run(t._translate('JPN', 'ENG', ['こんにちは']))
+    assert fake.calls == 2
+    assert out == ['HELLO']
+
+
+def test_translate_gives_up_after_retries_without_typeerror():
+    # All attempts None → a clear exception (not TypeError from re.findall(None)).
+    t, _ = _translator([None] * 10)
+    with pytest.raises(Exception) as ei:
+        asyncio.run(t._translate('JPN', 'ENG', ['こんにちは']))
+    assert not isinstance(ei.value, TypeError)
+    assert 'empty content' in str(ei.value).lower() or 'EmptyContent' in type(ei.value).__name__
+
+
+# #631 root: qwen3.6 via the gateway IGNORES every thinking-disable lever (reasoning ~6-8k chars
+# regardless) — so the completion cap must leave room for reasoning + content. The old
+# max_tokens = _MAX_TOKENS//2 = 2048 hit finish=length with content=None on dense pages.
+def test_max_completion_tokens_default_covers_reasoning():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    assert resolve_max_completion_tokens({}) == 4096
+
+
+def test_max_completion_tokens_env_override():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    assert resolve_max_completion_tokens({'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': '6144'}) == 6144
+    assert resolve_max_completion_tokens({'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': 'junk'}) == 4096
+
+
+# When thinking is ON the reasoning eats far MORE of the budget (measured on the 9arm gateway:
+# ~2k reasoning tokens even for a 2-line translate, and the disable levers are no-ops), so a
+# SEPARATE, larger cap applies — CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS (default 8192).
+def test_thinking_budget_default_larger_than_base():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    assert resolve_max_completion_tokens({}, thinking=True) == 8192
+    assert resolve_max_completion_tokens({}, thinking=True) > resolve_max_completion_tokens({}, thinking=False)
+
+
+def test_thinking_budget_env_override():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    env = {'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': '12000'}
+    assert resolve_max_completion_tokens(env, thinking=True) == 12000
+    assert resolve_max_completion_tokens({'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': 'junk'}, thinking=True) == 8192
+
+
+def test_thinking_flag_selects_the_right_env():
+    # thinking=False must NOT read the thinking env (uses base); thinking=True must NOT read the base env.
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    both = {'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': '6144',
+            'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': '12000'}
+    assert resolve_max_completion_tokens(both, thinking=False) == 6144
+    assert resolve_max_completion_tokens(both, thinking=True) == 12000

@@ -69,7 +69,7 @@ def _det_config(det_sfx):
     return SimpleNamespace(detector=SimpleNamespace(
         detector='default', detection_size=2048, text_threshold=0.5, box_threshold=0.7,
         unclip_ratio=2.3, det_invert=False, det_gamma_correct=True, det_rotate=False,
-        det_auto_rotate=True, det_sfx=det_sfx))
+        det_auto_rotate=True, det_sfx=det_sfx, det_bubble_seg=False))
 
 
 def test_run_detection_forwards_12_args_and_skips_sfx_when_off(monkeypatch):
@@ -138,7 +138,7 @@ def _render_config(renderer):
         renderer=renderer, line_spacing=1, font_size=24, font_size_offset=0,
         font_size_minimum=8, no_hyphenation=False, bubble_area_fit=True,
         supersampling=4, font_max_box_ratio=0.5, anti_overlap=False, font_size_max=0,
-        clean_layout=False, reference_layout=False, knuth_plass=False))
+        clean_layout=False, knuth_plass=False))
 
 
 def _render_ctx(target='THA'):
@@ -176,4 +176,4 @@ def test_run_rendering_default_dispatch_forwards_all_kwargs(monkeypatch):
     assert out == 'RENDERED'
     # positional: img_inpainted, text_regions, font_path, font_size, offset, minimum, do_hyphenation, render_mask, line_spacing
     assert seen['args'] == ('INP', ctx.text_regions, 'FONT', 24, 0, 8, True, 'RMASK', 1)
-    assert seen['kwargs'] == {'bubble_fit': True, 'supersampling': 4, 'font_max_box_ratio': 0.5, 'anti_overlap': False, 'font_size_max': 0, 'clean_layout': False, 'reference_layout': False, 'knuth_plass': False, 'page_shape': None}
+    assert seen['kwargs'] == {'bubble_fit': True, 'supersampling': 4, 'font_max_box_ratio': 0.5, 'anti_overlap': False, 'font_size_max': 0, 'clean_layout': False, 'knuth_plass': False, 'page_shape': None}

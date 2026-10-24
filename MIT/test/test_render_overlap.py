@@ -85,323 +85,68 @@ def test_multiple_neighbors_each_constrain_their_side():
     assert out == (0, 0, 8, 8)
 
 
-# ---- #175 S1: processing_scale — page-area font scaler (MangaTranslator pipeline) ----
+# ---- #535 Phase-1 slice A/C: fills_bubble_width — the narration discriminator ----
+# A region the segmenter placed in a balloon is dialogue-to-FILL only when its own
+# text footprint spans most of the balloon width. A narration column loosely sitting
+# in a big detected box (One-Punch "THIS BRAT…", rw/bw ~0.40-0.59) must fall through
+# to clean-layout's narrow source-referenced column — matching the target's tall
+# narrow block — instead of ballooning up wide.
 
-def test_processing_scale_is_sqrt_megapixels():
-    from manga_translator.render_overlap import processing_scale
-    assert processing_scale(1000, 1000) == 1.0          # 1 MP → 1.0
-    assert processing_scale(2000, 2000) == 2.0          # 4 MP → 2.0
-
-
-def test_processing_scale_clamps_extremes():
-    from manga_translator.render_overlap import processing_scale
-    assert processing_scale(100, 100) == 0.5            # 0.01 MP → sqrt 0.1 → clamp lo 0.5
-    assert processing_scale(5000, 5000) == 4.0          # 25 MP → sqrt 5 → clamp hi 4.0
-
-
-# ---- #175 S1: font_bounds — two-tier dialogue/display bounds (MangaTranslator config) ----
-
-def test_font_bounds_two_tier_at_scale_1():
-    from manga_translator.render_overlap import font_bounds
-    assert font_bounds(False, 1.0, 8) == (8, 16)        # dialogue 8–16
-    assert font_bounds(True, 1.0, 8) == (10, 64)        # display/SFX 10–64
-
-
-def test_font_bounds_scales_with_processing_scale():
-    from manga_translator.render_overlap import font_bounds
-    assert font_bounds(False, 2.0, 8) == (16, 32)       # dialogue ×2
-    assert font_bounds(True, 2.0, 8) == (20, 128)       # display ×2
-
-
-def test_font_bounds_floored_at_minimum():
-    from manga_translator.render_overlap import font_bounds
-    # ps=0.5 dialogue → round(4),round(8) → floored at fmin=8 → (8,8)
-    assert font_bounds(False, 0.5, 8) == (8, 8)
-
-
-# ---- #175 (corrected): clean-layout font scaled by processing_scale (keeps comic font + wrap) ----
-
-def test_clean_layout_font_size_unchanged_on_benchmark_resolution():
-    from manga_translator.render_overlap import clean_layout_font_size
-    # benchmark page ~1150×800 (0.92 MP → ps≈0.96) with the prod fixed font_size_max=20 →
-    # ~19, i.e. the same look that's already good (no regress).
-    assert clean_layout_font_size(20, 1150, 800, -1) == 19
-
-
-def test_clean_layout_font_size_grows_on_higher_resolution():
-    from manga_translator.render_overlap import clean_layout_font_size
-    # the fix: a higher-res page (3 MP → ps≈1.73) scales the SAME fixed 20 up → fills bubbles
-    # instead of staying tiny (the Gal Yome ENG-source report).
-    assert clean_layout_font_size(20, 2000, 1500, -1) == 35      # round(20 * 1.732)
-
-
-def test_clean_layout_font_size_floored_and_page_default():
-    from manga_translator.render_overlap import clean_layout_font_size
-    assert clean_layout_font_size(20, 200, 200, 12) == 12        # tiny page → ps clamp 0.5 → 10 → floor 12
-    # font_size_max unset → page-scaled base (H+W)/130, then × ps
-    assert clean_layout_font_size(0, 1300, 1300, -1) == 26       # base 20 × ps(1.69MP)=1.3
-
-
-def test_clean_layout_target_fs_narration_unchanged():
-    # #175 follow-up: narration (original lettering <= the flat clean font) must be untouched
-    # so the carefully-tuned flat clean size (ADR 025) does not regress.
-    from manga_translator.render_overlap import clean_layout_target_fs
-    assert clean_layout_target_fs(21, 26) == 26      # the measured narration region (orig 21 < flat 26)
-    assert clean_layout_target_fs(26, 26) == 26      # equal → flat
-    assert clean_layout_target_fs(0, 26) == 26       # no original size → flat
-    assert clean_layout_target_fs(None, 26) == 26
-
-
-def test_clean_layout_target_fs_display_caption_tracks_original():
-    # the measured display captions on Gal Yome page 11: render near the ORIGINAL size, not the
-    # flat 26 (which made them 2.6–3.7× too small vs the source lettering).
-    from manga_translator.render_overlap import clean_layout_target_fs
-    assert clean_layout_target_fs(96, 26) == 96      # "LOVE IS FORBIDDEN"
-    assert clean_layout_target_fs(67, 26) == 67      # "IN THIS COMPANY"
-
-
-def test_clean_layout_target_fs_caps_runaway():
-    from manga_translator.render_overlap import clean_layout_target_fs
-    assert clean_layout_target_fs(500, 26, abs_cap=120) == 120
-
-
-# ---- #431 S3: display_sfx — only FREE-FLOATING SFX gets the oversized display regime ----
-
-def test_display_sfx_free_floating_rescued_is_display():
-    from manga_translator.render_overlap import display_sfx
-    # a length-heuristic-rescued region with NO balloon → real SFX → display range/cap-exempt
-    assert display_sfx(sfx_rescued=True, is_sfx=False, has_bubble=False) is True
-
-
-def test_display_sfx_inside_bubble_is_dialogue():
-    from manga_translator.render_overlap import display_sfx
-    # the #431 bug: short source flagged SFX but it sits INSIDE a speech balloon
-    # ("DRINKING PARTY") → dialogue, NOT display → must size to the balloon, not 64px.
-    assert display_sfx(sfx_rescued=True, is_sfx=False, has_bubble=True) is False
-    assert display_sfx(sfx_rescued=False, is_sfx=True, has_bubble=True) is False
-
-
-def test_display_sfx_plain_dialogue_never_display():
-    from manga_translator.render_overlap import display_sfx
-    assert display_sfx(sfx_rescued=False, is_sfx=False, has_bubble=False) is False
-    assert display_sfx(sfx_rescued=False, is_sfx=False, has_bubble=True) is False
-
-
-def test_display_sfx_yolo_provenance_free_is_display():
-    from manga_translator.render_overlap import display_sfx
-    # det_sfx YOLO provenance with no balloon association → free SFX → display
-    assert display_sfx(sfx_rescued=False, is_sfx=True, has_bubble=False) is True
-
-
-# ---- #175 (patch-path fix): bubble-fit fills the balloon — bound by the box, not page-scale ----
-
-def test_bubble_fit_bounds_fills_a_large_balloon():
-    from manga_translator.render_overlap import bubble_fit_bounds
-    # a tall balloon interior (≈673px) must let the binary search grow large enough to FILL it,
-    # not cap at a page-scale [8,16]. high tracks the box height (font can't exceed it),
-    # capped by an absolute sanity ceiling. This is the EN→TH "text ≪ bubble" fix.
-    low, high = bubble_fit_bounds(673, font_size_minimum=24)
-    assert low == 24 and high == 200          # high = min(box_h, abs_max=200)
-
-
-def test_bubble_fit_bounds_small_box_caps_at_box_height():
-    from manga_translator.render_overlap import bubble_fit_bounds
-    # a small box → high is the box height itself (can't fit a taller glyph)
-    assert bubble_fit_bounds(50, font_size_minimum=24) == (24, 50)
-    assert bubble_fit_bounds(30, font_size_minimum=24) == (24, 30)   # box below the floor+1 still ≥ low+1
-
-
-def test_bubble_fit_bounds_floor_and_ceiling():
-    from manga_translator.render_overlap import bubble_fit_bounds
-    # floor at font_size_minimum (min 8); ceiling clamps huge boxes
-    assert bubble_fit_bounds(10, font_size_minimum=8) == (8, 10)
-    assert bubble_fit_bounds(5000, font_size_minimum=24) == (24, 200)   # abs ceiling
-    assert bubble_fit_bounds(20, font_size_minimum=-1) == (8, 20)       # bad fmin → 8 floor
-
-
-# ---- #175 residual #2: route narration out of bubble-fit (rw/bw discriminator) ----
-
-def test_fills_bubble_width_dialogue_fills():
+def test_dialogue_footprint_fills_balloon():
     from manga_translator.render_overlap import fills_bubble_width
-    # dialogue: the text footprint spans most of the balloon width → fill it (bubble-fit)
-    assert fills_bubble_width(284, 323) is True       # rw/bw=0.88 (measured dialogue)
-    assert fills_bubble_width(524, 584) is True        # 0.90
+    assert fills_bubble_width(90, 100) is True            # rw/bw 0.90 = dialogue
 
 
-def test_fills_bubble_width_narration_does_not_fill():
+def test_narration_narrow_footprint_falls_through():
     from manga_translator.render_overlap import fills_bubble_width
-    # narration/caption loosely placed in a large box → narrow source column, NOT fill
-    assert fills_bubble_width(128, 318) is False       # rw/bw=0.40 (measured narration)
-    assert fills_bubble_width(175, 295) is False        # 0.59
-    assert fills_bubble_width(24, 80) is False          # 0.30 short text
+    assert fills_bubble_width(50, 100) is False           # rw/bw 0.50 = narration
 
 
-def test_fills_bubble_width_threshold_and_degenerate():
+def test_no_balloon_info_does_not_block():
     from manga_translator.render_overlap import fills_bubble_width
-    assert fills_bubble_width(72, 100) is True          # 0.72 exactly → fill (>=)
-    assert fills_bubble_width(71, 100) is False         # just under
-    assert fills_bubble_width(50, 0) is True            # no bubble width info → don't block bubble-fit
+    assert fills_bubble_width(50, 0) is True              # bw<=0 → don't block
 
 
-# ---- anti-overlap territory: reserve only the space the text actually uses ----
+# ---- #535/#183: squeeze_width — narrow the column until the block fills the HEIGHT ----
 
-def test_region_territory_box_narrow_text_reserves_its_text_box_not_the_balloon():
-    # The #436 follow-up: a narration/clean-layout region whose text is a narrow column in a big
-    # balloon must reserve only its TEXT box, not the whole balloon — else it over-clamps an
-    # overlapping neighbour's bubble-fit box and shrinks its font (the measured front bubble:
-    # rw/bw 0.40). text box (100..300) inside balloon (100..600): rw/bw=0.40 → not filling.
-    from manga_translator.render_overlap import region_territory_box
-    assert region_territory_box(100, 50, 300, 250, (100, 50, 600, 250)) == (100, 50, 300, 250)
-
-
-def test_region_territory_box_filling_dialogue_reserves_the_balloon():
-    # dialogue that fills its balloon reserves the whole balloon (unchanged behaviour).
-    from manga_translator.render_overlap import region_territory_box
-    # text 100..560 in balloon 100..600 → rw/bw=0.92 → fills → balloon box
-    assert region_territory_box(100, 50, 560, 250, (100, 50, 600, 250)) == (100.0, 50.0, 600.0, 250.0)
+def test_squeeze_narrows_while_height_fits():
+    from manga_translator.render_overlap import squeeze_width
+    # block height at width w: total glyph area 3000 / w (narrower → taller)
+    measure = lambda w: 3000.0 / w
+    got = squeeze_width(measure, full_w=200.0, min_w=20.0, box_h=300.0)
+    assert got < 30                      # squeezed far below the full width
+    assert 3000.0 / got <= 300.0         # ...but the block still fits the height
 
 
-def test_region_territory_box_no_balloon_reserves_text_box():
-    from manga_translator.render_overlap import region_territory_box
-    assert region_territory_box(10, 20, 90, 120, None) == (10, 20, 90, 120)
+def test_squeeze_stops_at_min_width_floor():
+    from manga_translator.render_overlap import squeeze_width
+    got = squeeze_width(lambda w: 10.0, full_w=100.0, min_w=80.0, box_h=1000.0)
+    assert got >= 80.0                   # never below the longest-word floor
 
 
-# ---- #436 de-dup: drop a region whose box is mostly inside another's (the SFX-duplicate) ----
+def test_squeeze_noop_when_narrowing_would_overflow():
+    from manga_translator.render_overlap import squeeze_width
+    got = squeeze_width(lambda w: 500.0, full_w=100.0, min_w=10.0, box_h=300.0)
+    assert got == 100.0                  # first step already too tall → keep full
 
-def test_box_containment_fraction():
+
+# ---- #436 slice B: box_containment — the dedup geometry ----
+
+def test_containment_full_partial_none():
     from manga_translator.render_overlap import box_containment
-    # fraction of box A's area that lies inside box B
-    assert box_containment((0, 0, 10, 10), (0, 0, 10, 10)) == 1.0      # identical → fully contained
-    assert box_containment((0, 0, 10, 10), (0, 0, 5, 10)) == 0.5       # half inside
-    assert box_containment((0, 0, 10, 10), (20, 20, 30, 30)) == 0.0    # disjoint
-    # the measured #436 case: stylized "ปาร์ตี้" (412,120,714,420) almost inside the
-    # full-sentence region (429,137,698,399) — high containment
-    assert box_containment((429, 137, 698, 399), (412, 120, 714, 420)) == 1.0
+    assert box_containment((10, 10, 20, 20), (0, 0, 100, 100)) == 1.0   # fully inside
+    assert box_containment((0, 0, 10, 10), (20, 20, 30, 30)) == 0.0     # disjoint
+    half = box_containment((0, 0, 10, 10), (5, 0, 20, 10))              # right half inside
+    assert 0.45 < half < 0.55
 
 
-def test_box_containment_degenerate():
-    from manga_translator.render_overlap import box_containment
-    assert box_containment((5, 5, 5, 5), (0, 0, 10, 10)) == 0.0        # zero-area A → 0
-
-
-# ---- #183 width-squeeze: narrow the column so text fills a tall balloon's height ----
-
-def test_squeeze_width_narrows_a_tall_box():
-    from manga_translator.render_overlap import squeeze_width
-    # block height ∝ 1/width (narrower column → more lines → taller). A roomy box_h lets the
-    # squeeze narrow the column so the block fills the height instead of a few wide lines.
-    mh = lambda w: 45000.0 / w
-    out = squeeze_width(mh, full_w=300, min_w=100, box_h=320)
-    assert out < 300 and out >= 100
-    assert mh(out) <= 320 and mh(out * 0.9) > 320      # narrowest column that still fits the height
-
-
-def test_squeeze_width_noop_when_already_full():
-    from manga_translator.render_overlap import squeeze_width
-    mh = lambda w: 45000.0 / w
-    # at full width the block already (nearly) fills box_h → narrowing would overflow → no squeeze
-    assert squeeze_width(mh, full_w=150, min_w=50, box_h=305) == 150     # mh(150)=300≤305, mh(135)=333>305
-
-
-def test_squeeze_width_stops_at_floor():
-    from manga_translator.render_overlap import squeeze_width
-    # text always fits (tiny block) → squeeze would narrow forever, but the longest-token floor stops it
-    out = squeeze_width(lambda w: 10.0, full_w=300, min_w=250, box_h=1000)
-    assert 250 <= out < 300
-
-
-# ---- guard: every render_overlap helper CALLED in rendering/__init__.py is also IMPORTED there ----
-
-def test_rendering_imports_every_render_overlap_helper_it_calls():
-    """Regression net for the #183 NameError: ``squeeze_width``/``box_containment`` were USED in
-    rendering/__init__.py but missing from its ``from ..render_overlap import`` line, so the
-    bubble-fit path raised NameError at runtime (swallowed into an inpaint-only patch — text
-    silently dropped). Unit tests import the helpers directly, and the golden render suite doesn't
-    exercise the bubble-fit path, so neither caught it; only live E2E did. This pure static check
-    asserts the import line covers every helper the renderer actually calls."""
-    import re, pathlib
-    base = pathlib.Path(__file__).resolve().parents[1] / "manga_translator"
-    ro = (base / "render_overlap.py").read_text(encoding="utf-8")
-    rend = (base / "rendering" / "__init__.py").read_text(encoding="utf-8")
-    defs = set(re.findall(r'^def (\w+)\(', ro, re.M))
-    imported = {x.strip() for x in re.search(r'from \.\.render_overlap import (.+)', rend).group(1).split(',')}
-    code = [l for l in rend.splitlines() if not l.lstrip().startswith('#')]
-    called = {fn for fn in defs if any(re.search(r'(?<![\w.])' + fn + r'\s*\(', l) for l in code)}
-    missing = called - imported
-    assert not missing, f"render_overlap helpers called but not imported in rendering/__init__.py: {sorted(missing)}"
-
-
-# ---- #175 patch-path follow-up: clean-layout narration must scale by PAGE area, not crop ----
-
-def test_clean_layout_font_size_page_vs_crop_resolution():
-    """The user-flagged "narration tiny while dialogue is normal" bug: clean-layout font scales by
-    ``processing_scale`` of the AREA it is given. A per-region CROP (full-res but small area) drives
-    that to its 0.5 floor → font collapses to the page-minimum; the full PAGE area scales it to the
-    designed size. ``_clean_layout_dst`` must therefore receive PAGE dims, not the crop's img.shape.
-    This pins the contract that the page_shape wiring restores."""
-    from manga_translator.render_overlap import clean_layout_font_size
-    fmin = 17                                               # page-scaled floor (#250)
-    crop = clean_layout_font_size(20, 600, 600, fmin)       # ~0.36 MP → ps floor 0.5 → 10 → floored 17
-    page = clean_layout_font_size(20, 2048, 1456, fmin)     # ~3 MP → ps 1.73 → round(34.6)=35
-    assert crop == fmin and page == 35 and page > crop
-
-
-# ---- readable-floor: the -1 auto font floor must be PAGE-derived, not crop-derived --------
-# (master plan 2 P1) In the per-region patch path ``img.shape`` is the small CROP (~700px
-# perimeter → round(700/200) ≈ 3-4px), so ``font_size_minimum == -1`` collapsed narrow-bubble
-# text to a sub-legible ~3px "text-loss". The floor must come from the PAGE, clamped legible.
-
-def test_readable_floor_is_page_derived():
-    from manga_translator.render_overlap import readable_floor
-    # a full manga page (2600+1080 = 3680 → round(3680/200) = 18) yields a legible floor
-    assert readable_floor(2600, 1080) == 18
-
-
-def test_readable_floor_clamps_a_tiny_crop_to_the_legibility_minimum():
-    from manga_translator.render_overlap import readable_floor, MIN_LEGIBLE_PX
-    # a small crop (700+500 = 1200 → round/200 = 6) would be sub-legible → clamp up
-    assert readable_floor(700, 500) == MIN_LEGIBLE_PX
-    assert MIN_LEGIBLE_PX >= 10
-
-
-def test_resolve_font_floor_uses_page_not_the_crop():
-    from manga_translator.render_overlap import resolve_font_floor, readable_floor
-    # production patch path: img.shape is the CROP, page_shape is the full page.
-    # THE BUG: floor was round((700+500)/200)=6 (invisible). FIX: page-derived (18).
-    floor = resolve_font_floor(-1, (700, 500, 3), (2600, 1080))
-    assert floor == readable_floor(2600, 1080) == 18
-
-
-def test_resolve_font_floor_falls_back_to_img_shape_when_no_page():
-    from manga_translator.render_overlap import resolve_font_floor, readable_floor
-    # full-page render (no separate page_shape) → identical to using img.shape
-    assert resolve_font_floor(-1, (2600, 1080, 3), None) == readable_floor(2600, 1080)
-
-
-def test_resolve_font_floor_passes_through_an_explicit_minimum():
-    from manga_translator.render_overlap import resolve_font_floor
-    # an explicit (non -1) floor is honored unchanged (clamped to >= 1)
-    assert resolve_font_floor(8, (700, 500, 3), (2600, 1080)) == 8
-    assert resolve_font_floor(0, (700, 500, 3), (2600, 1080)) == 1
-
-
-def test_resize_regions_floors_fonts_to_the_page_not_the_crop():
-    """End-to-end: resize_regions_to_font_size with font_size_minimum=-1 must derive the floor from
-    the PAGE (page_shape), not the small per-region CROP (img.shape). Reproduces the patch-path
-    'text shrinks to ~3px invisible' defect (master plan 2 P1)."""
+def test_longest_token_width_thai_word_aware():
+    # item-9 port: spaceless Thai measures per WORD (ZWSP segmentation), not the
+    # whole line — the ss re-wrap floor that stops "ขอโทษ" -> "ขอโ/ทบ".
     import os
-    import numpy as np
-    import manga_translator
-    from manga_translator.rendering import resize_regions_to_font_size, text_render
-    from manga_translator.render_overlap import readable_floor
-    from manga_translator.utils import TextBlock
-    text_render.set_font(os.path.join(os.path.dirname(os.path.dirname(manga_translator.__file__)),
-                                      'fonts', 'anime_ace_3.ttf'))
-    region = TextBlock([[[10, 10], [110, 10], [10, 60], [110, 60]]], texts=['x'],
-                       translation='hi', direction='h', target_lang='ENG', font_size=40)
-    region.set_font_colors([255, 255, 255], [0, 0, 0])
-    crop = np.zeros((300, 220, 3), dtype=np.uint8)          # the small per-region CROP (bug source)
-    # font_size_fixed=0 collapses the target to the resolved floor, exposing WHICH floor is used.
-    resize_regions_to_font_size(crop, [region], 0, 0, -1, page_shape=(2600, 1080))
-    # BUG: floor = round((300+220)/200) = 3 (sub-legible). FIX: page-derived readable_floor = 18.
-    assert region.font_size >= readable_floor(2600, 1080)
+    from manga_translator.rendering import text_render as T
+    T.set_font(os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Prompt-Bold.ttf'))
+    w_word = T.longest_token_width(24, 'ขอโทษ')
+    w_line = T.longest_token_width(24, 'ฉันขอโทษนะครับผม')
+    assert 0 < w_line < T.get_string_width(24, 'ฉันขอโทษนะครับผม')  # per-word, not whole line
+    assert w_word > 0

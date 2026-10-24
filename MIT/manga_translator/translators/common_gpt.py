@@ -247,20 +247,16 @@ class CommonGPTTranslator(ConfigGPT, CommonTranslator):
     
 
     def _parse_response(self, response: str, queries: List):
-        # Split response into translations  
-        new_translations = re.split(r'<\|\d+\|>', response)  
-        
-        # 立即清理每个翻译文本的前后空格
-        # Immediately clean leading and trailing whitespace from each translation text
-        new_translations = [t.strip() for t in new_translations]
-        
-        if not new_translations[0].strip():  
-            new_translations = new_translations[1:]  
-
-        if len(queries) == 1 and len(new_translations) == 1 and not re.match(r'^\s*<\|\d+\|>', response):  
-            raise Warning('Single query response does not contain prefix.')  
-        
-        return new_translations
+        # #40/#535 (live Otome v9): the old positional re.split ignored the index
+        # numbers — a model dropping one <|i|> shifted EVERY following bubble's
+        # translation (page-wide misalignment). Map blocks BY INDEX and guarantee
+        # exactly N, in order, with misses marked (normalize_numbered_output).
+        from .numbered_contract import normalize_numbered_output
+        if len(queries) == 1 and not re.match(r'^\s*<\|\d+\|>', response):
+            if response.strip():
+                return [response.strip()]
+            raise Warning('Single query response does not contain prefix.')
+        return normalize_numbered_output(response, len(queries))
 
     async def _ratelimit_sleep(self):
         """

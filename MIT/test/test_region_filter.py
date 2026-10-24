@@ -74,3 +74,35 @@ def test_sfx_rescued_region_with_blank_translation_is_still_filtered():
     """A rescued region that ended up blank has nothing to render → still dropped."""
     r = SimpleNamespace(text='LOOM', translation='   ', sfx_rescued=True)
     assert filter_translated_regions([r], _cfg()) == []
+
+
+# ---- #535 Phase-0a: drop telemetry — every dropped region + its reason exposed ----
+
+def test_with_drops_returns_kept_and_dropped_with_reasons():
+    from manga_translator.region_filter import filter_translated_regions_with_drops
+    keep = _r('hello', 'สวัสดี')
+    blank = _r('konnichiwa', '   ')
+    numeric = _r('123', '42')
+    kept, dropped = filter_translated_regions_with_drops([keep, blank, numeric], _cfg())
+
+    assert kept == [keep]
+    assert [(r is blank, reason) for r, reason in dropped][0] == (True, 'Translation contain blank areas')
+    assert dropped[1][0] is numeric and dropped[1][1] == 'Numeric translation'
+
+
+def test_with_drops_blank_translation_is_still_reported():
+    # the legacy logger skipped blank translations entirely — telemetry must not.
+    from manga_translator.region_filter import filter_translated_regions_with_drops
+    blank = _r('source text here', '')
+    kept, dropped = filter_translated_regions_with_drops([blank], _cfg())
+    assert kept == [] and len(dropped) == 1
+    assert dropped[0][1] == 'Translation contain blank areas'
+
+
+def test_legacy_filter_unchanged_and_delegates():
+    # backward compat: same kept list as the *_with_drops variant.
+    from manga_translator.region_filter import filter_translated_regions_with_drops
+    regions = [_r('a', 'b'), _r('x', ''), _r('n', '7')]
+    kept_legacy = filter_translated_regions(list(regions), _cfg())
+    kept_new, _ = filter_translated_regions_with_drops(list(regions), _cfg())
+    assert kept_legacy == kept_new
