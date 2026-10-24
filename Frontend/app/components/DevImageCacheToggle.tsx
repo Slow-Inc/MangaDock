@@ -57,14 +57,14 @@ export default function DevImageCacheToggle() {
         "fixed bottom-4 right-4 z-9999",
         "flex items-center gap-1.5 px-3 py-1.5",
         "rounded-full backdrop-blur-sm",
-        "text-white text-[0.7rem] font-semibold tracking-wide leading-none",
+        "text-ink text-[0.7rem] font-semibold tracking-wide leading-none",
         "cursor-pointer select-none transition-colors duration-200",
         active
-          ? "bg-green-950/85 border border-green-500/50"
-          : "bg-red-950/85 border border-red-500/50",
+          ? "bg-ok/15 border border-ok/50"
+          : "bg-danger/15 border border-danger/50",
       ].join(" ")}
     >
-      <span className="text-[0.65rem]">{active ? "🟢" : "🔴"}</span>
+      <span aria-hidden className={`h-2 w-2 rounded-full ${active ? "bg-ok" : "bg-danger"}`} />
       <span>IMG&nbsp;CACHE&nbsp;{active ? "FORCED LOCAL" : "NORMAL"}</span>
     </button>
   );

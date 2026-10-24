@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type Lenis from "lenis";
 import TopupModal from "./TopupModal";
 import { useChapterUnlock } from "../hooks/useChapterUnlock";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { levelKey } from "../lib/contentLevel";
 import { chapterAccess } from "../lib/chapterAccess";
 import { addToHistory } from "../lib/readingHistory";
 import { useAuth } from "../contexts/AuthContext";
+import Loader from "./ui/Loader";
 import type { LandingBook, MangaChapter, ActiveChapter } from "../lib/types";
+import Coin from "./ui/Coin";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 const API_BASE = "/api/proxy";
 
@@ -54,32 +58,32 @@ function ChapterRowInner({
       disabled={!readable && !coinLocked}
       className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${
         isHighlighted
-          ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/30 cursor-pointer"
+          ? "border-accent/50 bg-accent/10 ring-1 ring-accent/30 cursor-pointer"
           : coinLocked
-          ? "border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-pointer"
+          ? "border-coin/20 hover:border-coin/40 hover:bg-coin/5 cursor-pointer"
           : readable
-          ? "border-white/10 hover:border-white/25 hover:bg-white/8 cursor-pointer"
-          : "border-white/5 opacity-50 cursor-not-allowed"
+          ? "border-line hover:border-ink-3 hover:bg-fill cursor-pointer"
+          : "border-line opacity-50 cursor-not-allowed"
       }`}
     >
       {!isTreeChild && (
-        <span className="w-20 shrink-0 text-xs font-semibold text-white">
+        <span className="w-20 shrink-0 text-xs font-semibold text-ink">
           ตอนที่ {ch.chapterNumber ?? "?"}
         </span>
       )}
       {ch.title ? (
-        <span className="flex-1 truncate text-xs text-white/55">{ch.title}</span>
+        <span className="flex-1 truncate text-xs text-ink-2">{ch.title}</span>
       ) : (
         <span className="flex-1" />
       )}
       {isHighlighted && (
-        <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+        <span className="shrink-0 rounded bg-accent/25 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
           อ่านค้างไว้
         </span>
       )}
       {ch.source === "user" && (
         <span
-          className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-medium text-purple-300"
+          className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent"
           title={ch.translatorName ? `แปลโดย ${ch.translatorName}` : "แปลโดยผู้ใช้"}
         >
           {ch.translatorName ? ch.translatorName : "ผู้ใช้แปล"}
@@ -88,34 +92,34 @@ function ChapterRowInner({
       <span
         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
           ch.translatedLanguage === "th"
-            ? "bg-blue-500/20 text-blue-300"
-            : "bg-white/8 text-white/40"
+            ? "bg-accent/20 text-accent"
+            : "bg-fill text-ink-3"
         }`}
       >
         {ch.translatedLanguage === "th" ? "ภาษาไทย" : ch.translatedLanguage.toUpperCase()}
       </span>
       {coinLocked ? (
         isPurchasing ? (
-          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-            <div className="h-3 w-3 animate-spin rounded-full border border-amber-300/30 border-t-amber-300" />
+          <span className="shrink-0 flex items-center gap-1 rounded bg-coin/20 px-2 py-0.5 text-[10px] font-semibold text-coin">
+            <Loader context="inline" label="กำลังปลดล็อค" />
             ปลดล็อค...
           </span>
         ) : (
-          <span className="shrink-0 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-            🪙 {ch.priceCoins} ปลดล็อค
+          <span className="shrink-0 rounded bg-coin/20 px-2 py-0.5 text-[10px] font-semibold text-coin">
+            <Coin className="mr-0.5 inline align-[-0.125em]" />{ch.priceCoins} ปลดล็อค
           </span>
         )
       ) : readable ? (
-        <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+        <span className="shrink-0 rounded bg-ok/15 px-1.5 py-0.5 text-[10px] font-medium text-ok">
           {ch.pageCount > 0 ? `${ch.pageCount} หน้า` : "พร้อมอ่าน"}
         </span>
       ) : (
-        <span className="shrink-0 rounded bg-white/8 px-1.5 py-0.5 text-[10px] font-medium text-white/30">
+        <span className="shrink-0 rounded bg-fill px-1.5 py-0.5 text-[10px] font-medium text-ink-3">
           {unavailableLabel}
         </span>
       )}
       {readable && (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-white/30">
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-ink-3">
           <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
         </svg>
       )}
@@ -127,12 +131,12 @@ function ChapterRowInner({
     <div className="relative flex gap-0 pb-1">
       <div className="relative w-6 shrink-0 self-stretch">
         <div
-          className="absolute left-2.5 top-0 w-px bg-white/10"
+          className="absolute left-2.5 top-0 w-px bg-line"
           style={{ bottom: isLast ? "50%" : "0" }}
         />
         <div className="absolute left-2.5 top-4 flex items-center">
-          <div className="h-px w-3 bg-white/10" />
-          <div className="h-1 w-1 rounded-full bg-white/20" />
+          <div className="h-px w-3 bg-line" />
+          <div className="h-1 w-1 rounded-full bg-ink-3" />
         </div>
       </div>
       <div className="flex-1">{row}</div>
@@ -143,7 +147,6 @@ function ChapterRowInner({
 type ChapterListProps = {
   book: LandingBook;
   effectiveHighlightId?: string;
-  asPage: boolean;
   /** Drives Lenis on/off — caller passes `visible && activeChapter === null` */
   visible: boolean;
   onChapterSelect: (ch: ActiveChapter) => void;
@@ -156,7 +159,6 @@ type ChapterListProps = {
 export default function ChapterList({
   book,
   effectiveHighlightId,
-  asPage,
   visible,
   onChapterSelect,
   sectionRef,
@@ -166,6 +168,7 @@ export default function ChapterList({
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [langFilter, setLangFilter] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const groupIdBase = useId(); // a popup can open over another popup: keep group ids unique per list
 
   const highlightChapterRef = useRef<HTMLButtonElement>(null);
   const chaptersListScrollRef = useRef<HTMLDivElement>(null);
@@ -194,7 +197,7 @@ export default function ChapterList({
 
     Promise.all([
       cacheOrFetch<MangaChapter[]>(
-        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}`,
+        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}${levelKey()}`,
         () =>
           apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then(async (r) => {
             if (!r.ok) throw new Error("chapters fetch failed");
@@ -254,7 +257,7 @@ export default function ChapterList({
   useEffect(() => {
     if (!loadingChapters && effectiveHighlightId) {
       setTimeout(() => {
-        highlightChapterRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        highlightChapterRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
       }, 400);
     }
   }, [loadingChapters, effectiveHighlightId]);
@@ -263,7 +266,7 @@ export default function ChapterList({
   useLocalLenis(
     chaptersListScrollRef,
     "vertical",
-    !asPage && visible && chapters.length > 0,
+    visible && chapters.length > 0,
     chaptersLenisRef,
     chaptersContentRef,
   );
@@ -301,7 +304,7 @@ export default function ChapterList({
       {/* Header row */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 shrink-0">
-          <h3 className="text-sm font-semibold text-white/80">
+          <h3 className="text-sm font-semibold text-ink">
             {loadingChapters
               ? "กำลังโหลดตอน..."
               : langFilter === "all"
@@ -311,10 +314,10 @@ export default function ChapterList({
           {coinBalance !== null && (
             <button
               onClick={() => setTopupOpen(true)}
-              className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/25"
+              className="flex items-center gap-1 rounded-full bg-coin/15 px-2 py-0.5 text-[10px] font-semibold text-coin transition hover:bg-coin/25"
               title="เติมเหรียญ"
             >
-              🪙 {coinBalance}
+              <Coin /> {coinBalance}
             </button>
           )}
         </div>
@@ -327,8 +330,8 @@ export default function ChapterList({
                 onClick={() => setLangFilter(l)}
                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
                   langFilter === l
-                    ? "bg-white/20 text-white"
-                    : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70"
+                    ? "bg-ink text-bg"
+                    : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                 }`}
               >
                 {labelFor(l)}
@@ -341,13 +344,13 @@ export default function ChapterList({
       {loadingChapters ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-11 animate-pulse rounded-lg bg-white/10" />
+            <div key={i} className="h-11 animate-pulse rounded-lg bg-fill" />
           ))}
         </div>
       ) : chapters.length > 0 ? (
         <div
           ref={chaptersListScrollRef}
-          className={asPage ? "" : "max-h-[50vh] md:max-h-80 overflow-y-auto custom-scrollbar"}
+          className="max-h-[50vh] md:max-h-80 overflow-y-auto custom-scrollbar"
         >
           <div ref={chaptersContentRef} className="space-y-1.5">
             {(() => {
@@ -362,7 +365,7 @@ export default function ChapterList({
                 groupMap.get(key)!.push(ch);
               }
 
-              return Array.from(groupMap.entries()).map(([chNum, grp]) => {
+              return Array.from(groupMap.entries()).map(([chNum, grp], groupIndex) => {
                 if (grp.length === 1) {
                   return (
                     <ChapterRowInner
@@ -384,6 +387,9 @@ export default function ChapterList({
                 return (
                   <div key={groupKey}>
                     <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`${groupIdBase}-${groupIndex}`} // by index: user chapter numbers are free text
                       onClick={() =>
                         setExpandedGroups((prev) => {
                           const next = new Set(prev);
@@ -394,16 +400,16 @@ export default function ChapterList({
                       }
                       className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${
                         groupHasHighlight && !isOpen
-                          ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/30 hover:border-blue-400/60 hover:bg-blue-500/15"
-                          : "border-white/10 hover:border-white/25 hover:bg-white/8"
+                          ? "border-accent/50 bg-accent/10 ring-1 ring-accent/30 hover:border-accent/60 hover:bg-accent/15"
+                          : "border-line hover:border-ink-3 hover:bg-fill"
                       }`}
                     >
-                      <span className="w-20 shrink-0 text-xs font-semibold text-white">
+                      <span className="w-20 shrink-0 text-xs font-semibold text-ink">
                         ตอนที่ {chNum}
                       </span>
-                      <span className="flex-1 text-xs text-white/40">{grp.length} เวอร์ชัน</span>
+                      <span className="flex-1 text-xs text-ink-3">{grp.length} เวอร์ชัน</span>
                       {groupHasHighlight && !isOpen && (
-                        <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+                        <span className="shrink-0 rounded bg-accent/25 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
                           อ่านค้างไว้
                         </span>
                       )}
@@ -413,8 +419,8 @@ export default function ChapterList({
                             key={lang}
                             className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                               lang === "th"
-                                ? "bg-blue-500/20 text-blue-300"
-                                : "bg-white/8 text-white/40"
+                                ? "bg-accent/20 text-accent"
+                                : "bg-fill text-ink-3"
                             }`}
                           >
                             {lang === "th" ? "ภาษาไทย" : lang.toUpperCase()}
@@ -426,7 +432,7 @@ export default function ChapterList({
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
-                        className={`h-3.5 w-3.5 shrink-0 text-white/30 transition-transform duration-200 ${
+                        className={`h-3.5 w-3.5 shrink-0 text-ink-3 transition-transform duration-200 ${
                           isOpen ? "rotate-90" : ""
                         }`}
                       >
@@ -434,6 +440,8 @@ export default function ChapterList({
                       </svg>
                     </button>
                     <div
+                      id={`${groupIdBase}-${groupIndex}`}
+                      inert={!isOpen} // collapsed is only 0fr: keep its rows out of the Tab order (#952)
                       className="grid transition-all duration-300 ease-in-out"
                       style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                     >
@@ -463,7 +471,7 @@ export default function ChapterList({
           </div>
         </div>
       ) : (
-        <p className="text-xs text-white/40">ไม่พบตอนที่แปลแล้ว</p>
+        <p className="text-xs text-ink-3">ไม่พบตอนที่แปลแล้ว</p>
       )}
 
       <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />

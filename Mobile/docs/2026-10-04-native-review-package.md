@@ -1,0 +1,13 @@
+# Native migration whole-workspace review
+
+Read-only review of approved PRD #724 and S01–S29 (#725–#753). Source work is uncommitted on feat/mobile-native-phase4; review current files including untracked Mobile/src and tests, not only git diff. Preserve unrelated existing Backend compilation fixes. Scope: native Android UI from existing responsive mobile Frontend, existing Backend/Supabase/MIT contracts and data; no embedded WebView. Do not change files or send messages to external applications.
+
+Spec: 2026-10-02-native-mobile-migration-prd.md. Plan: 2026-10-02-native-mobile-migration-plan.json. Slice briefs: native-migration-publish/S*.md. Ledger: 2026-10-03-native-completion-ledger.md, including Ruling and final gap rulings. Design baseline: ../../DESIGN.md, Frontend responsive mobile source, 2026-10-02-native-responsive-design-parity.md.
+
+Verified before review: 210 Mobile tests, typecheck; Android x86_64 debug assembly with real native media/share dependencies. Fresh Hermes source export pending. Live populated UI, provider setup, signed device/replacement acceptance remain open because Mobile public env is missing/mismatched. A passing source suite is not release acceptance. Initial missing-module tracer failures were not behavior RED; ledger records that deviation.
+
+Review focus: primary native journey reachability, private identity/permission isolation, late GET/SSE results overwriting acknowledged changes, OS incoming links and Android Back, upload uncertainty/draft/publish lifecycle, actual public SDK auth/MFA/recovery semantics, native dependencies/build compatibility. Compare API contracts with real Backend source before judging. Check native UI actions against current Frontend; no report queue, approvals, withdrawals or Auth account deletion capability exists in the current contracts. Metadata chapter/language fields are locked after creation in the original upload editor; description/price remain editable. Staff mobile UI adapts current desktop tokens/actions because no original mobile management layout exists.
+
+Report concrete Critical/Important/Minor findings with file:line and realistic impact, missing verification separately, and any behavior declined to judge. Do not infer full parity or live acceptance. One final review only; implementer will regrade and fix important findings using behavior RED→GREEN and rerun the full suite.
+
+Tokensave was tried repeatedly in this session and timed out; SQLite .tokensave/tokensave.db is absent. Respect remaining graph budget; use narrow targeted source reads after this fallback rather than repeat hung calls.

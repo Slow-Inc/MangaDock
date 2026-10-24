@@ -6,7 +6,10 @@ import BookDetailModal from "./BookDetailModal";
 import HeroDescription from "./HeroDescription";
 import HeroDetailButton from "./HeroDetailButton";
 import type { LandingBook } from "../lib/types";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import { modalStack } from "../lib/bookModalHistory";
+import { heroAutoplay, useReducedMotion } from "../hooks/reducedMotion";
+import { Pause, Play } from "lucide-react";
 
 type Props = { books: LandingBook[] };
 
@@ -24,11 +27,13 @@ type DotsProps = {
   idx: number;
   desktop: boolean;
   onDotClick: (i: number) => void;
+  autoplay: boolean;
+  onToggleAutoplay: () => void;
 };
 
-function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
+function Dots({ total, idx, desktop, onDotClick, autoplay, onToggleAutoplay }: DotsProps) {
   const pillRef = useRef<HTMLDivElement>(null);
-  const dotEls = useRef<(HTMLButtonElement | null)[]>([]);
+  const dotEls = useRef<(HTMLSpanElement | null)[]>([]);
   const prevIdxRef = useRef(idx);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,20 +92,38 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
 
   return (
     <div
-      className={`relative flex items-center gap-1.5 ${
-        desktop ? 'mt-8 justify-start' : 'mt-3 justify-center'
+      // 24 px buttons (WCAG 2.5.8) around 8 px dots; margins keep the dots where the old 8 px row sat.
+      className={`relative -mb-2 flex items-center ${
+        desktop ? '-ml-2 mt-6 justify-start' : 'mt-1 justify-center'
       }`}
     >
-      <div ref={pillRef} className="pointer-events-none absolute h-2 rounded-full bg-white" />
+      <div ref={pillRef} className="pointer-events-none absolute h-2 rounded-full bg-ink" />
       {Array.from({ length: total }, (_, i) => (
         <button
           key={i}
-          ref={(el) => { dotEls.current[i] = el; }}
           onClick={() => onDotClick(i)}
-          className="h-2 w-2 rounded-full bg-white/25 transition-colors duration-300 hover:bg-white/50"
+          className="group grid h-6 w-6 place-items-center rounded-full"
           aria-label={`สลับไปรายการที่ ${i + 1}`}
-        />
+        >
+          <span
+            ref={(el) => { dotEls.current[i] = el; }}
+            className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 group-hover:bg-ink/50"
+          />
+        </button>
       ))}
+      {/* WCAG 2.2.2: rotation that runs on its own needs a way to stop it (#849) */}
+      <button
+        type="button"
+        onClick={onToggleAutoplay}
+        className="ml-1 grid h-6 w-6 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink"
+        aria-label={autoplay ? "หยุดเลื่อนอัตโนมัติ" : "เล่นอัตโนมัติ"}
+      >
+        {/* pointer-events-none: the icon swaps under the pointer on click; a hovered node that leaves the DOM
+            stops React's onMouseLeave from reaching the hero, and the hover hold would stick */}
+        {autoplay
+          ? <Pause className="pointer-events-none h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />
+          : <Play className="pointer-events-none h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />}
+      </button>
     </div>
   );
 }
@@ -108,8 +131,26 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
 export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
-  const [mobileDlOpen, setMobileDlOpen] = useState(false);
+  // The book the mobile popup was opened on: a snapshot, so the rotation behind the popup cannot change it (#948)
+  const [openBook, setOpenBook] = useState<LandingBook | null>(null);
   const pausedRef = useRef(false);
+  const focusInsideRef = useRef(false);
+  const reducedMotion = useReducedMotion();
+  const [autoplayChoice, setAutoplayChoice] = useState<boolean | null>(null);
+  const autoplay = heroAutoplay(autoplayChoice, reducedMotion);
+  const toggleAutoplay = useCallback(() => {
+    if (!autoplay) focusInsideRef.current = false; // Play means play, even with focus on the button
+    setAutoplayChoice(!autoplay);
+  }, [autoplay]);
+  // Keyboard focus anywhere in the hero holds the rotation, as a hovering mouse does. Only keyboard focus:
+  // a click or tap also focuses the button, and that must not hold the rotation until focus moves away.
+  // Focus inside a portal (the book popup) still reaches here because React's onFocus bubbles through it.
+  const onFocusIn = useCallback((e: React.FocusEvent) => {
+    if ((e.target as Element).matches(":focus-visible")) focusInsideRef.current = true;
+  }, []);
+  const onFocusOut = useCallback((e: React.FocusEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) focusInsideRef.current = false;
+  }, []);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
   const total = books.length;
@@ -146,13 +187,14 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
   const handleMobileTap = useCallback(() => {
     if (didSwipeRef.current) return;
-    setMobileDlOpen(true);
-  }, []);
+    setOpenBook(books[idx]);
+  }, [books, idx]);
 
   useEffect(() => {
-    if (total <= 1) return;
+    if (total <= 1 || !autoplay) return;
     const t = setInterval(() => {
-      if (!pausedRef.current) {
+      // Not behind an open book popup: rotating there remounts the desktop detail button and drops its popup (#948)
+      if (!pausedRef.current && !focusInsideRef.current && !modalStack.anyOpen()) {
         setVisible(false);
         setTimeout(() => {
           setIdx((i) => (i + 1) % total);
@@ -161,70 +203,61 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
       }
     }, ROTATION_MS);
     return () => clearInterval(t);
-  }, [total]);
+  }, [total, autoplay]);
 
   const book = books[idx];
-  const resolvedUrl = resolvedThumbnail(book);
-  const [imgUrl, setImgUrl] = useState(resolvedUrl);
-  const [imgFellBack, setImgFellBack] = useState(false);
-  useEffect(() => { setImgUrl(resolvedUrl); setImgFellBack(false); }, [resolvedUrl]);
-  const handleImgError = () => {
-    if (!imgFellBack && book.thumbnail) {
-      setImgFellBack(true);
-      setImgUrl(book.thumbnail.includes("mangadex.org")
-        ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
-        : book.thumbnail);
-    }
-  };
+  // null once every source failed: the poster shows the same quiet gradient as an uncached cover (#921)
+  const cover = useCoverSrc(book);
+  const poster = book.thumbnailCached === false ? null : cover.src;
   const [titleMain, titleSub] = splitTitle(book);
 
   return (
     <>
       {/* ─── Mobile ─── */}
       <section className="relative px-4 pb-2 pt-20 md:hidden">
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onFocus={onFocusIn} onBlur={onFocusOut}>
         <button
           type="button"
           onClick={handleMobileTap}
           aria-label={`ดูรายละเอียด ${book.title}`}
-          className="group relative mx-auto block aspect-2/3 w-full max-w-[88%] overflow-hidden rounded-2xl text-left shadow-2xl"
+          className="group relative mx-auto block aspect-2/3 w-full max-w-[88%] overflow-hidden rounded-2xl text-left"
         >
           <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            {book.thumbnailCached === false ? (
-              <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent" />
+            {!poster ? (
+              <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
             ) : (
               <Image
-                src={imgUrl}
-                alt={book.title}
+                src={poster}
+                alt="" // the button's aria-label and the h1 below already name the book
                 fill
                 priority={idx === 0}
                 sizes="88vw"
                 className="object-cover object-center transition duration-300 group-active:scale-[0.985]"
-                onError={handleImgError}
+                onError={cover.onError}
               />
             )}
           </div>
-          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-bg/90 via-bg/50 to-transparent" />
           <div className={`absolute inset-x-0 bottom-0 p-5 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <h1 className="text-2xl font-black leading-tight text-white text-balance drop-shadow-lg">{titleMain}</h1>
+            <h1 className="text-2xl font-black leading-tight text-ink text-balance">{titleMain}</h1>
             {titleSub && (
-              <p className="mt-1 text-sm font-semibold tracking-wide text-white/75 drop-shadow-lg">
+              <p className="mt-1 text-sm font-semibold text-ink">
                 {titleSub}
               </p>
             )}
           </div>
         </button>
 
-        <div className={`mt-3 flex flex-wrap items-center justify-center gap-x-1 text-xs text-white/70 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
+        <div className={`mt-3 flex flex-wrap items-center justify-center gap-x-1 text-xs text-ink-2 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
           {(book.categories.length > 0 ? book.categories : ["E-Book"]).slice(0, 4).map((cat, i) => (
             <span key={cat} className="flex items-center gap-1">
-              {i > 0 && <span className="text-white/30">•</span>}
+              {i > 0 && <span className="text-ink-3">•</span>}
               {cat}
             </span>
           ))}
         </div>
 
-        {total > 1 && <Dots total={total} idx={idx} desktop={false} onDotClick={(i) => advance(i, true)} />}
+        {total > 1 && <Dots total={total} idx={idx} desktop={false} onDotClick={(i) => advance(i, true)} autoplay={autoplay} onToggleAutoplay={toggleAutoplay} />}
         </div>
       </section>
 
@@ -233,63 +266,66 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
         className="relative hidden w-full overflow-hidden pb-12 pt-28 md:block lg:pb-16 lg:pt-32"
         onMouseEnter={() => { pausedRef.current = true; }}
         onMouseLeave={() => { pausedRef.current = false; }}
+        onFocus={onFocusIn}
+        onBlur={onFocusOut}
       >
         {/* Blurred background */}
         <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-          {book.thumbnailCached !== false && (
+          {poster && (
             <Image
-              src={imgUrl}
+              src={poster}
               alt=""
               fill
               priority={idx === 0}
               sizes="100vw"
               aria-hidden
               className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
-              onError={handleImgError}
+              onError={cover.onError}
             />
           )}
         </div>
-        <div className="absolute inset-0 bg-linear-to-b from-background/60 via-background/40 to-background" />
+        <div className="absolute inset-0 bg-linear-to-b from-bg/60 via-bg/40 to-bg" />
 
         {/* Two-panel card */}
         <div className="relative z-10 mx-auto flex h-96 max-w-5xl gap-8 px-8 lg:h-108 lg:gap-12 lg:px-12 xl:h-120 xl:max-w-6xl">
           {/* Poster */}
-          <div className="relative aspect-2/3 w-64 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 lg:w-72 xl:w-80">
+          <div className="relative aspect-2/3 w-64 shrink-0 overflow-hidden rounded-2xl ring-1 ring-line lg:w-72 xl:w-80">
             <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-              {book.thumbnailCached === false ? (
-                <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent" />
+              {!poster ? (
+                <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
               ) : (
                 <Image
-                  src={imgUrl}
+                  src={poster}
                   alt={book.title}
                   fill
                   priority={idx === 0}
                   sizes="320px"
                   className="object-cover object-center"
-                  onError={handleImgError}
+                  onError={cover.onError}
                 />
               )}
             </div>
           </div>
 
           {/* Info */}
-          <div className={`flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-amber-400">Top 10 หนังสือที่น่าอ่านวันนี้</p>
-            <h1 className="text-4xl font-black uppercase leading-tight text-white text-balance lg:text-5xl xl:text-6xl">
+          {/* -ml-2 pl-2: the clip box reaches 8 px left of the text so dot 1's 24 px target and ring are not cut (#848) */}
+          <div className={`-ml-2 flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 pl-2 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
+            <p className="mb-3 text-xs font-semibold text-accent">Top 10 หนังสือที่น่าอ่านวันนี้</p>
+            <h1 className="text-4xl font-black uppercase leading-tight text-ink text-balance lg:text-5xl xl:text-6xl">
               {titleMain}
             </h1>
             {titleSub && (
-              <p className="mt-2 text-lg font-semibold tracking-[0.08em] text-white/70 lg:text-xl">
+              <p className="mt-2 text-lg font-semibold text-ink-2 lg:text-xl">
                 {titleSub}
               </p>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
               {(book.categories.length > 0 ? book.categories : ["E-Book"]).slice(0, 5).map((cat) => (
-                <span key={cat} className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white/90">
+                <span key={cat} className="rounded-full border border-ink-3 bg-fill px-3 py-1 text-ink">
                   {cat}
                 </span>
               ))}
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white/90">
+              <span className="rounded-full border border-ink-3 bg-fill px-3 py-1 text-ink">
                 {book.publishedDate || "ปีที่ไม่ระบุ"}
               </span>
             </div>
@@ -299,13 +335,13 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
             <div className="mt-7">
               <HeroDetailButton key={book.id} book={book} />
             </div>
-            {total > 1 && <Dots total={total} idx={idx} desktop={true} onDotClick={(i) => advance(i, true)} />}
+            {total > 1 && <Dots total={total} idx={idx} desktop={true} onDotClick={(i) => advance(i, true)} autoplay={autoplay} onToggleAutoplay={toggleAutoplay} />}
           </div>
         </div>
       </section>
 
-      {mobileDlOpen && (
-        <BookDetailModal book={book} onClose={() => setMobileDlOpen(false)} />
+      {openBook && (
+        <BookDetailModal book={openBook} onClose={() => setOpenBook(null)} />
       )}
     </>
   );

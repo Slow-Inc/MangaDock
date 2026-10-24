@@ -3,6 +3,7 @@
 import { Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
+import Mascot from "../components/mascot/Mascot";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import {
   getFavorites,
@@ -13,6 +14,7 @@ import {
 import {
   getFollows,
   loadFollows,
+  followsLoadFailed,
   FOLLOW_EVENT,
   type FollowedSeries,
 } from "../hooks/useSeriesFollow";
@@ -23,6 +25,12 @@ import {
 } from "../lib/readingHistory";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
+import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
+import { useToast } from "../contexts/ToastContext";
+import { useLevelFiltered } from "../lib/historyRatings";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -92,32 +100,32 @@ function Pagination({
   const pageNums = Array.from({ length: Math.min(5, totalPages) }, (_, i) => start + i);
   return (
     <div className="mt-10 flex flex-col items-center gap-3">
-      <p className="text-xs text-white/40">
+      <p className="text-xs text-ink-3">
         หน้า {page} / {totalPages} — {total.toLocaleString()} รายการทั้งหมด
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button disabled={page <= 1} onClick={() => onPageChange(1)}
-          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+          className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30">
           «
         </button>
         <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}
-          className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+          className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30">
           ← ก่อนหน้า
         </button>
         {pageNums.map((p) => (
           <button key={p} onClick={() => onPageChange(p)}
             className={`h-9 w-9 rounded-lg text-sm transition ${
-              p === page ? "bg-white font-semibold text-black" : "border border-white/10 text-white/50 hover:border-white/30 hover:text-white"
+              p === page ? "bg-ink font-semibold text-bg" : "border border-line text-ink-2 hover:border-ink-3 hover:text-ink"
             }`}>
             {p}
           </button>
         ))}
         <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}
-          className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+          className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30">
           ถัดไป →
         </button>
         <button disabled={page >= totalPages} onClick={() => onPageChange(totalPages)}
-          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+          className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30">
           »
         </button>
       </div>
@@ -166,7 +174,7 @@ function ChipBar({ categories, active, onSelect }: {
   }, [categories]);
 
   const scroll = (dir: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: scrollBehavior() });
   };
 
   if (categories.length <= 1) return null;
@@ -175,11 +183,11 @@ function ChipBar({ categories, active, onSelect }: {
       {/* Left fade + button */}
       {canLeft && (
         <>
-          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-bg to-transparent" />
           <button
             aria-label="เลื่อนซ้าย"
             onClick={() => scroll(-1)}
-            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -197,8 +205,8 @@ function ChipBar({ categories, active, onSelect }: {
             onClick={() => onSelect(cat)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               active === cat
-                ? "bg-white text-black"
-                : "bg-white/8 text-white/55 hover:bg-white/15 hover:text-white/80"
+                ? "bg-ink text-bg"
+                : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
             }`}
           >
             {cat === "all" ? "ทั้งหมด" : cat}
@@ -209,11 +217,11 @@ function ChipBar({ categories, active, onSelect }: {
       {/* Right fade + button */}
       {canRight && (
         <>
-          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-bg to-transparent" />
           <button
             aria-label="เลื่อนขวา"
             onClick={() => scroll(1)}
-            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -226,20 +234,8 @@ function ChipBar({ categories, active, onSelect }: {
 function EmptyState({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <svg
-        className="mb-4 h-14 w-14 text-white/15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
-        />
-      </svg>
-      <p className="text-sm text-white/30">{label}</p>
+      <Mascot area="reader" size={72} className="mb-4" />
+      <p className="text-sm text-ink-3">{label}</p>
     </div>
   );
 }
@@ -247,23 +243,11 @@ function EmptyState({ label }: { label: string }) {
 function LoginPrompt({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <svg
-        className="mb-4 h-14 w-14 text-white/15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-        />
-      </svg>
-      <p className="mb-4 text-sm text-white/40">เข้าสู่ระบบเพื่อดูรายการของคุณ</p>
+      <Mascot area="login" size={72} className="mb-4" />
+      <p className="mb-4 text-sm text-ink-3">เข้าสู่ระบบเพื่อดูรายการของคุณ</p>
       <button
         onClick={onLogin}
-        className="rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-white/85 active:scale-95"
+        className="rounded-xl bg-ink px-6 py-2.5 text-sm font-semibold text-bg transition hover:bg-ink/85 active:scale-95"
       >
         เข้าสู่ระบบ
       </button>
@@ -280,8 +264,12 @@ function MyListContent() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favorites, setFavorites]   = useState<GridBook[]>([]);
   const [follows, setFollows]       = useState<GridBook[]>([]);
+  const [followsFailed, setFollowsFailed] = useState(false);
+  const { showToast } = useToast();
   const [likedBooks, setLikedBooks] = useState<GridBook[]>([]);
-  const [history, setHistory]       = useState<GridBook[]>([]);
+  const [allHistory, setHistory]    = useState<GridBook[]>([]);
+  // titles above the content level stay in the history but are not listed (#1105)
+  const history = useLevelFiltered(allHistory);
   const [visible, setVisible] = useState(true);
   const fadeOutStartRef = useRef<number>(0);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -321,6 +309,7 @@ function MyListContent() {
       setFavorites(favs);
       setHistory(hist);
       setFollows(getFollows().map(followToGrid));
+      setFollowsFailed(followsLoadFailed());
 
       // Liked = books in favs OR hist whose ID is liked
       const seen = new Set<string>();
@@ -384,11 +373,17 @@ function MyListContent() {
   const handleExport = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const res = await fetch('/api/proxy/users/me/history/export', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    if (!res.ok) return;
-    const blob = await res.blob();
+    let blob: Blob;
+    try {
+      const res = await fetch('/api/proxy/users/me/history/export', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      blob = await res.blob();
+    } catch {
+      showToast({ type: "error", message: "ส่งออกประวัติการอ่านไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // #934
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -398,24 +393,24 @@ function MyListContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
-      <main className="page-shell page-shell-nav page-shell-wide">
+      <main id="main" className="page-shell page-shell-nav page-shell-wide">
         {/* Page header */}
         <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+            <h1 className="text-2xl font-bold text-ink md:text-3xl">
               รายการของฉัน
             </h1>
-            <p className="mt-1 text-sm text-white/40">
+            <p className="mt-1 text-sm text-ink-3">
               มังงะที่คุณบันทึก ถูกใจ และกำลังอ่าน
             </p>
           </div>
           {user && activeTab === "history" && history.length > 0 && (
             <button
               onClick={handleExport}
-              className="shrink-0 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/60 transition hover:border-white/30 hover:text-white active:scale-95"
+              className="shrink-0 rounded-xl border border-line px-4 py-2 text-xs font-medium text-ink-2 transition hover:border-ink-3 hover:text-ink active:scale-95"
             >
               Export CSV
             </button>
@@ -423,7 +418,7 @@ function MyListContent() {
         </div>
 
         {/* Tab bar */}
-        <div className="mobile-tabs-scroll mb-6 flex gap-0 overflow-x-auto whitespace-nowrap border-b border-white/10 sm:mb-8">
+        <div className="mobile-tabs-scroll mb-6 flex gap-0 overflow-x-auto whitespace-nowrap border-b border-line sm:mb-8">
           {TABS.map((tab) => {
             const count = tabBooks[tab.key].length;
             return (
@@ -432,8 +427,8 @@ function MyListContent() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`relative flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors sm:px-5 ${
                   activeTab === tab.key
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
+                    ? "text-ink"
+                    : "text-ink-2 hover:text-ink"
                 }`}
               >
                 {tab.label}
@@ -441,15 +436,15 @@ function MyListContent() {
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                       activeTab === tab.key
-                        ? "bg-white/20 text-white"
-                        : "bg-white/8 text-white/40"
+                        ? "bg-ink/15 text-ink"
+                        : "bg-fill text-ink-3"
                     }`}
                   >
                     {count}
                   </span>
                 )}
                 {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-white" />
+                  <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-ink" />
                 )}
               </button>
             );
@@ -461,19 +456,26 @@ function MyListContent() {
           /* Skeleton while session is restoring — mirrors MangaGrid layout */
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {[...Array(14)].map((_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-white/5" />
-                <div className="h-3 w-4/5 animate-pulse rounded bg-white/5" />
-                <div className="h-3 w-3/5 animate-pulse rounded bg-white/5" />
+              <div key={i} aria-hidden className="flex flex-col gap-2">
+                <div className="aspect-2/3 w-full overflow-hidden rounded-xl bg-fill">
+                  <div className={`h-full w-full animate-pulse ${DOT_FIELD}`} style={shimmerDelay(i)} />
+                </div>
+                <div className="h-3 w-4/5 rounded bg-fill" />
+                <div className="h-3 w-3/5 rounded bg-fill" />
               </div>
             ))}
           </div>
-        ) : !user ? (
+        ) : !user && activeTab !== "history" ? (
+          /* Reading history lives on the device, so a guest sees theirs; the other tabs are account-backed (#967) */
           <LoginPrompt onLogin={openLoginModal} />
         ) : (
           <div key={activeTab} className="tab-fade-in">
             {(() => {
               const books = tabBooks[activeTab];
+              // a failed follows load is not "no series followed" (#934)
+              if (books.length === 0 && activeTab === "follows" && followsFailed) {
+                return <LoadError what="series ที่ติดตาม" onRetry={loadFollows} />;
+              }
               if (books.length === 0) return <EmptyState label={emptyMessages[activeTab]} />;
 
               // Category filter chips
@@ -485,7 +487,7 @@ function MyListContent() {
                     startFadeOut();
                     setCategoryFilter(cat);
                     setPage(1);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    window.scrollTo({ top: 0, behavior: scrollBehavior() });
                   }}
                 />
               );
@@ -495,12 +497,12 @@ function MyListContent() {
               const handlePageChange = (p: number) => {
                 startFadeOut();
                 setPage(p);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                window.scrollTo({ top: 0, behavior: scrollBehavior() });
               };
               return (
                 <>
                   {chips}
-                  <p className="mb-5 text-xs text-white/30">
+                  <p className="mb-5 text-xs text-ink-3">
                     {filteredBooks.length.toLocaleString()} เรื่อง
                     {categoryFilter !== "all" && ` · ${categoryFilter}`}
                   </p>
@@ -529,6 +531,7 @@ function MyListContent() {
 }
 
 export default function MyListPage() {
+  usePageTitle("รายการของฉัน");
   return (
     <Suspense>
       <MyListContent />

@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTopupCreate, TIERS } from "../hooks/useTopupCreate";
 import { useTopupStream } from "../hooks/useTopupStream";
 import { cancelTopup, simulateTopup } from "../lib/studioApi";
 import { errMessage } from "@/lib/errMessage";
+import { PRIMARY_FILL } from "./ui/Button";
+import Mascot from "./mascot/Mascot";
+import Coin from "./ui/Coin";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 function formatCountdown(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -62,53 +66,53 @@ function QrStep({
 
   return (
     <>
-      <div className="border-b border-white/10 px-5 py-4 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-white">สแกน QR เพื่อชำระเงิน</h2>
-        <button onClick={handleCancel} className="text-white/40 hover:text-white transition text-lg leading-none">✕</button>
+      <div className="border-b border-line px-5 py-4 flex items-center justify-between">
+        <h2 className="text-sm font-bold text-ink">สแกน QR เพื่อชำระเงิน</h2>
+        <button onClick={handleCancel} aria-label="ยกเลิกการชำระเงิน" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
         {status === "paid" ? (
           <>
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/20 text-3xl text-green-400">✓</div>
-            <p className="text-base font-bold text-white">ชำระเงินสำเร็จ</p>
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ok/10 text-3xl text-ok">✓</div>
+            <p className="text-base font-bold text-ink">ชำระเงินสำเร็จ</p>
             {successBalance !== null && (
               <>
-                <p className="text-2xl font-bold text-amber-300">🪙 {successBalance.toLocaleString()}</p>
-                <p className="text-xs text-white/40">ยอดเหรียญปัจจุบัน</p>
+                <p className="flex items-center justify-center gap-2 text-2xl font-bold text-coin"><Coin /> {successBalance.toLocaleString()}</p>
+                <p className="text-xs text-ink-3">ยอดเหรียญปัจจุบัน</p>
               </>
             )}
-            <p className="text-xs text-white/40">กำลังปิด...</p>
+            <p className="text-xs text-ink-3">กำลังปิด...</p>
           </>
         ) : (
           <>
-            <p className="text-xs text-white/40">สแกน QR ด้วยแอปธนาคาร</p>
+            <p className="text-xs text-ink-3">สแกน QR ด้วยแอปธนาคาร</p>
             <div className={`rounded-xl bg-white p-3 transition-all duration-300 ${status === "expired" ? "opacity-25 blur-sm" : ""}`}>
               <QRCodeSVG value={qrString} size={180} />
             </div>
             {status === "pending" && (
               <>
-                <p className="font-mono text-sm text-amber-300">⏱ {formatCountdown(countdown)}</p>
+                <p className="font-mono text-sm text-coin">⏱ {formatCountdown(countdown)}</p>
                 {process.env.NODE_ENV !== "production" && (
                   <button
                     onClick={handleSimulate}
                     disabled={simulating}
-                    className="w-full rounded-xl border border-yellow-500/30 bg-yellow-500/10 py-2 text-xs font-semibold text-yellow-300 transition hover:bg-yellow-500/20 disabled:opacity-40"
+                    className="w-full rounded-xl border border-accent/40 bg-accent/10 py-2 text-xs font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-40"
                   >
                     {simulating ? "กำลังจำลอง..." : "⚡ จำลองการชำระ"}
                   </button>
                 )}
-                {simError && <p className="text-xs text-red-400">{simError}</p>}
-                <button onClick={handleCancel} className="text-xs text-white/30 transition hover:text-white/60">
+                {simError && <p className="text-xs text-danger">{simError}</p>}
+                <button onClick={handleCancel} className="text-xs text-ink-3 transition hover:text-ink-2">
                   ยกเลิก
                 </button>
               </>
             )}
             {status === "expired" && (
               <>
-                <p className="text-xs text-red-400">QR หมดอายุแล้ว</p>
+                <p className="text-xs text-danger">QR หมดอายุแล้ว</p>
                 <button
                   onClick={onRetry}
-                  className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                  className="w-full rounded-xl border border-coin/40 bg-coin/10 py-2.5 text-sm font-semibold text-coin transition hover:bg-coin/20"
                 >
                   สร้าง QR ใหม่
                 </button>
@@ -138,6 +142,11 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
     if (!isOpen) setQrData(null);
   }, [isOpen]);
 
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes as the scrim does (a pending payment stays
+  // pending, as it does on a scrim click), focus goes back to the opener
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, isOpen);
+
   if (!isOpen) return null;
 
   const onProceed = async () => {
@@ -149,10 +158,11 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+      ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={qrData ? "สแกน QR เพื่อชำระเงิน" : "เติมเหรียญ"}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 p-4 outline-none"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] shadow-2xl">
+      <div className="w-full max-w-xs rounded-2xl border border-line bg-surface shadow-2xl">
         {qrData ? (
           <QrStep
             key={qrData.paymentId}
@@ -165,12 +175,15 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
           />
         ) : (
           <>
-            <div className="border-b border-white/10 px-5 py-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-white">เติมเหรียญ</h2>
-                <p className="mt-0.5 text-xs text-white/40">1 เหรียญ = 1 บาท • PromptPay QR</p>
+            <div className="border-b border-line px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mascot area="wallet" size={40} interactive={false} />
+                <div>
+                  <h2 className="text-sm font-bold text-ink">เติมเหรียญ</h2>
+                  <p className="mt-0.5 text-xs text-ink-3">1 เหรียญ = 1 บาท • PromptPay QR</p>
+                </div>
               </div>
-              <button onClick={onClose} className="text-white/40 hover:text-white transition text-lg leading-none">✕</button>
+              <button onClick={onClose} aria-label="ปิด" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
             </div>
             <div className="p-5">
               <div className="mb-3 grid grid-cols-3 gap-2">
@@ -178,38 +191,38 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <button
                     key={t}
                     onClick={() => { setSelectedAmount(t); setUseCustom(false); }}
-                    className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                    className={`rounded-xl border py-2.5 text-sm font-semibold tabular-nums transition ${
                       !useCustom && selectedAmount === t
-                        ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                        ? "border-coin/40 bg-coin/10 text-coin"
+                        : "border-line bg-fill text-ink-2 hover:bg-raised"
                     }`}
                   >
-                    🪙 {t}
+                    {t}
                   </button>
                 ))}
               </div>
               <div className="mb-4">
-                <input
+                <input aria-label="จำนวนอื่น (ขั้นต่ำ 20)"
                   type="number"
                   min="20"
                   placeholder="จำนวนอื่น (≥20)"
                   value={customAmount}
                   onFocus={() => setUseCustom(true)}
                   onChange={(e) => { setCustomAmount(e.target.value); setUseCustom(true); }}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-amber-500/50 focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-coin/40 focus:outline-none"
                 />
               </div>
-              {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+              {error && <p className="mb-3 text-xs text-danger">{error}</p>}
               <button
                 onClick={onProceed}
                 disabled={!canProceed || creating}
-                className="w-full rounded-xl bg-amber-600 py-2.5 text-sm font-bold text-white transition hover:bg-amber-500 disabled:opacity-40"
+                className={`w-full rounded-xl ${PRIMARY_FILL} py-2.5 text-sm font-bold transition disabled:opacity-40`}
               >
                 {creating ? "กำลังสร้าง QR..." : `ดำเนินการ${canProceed ? ` (${effectiveAmount} ฿)` : ""}`}
               </button>
               <button
                 onClick={onClose}
-                className="mt-3 w-full text-center text-xs text-white/30 transition hover:text-white/60"
+                className="mt-3 w-full text-center text-xs text-ink-3 transition hover:text-ink-2"
               >
                 ยกเลิก
               </button>

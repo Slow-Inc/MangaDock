@@ -49,3 +49,25 @@ export function pillMainText(
     ? `แปลไปแล้ว ${done}/${total} หน้า`
     : `กำลังแปลหน้า ${currentPageNumber}`;
 }
+
+export type SegmentState = "done" | "active" | "todo";
+
+/** The five MIT steps as segments of the staged progress bar (reader translate pill). */
+export function stageSegments(info: StageInfo | null): SegmentState[] {
+  return Array.from({ length: TOTAL }, (_, i) => {
+    if (!info) return "todo";
+    const step = i + 1;
+    return step < info.step ? "done" : step === info.step ? "active" : "todo";
+  });
+}
+
+/**
+ * The page MIT is working on right now. A single-page run sets its own index; a batch run only names
+ * the page in the stream's progress event — reading just the first left the page strip idle in a batch.
+ */
+export function activeTranslatingPage(
+  singlePageIndex: number | null,
+  stage: { pageIndex: number; stage: string } | null,
+): number | null {
+  return singlePageIndex ?? stage?.pageIndex ?? null;
+}

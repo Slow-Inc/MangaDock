@@ -426,7 +426,7 @@ export class AdminService {
     void this.logAudit(adminUid, 'delete_post', 'post', id);
   }
 
-  async pinPost(id: string, pinned: boolean): Promise<void> {
+  async pinPost(adminUid: string, id: string, pinned: boolean): Promise<void> {
     const { error } = await this.db
       .from('forum_posts')
       .update({ pinned })
@@ -437,6 +437,12 @@ export class AdminService {
       throw new InternalServerErrorException(
         `Failed to update pin: ${error.message}`,
       );
+    void this.logAudit(
+      adminUid,
+      pinned ? 'pin_post' : 'unpin_post',
+      'post',
+      id,
+    );
   }
 
   // ── Transactions ─────────────────────────────────────────────────────────────

@@ -89,6 +89,9 @@ export function useChapterTranslation(
   const [showModelSelector, setShowModelSelector] = useState(true);
 
   const translateControllerRef = useRef<AbortController | null>(null);
+  // Bumped by every reset (chapter, target language, derivative). Work captures it before awaiting and drops its
+  // result if it changed — the batch can be aborted, but its health check and a single-page translation cannot (#1001)
+  const generationRef = useRef(0);
 
   // Tick the per-page timer once a second while any translation runs — a
   // number that visibly moves is the cheapest "the system is alive" signal.
@@ -136,6 +139,7 @@ export function useChapterTranslation(
 
   // Reset translation state whenever the chapter changes
   useEffect(() => {
+    generationRef.current++;
     translateControllerRef.current?.abort();
     translateControllerRef.current = null;
     setTranslating(false);
@@ -152,6 +156,7 @@ export function useChapterTranslation(
   // (different cache key — and patches from one derivative must not overlay
   // the other, #156)
   useEffect(() => {
+    generationRef.current++;
     translateControllerRef.current?.abort();
     translateControllerRef.current = null;
     setTranslating(false);
@@ -170,10 +175,13 @@ export function useChapterTranslation(
 
   const startTranslate = async () => {
     if (pages.length === 0) return;
+    const generation = generationRef.current;
     // Re-verify service before starting
     const healthy = await checkMitHealth();
     setMitStatus(healthy ? "online" : "offline");
     if (!healthy) return;
+    // The chapter / language changed during the check: `pages` and `chapterId` here are the old ones (#1001)
+    if (generation !== generationRef.current) return;
 
     const total = pages.length;
     const pendingIndices = Array.from({ length: total }, (_, i) => i).filter(
@@ -306,8 +314,12 @@ export function useChapterTranslation(
       if (translateControllerRef.current === controller) {
         translateControllerRef.current = null;
       }
-      pageStartRef.current = null;
-      setCurrentStage(null);
+      // A run the reader left (chapter / language reset) must not clear the timer of a translation started since;
+      // a manual stop keeps the generation, so it still clears here (#1001 review)
+      if (generation === generationRef.current) {
+        pageStartRef.current = null;
+        setCurrentStage(null);
+      }
       if (!controller.signal.aborted) {
         if (failedMap.size > 0) {
           const firstError = failedMap.values().next().value ?? "";
@@ -346,6 +358,8 @@ export function useChapterTranslation(
     }
     const pageUrl = pages[pageIndex];
     if (!pageUrl) return;
+    const generation = generationRef.current;
+    const stale = () => generation !== generationRef.current; // the reader moved on: drop this page's result (#1001)
     setTranslatingCurrentPage(true);
     setTranslatingCurrentPageIndex(pageIndex);
     pageStartRef.current = Date.now();
@@ -358,6 +372,7 @@ export function useChapterTranslation(
         imageModel: await getEffectiveImageModel(),
         derivative,
       });
+      if (stale()) return;
       console.log(`[PageTranslate] Page ${pageIndex + 1} done — ${patches.length} patches:`, patches);
       if (patches.length > 0) {
         setPatchedPages((prev) => new Map(prev).set(pageIndex, patches));
@@ -365,6 +380,7 @@ export function useChapterTranslation(
       setCompletedTranslatedPages((prev) => new Set([...prev, pageIndex]));
       setShowTranslation(true);
     } catch (err) {
+      if (stale()) return;
       console.error(`[PageTranslate] Page ${pageIndex + 1} failed:`, err);
       if (isCaptchaExpiredError(err)) {
         // Clearance token expired — re-open the captcha instead of failing hard.
@@ -380,9 +396,12 @@ export function useChapterTranslation(
         });
       }
     } finally {
-      setTranslatingCurrentPage(false);
-      setTranslatingCurrentPageIndex(null);
-      pageStartRef.current = null;
+      // the reset already cleared these, and a translation started on the new chapter now owns them
+      if (!stale()) {
+        setTranslatingCurrentPage(false);
+        setTranslatingCurrentPageIndex(null);
+        pageStartRef.current = null;
+      }
     }
   };
 

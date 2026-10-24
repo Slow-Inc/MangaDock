@@ -30,6 +30,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[feedback-proactive-clink-brainstorm]] — In goal-mode, invoke /clink-brainstorm WITHOUT asking for technical forks multiple agents can enrich (Claude picks how many/which); always verify "external prereq/blocked" claims against the real repo first
 - [[feedback-techdebt-all-scenarios]] — When refactoring tech debt in shared/core modules, enumerate and characterization-test EVERY scenario you can imagine BEFORE touching code — a refactor error there breaks the whole system.
 - [[feedback-test-every-round]] — ทำงานเสร็จทุกครั้งต้อง test ครบทุกรอบ รวม frontend E2E (Playwright ผ่าน tunnel) ไม่ใช่แค่ unit
+- [[feedback-frontend-css-layer-and-blur]] — global CSS outside @layer beats Tailwind utilities (focus ring + img bugs); no backdrop-blur on repeated items/scrims; measure perf on `next start` in clean headless, not the MCP window
 - [[feedback-root-cause-before-fix]] — **พื้นฐาน**: ห้ามเดาสาเหตุ ห้ามเสนอวิธีแก้ก่อนพิสูจน์ root cause ด้วยหลักฐานที่แยกแยะสมมติฐานได้; error/assert message ไม่ใช่ข้อเท็จจริง (เปิดโค้ดจริงเสมอ); ต้องมี minimal repro ที่โชว์กลไก; แก้ก่อนรู้สาเหตุเสี่ยงกลบสาเหตุ (บทเรียน #679/#680)
 - [[feedback-verify-before-claiming]] — ห้ามเคลม "แก้แล้ว" จนกว่าจะ eyeball render จริงเทียบ target + SendUserFile ให้ user confirm; test/replay ผ่าน ≠ verified; metric ต้องครอบทั้ง over/under
 - [[feedback-update-readme-on-command-change]] — แก้อะไรที่กระทบ command/script หรือเพิ่ม tool ใหม่ ต้องอัปเดต README.md ด้วยทุกครั้ง
@@ -66,6 +67,8 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[reference-external-docs-index]] — Catalog of knowledge-bearing MD files OUTSIDE the vault (resume points, benchmark reports, ADRs, PRDs, DONE/PIPELINE logs) — read these too; reconcile new ones in so nothing is missed
 - [[project-mangatranslator-study]] — Pointer ไป deep-scan ตัวจริงของ meangrinch/MangaTranslator ใน `docs/research/` — headline table ว่า need ไหนอ่าน doc ไหน
 - [[reference-frontend-ui-libraries]] — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects) — บทบาทต่างกัน ใช้คู่กันได้ + MCP setup
+- [[reference-frontend-a11y-gotchas]] — Next 16/React 19/Tailwind v4 traps from the a11y pass: titles need a stack + head observer, `not-sr-only` resets padding, `inert` closed popovers, JS motion vs reduced-motion, server fetch deadlines
+- [[reference-frontend-signed-in-e2e]] — E2E a signed-in flow with no real account: fake Supabase session in localStorage + Playwright answering the Supabase host (0 network calls) + stand-in backend `FLAKY_ONCE`; never point the dev's real session at a stand-in; ROLE admin = 8; disk-full build via a `.next` junction to C:; the whole-app overflow/broken-image sweep
 - [[reference-gh-cli-path]] — gh CLI ไม่อยู่ใน Bash PATH — ใช้ full path `C:\Program Files\GitHub CLI\gh.exe` เสมอ
 
 ---

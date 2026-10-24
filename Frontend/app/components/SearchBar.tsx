@@ -42,27 +42,27 @@ export default function SearchBar() {
       <form
         onSubmit={handleSubmit}
         aria-hidden={!isOpen}
-        className={`flex items-center overflow-hidden rounded-full border border-white/20 bg-black/75 backdrop-blur-xl transition-all duration-300 ${
+        className={`flex items-center overflow-hidden rounded-full border border-line bg-surface/75 backdrop-blur-xl transition-all duration-300 focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/20 ${
           isOpen
             ? "fixed left-4 right-4 top-[calc(4.75rem+env(safe-area-inset-top))] z-[80] w-auto opacity-100 shadow-2xl md:static md:left-auto md:right-auto md:top-auto md:z-auto md:w-72 md:shadow-none"
             : "pointer-events-none w-0 opacity-0"
         }`}
       >
-        <input
+        <input aria-label="ค้นหาหนังสือ"
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="ค้นหาหนังสือ..."
           tabIndex={isOpen ? 0 : -1}
-          className="w-full bg-transparent px-4 py-2 text-sm text-white placeholder-white/40 outline-none"
+          className="w-full bg-transparent px-4 py-2 text-sm text-ink placeholder:text-ink-3 outline-none"
         />
         {/* Clear button */}
         {query && (
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="pr-2 text-white/50 hover:text-white"
+            className="pr-2 text-ink-2 hover:text-ink"
             aria-label="ล้างคำค้นหา"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
@@ -80,7 +80,7 @@ export default function SearchBar() {
           if (isOpen) setQuery("");
         }}
         aria-label={isOpen ? "ปิดค้นหา" : "ค้นหา"}
-        className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+        className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-ink-2 transition hover:bg-fill hover:text-ink"
       >
         {isOpen ? (
           // X icon when open

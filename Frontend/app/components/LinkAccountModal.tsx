@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
+import Loader from "./ui/Loader";
 
 export interface LinkAccountModalProps {
   isOpen: boolean;
@@ -38,10 +40,7 @@ const FacebookIcon = ({ cls = "h-5 w-5" }: { cls?: string }) => (
 );
 
 const SpinnerIcon = () => (
-  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-  </svg>
+  <Loader context="inline" className="text-current!" />
 );
 
 const LinkIcon = () => (
@@ -77,13 +76,8 @@ export default function LinkAccountModal({
     }
   }, [visible, isPasswordMode]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    if (isOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, close]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes, focus goes back to the opener
+  useModalDialog(overlayRef, close, mounted);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -142,11 +136,11 @@ export default function LinkAccountModal({
     : existingProvider === "facebook" ? FacebookIcon : null;
   const providerBadgeCls =
     linkingProvider === "google"
-      ? "border-white/20 bg-white/10"
+      ? "border-ink-3 bg-raised"
       : "border-[#1877F2]/40 bg-[#1877F2]/20";
   const socialBtnCls =
     existingProvider === "google"
-      ? "border-white/10 bg-white/5 hover:bg-white/10"
+      ? "border-line bg-fill hover:bg-raised"
       : "border-[#1877F2]/40 bg-[#1877F2]/20 hover:bg-[#1877F2]/30";
 
   if (!mounted || typeof document === "undefined") return null;
@@ -154,22 +148,23 @@ export default function LinkAccountModal({
   return createPortal(
     <div
       ref={overlayRef}
+      tabIndex={-1} role="dialog" aria-modal="true" aria-label="เชื่อมบัญชี"
       onClick={(e) => {
         if (e.target === overlayRef.current) close();
       }}
-      className={`fixed inset-0 z-400 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-400 outline-none flex items-center justify-center bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
       <div
-        className={`relative w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+        className={`relative w-full max-w-sm rounded-3xl border border-line bg-surface shadow-2xl transition-all duration-300 ${
           visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
         {/* Close button */}
         <button
           onClick={close}
-          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-ink-2 transition hover:bg-raised hover:text-ink"
           aria-label="ปิด"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
@@ -180,7 +175,7 @@ export default function LinkAccountModal({
         <div className="flex flex-col items-center px-8 pb-8 pt-10">
           {/* Provider badge — shows which new provider is being linked */}
           <div
-            className={`mb-6 flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-white ${providerBadgeCls}`}
+            className={`mb-6 flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-ink ${providerBadgeCls}`}
           >
             <LinkingProviderIcon />
             <span>เชื่อมบัญชีกับ {linkingLabel}</span>
@@ -188,19 +183,19 @@ export default function LinkAccountModal({
 
           {/* Letter avatar with link badge */}
           <div className="relative mb-4">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-purple-600 text-3xl font-bold text-white shadow-lg ring-4 ring-white/10">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface text-3xl font-bold text-ink shadow-lg ring-4 ring-line">
               {email.charAt(0).toUpperCase()}
             </div>
-            <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0f1117] bg-blue-600 text-white shadow">
+            <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-surface bg-accent text-bg shadow">
               <LinkIcon />
             </span>
           </div>
 
           {/* Email */}
-          <p className="mb-1 text-sm font-semibold text-white">{email}</p>
+          <p className="mb-1 text-sm font-semibold text-ink">{email}</p>
 
           {/* Description — adapts to existing provider */}
-          <p className="mb-7 text-center text-xs text-white/50 leading-relaxed">
+          <p className="mb-7 text-center text-xs text-ink-2 leading-relaxed">
             {isPasswordMode ? (
               <>
                 บัญชีนี้ตั้งค่ารหัสผ่านไว้แล้ว<br />
@@ -218,10 +213,10 @@ export default function LinkAccountModal({
           {isPasswordMode && (
             <form onSubmit={handlePasswordSubmit} className="w-full space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-white/60">
+                <label className="mb-1.5 block text-xs font-medium text-ink-2">
                   รหัสผ่าน
                 </label>
-                <input
+                <input aria-label="รหัสผ่าน"
                   ref={inputRef}
                   type="password"
                   value={password}
@@ -232,12 +227,12 @@ export default function LinkAccountModal({
                   required
                   minLength={6}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30"
+                  className="w-full rounded-xl border border-line bg-fill px-4 py-3 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
                 />
               </div>
 
               {error && (
-                <p className="rounded-xl bg-red-500/20 px-4 py-2.5 text-center text-xs text-red-300">
+                <p className="rounded-xl bg-danger/20 px-4 py-2.5 text-center text-xs text-danger">
                   {error}
                 </p>
               )}
@@ -245,7 +240,7 @@ export default function LinkAccountModal({
               <button
                 type="submit"
                 disabled={loading || !password}
-                className="w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-xl bg-ink py-3 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -260,7 +255,7 @@ export default function LinkAccountModal({
               <button
                 type="button"
                 onClick={close}
-                className="w-full rounded-xl py-2.5 text-sm text-white/40 transition hover:text-white/70"
+                className="w-full rounded-xl py-2.5 text-sm text-ink-3 transition hover:text-ink-2"
               >
                 ยกเลิก
               </button>
@@ -271,7 +266,7 @@ export default function LinkAccountModal({
           {!isPasswordMode && (
             <div className="w-full space-y-4">
               {error && (
-                <p className="rounded-xl bg-red-500/20 px-4 py-2.5 text-center text-xs text-red-300">
+                <p className="rounded-xl bg-danger/20 px-4 py-2.5 text-center text-xs text-danger">
                   {error}
                 </p>
               )}
@@ -280,7 +275,7 @@ export default function LinkAccountModal({
                 type="button"
                 onClick={handleSocialConfirm}
                 disabled={loading}
-                className={`flex w-full items-center gap-3 rounded-xl border px-5 py-3.5 text-sm font-medium text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${socialBtnCls}`}
+                className={`flex w-full items-center gap-3 rounded-xl border px-5 py-3.5 text-sm font-medium text-ink transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${socialBtnCls}`}
               >
                 {loading ? (
                   <>
@@ -299,7 +294,7 @@ export default function LinkAccountModal({
                 type="button"
                 onClick={close}
                 disabled={loading}
-                className="w-full rounded-xl py-2.5 text-sm text-white/40 transition hover:text-white/70 disabled:opacity-50"
+                className="w-full rounded-xl py-2.5 text-sm text-ink-3 transition hover:text-ink-2 disabled:opacity-50"
               >
                 ยกเลิก
               </button>

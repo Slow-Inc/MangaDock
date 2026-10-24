@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type { ForumPost, ForumComment, ForumCategory, UserProfileResponse } from "./types";
 import { cacheOrFetch, cacheInvalidate, cacheClearByTag, TTL } from "./apiCache";
 import { createAuthHeaders } from "./apiUtils";
+import { HttpError } from "./httpError";
 
 const API_BASE = "/api/proxy";
 
@@ -91,7 +92,7 @@ export async function getPost(id: string) {
       const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
         headers: createAuthHeaders(token),
       });
-      if (!res.ok) throw new Error("Post not found");
+      if (!res.ok) throw new HttpError(res.status, "Post not found"); // 404 vs failed load (#913)
       return res.json() as Promise<ForumPost>;
     },
     TTL.SHORT,
@@ -216,7 +217,7 @@ export async function getProfile(uid: string): Promise<UserProfileResponse> {
   const res = await fetch(`${API_BASE}/forum/profile/${uid}`, {
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Profile not found");
+  if (!res.ok) throw new HttpError(res.status, "Profile not found"); // 404 vs failed load (#913)
   return res.json() as Promise<UserProfileResponse>;
 }
 
@@ -228,7 +229,8 @@ export async function deletePost(id: string): Promise<void> {
     method: "DELETE",
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to delete post");
+  // 404: already deleted (another tab, a moderator) — for a delete that is done (#1023)
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete post");
   cacheInvalidate(`post:${id}`, `comments:${id}`);
   cacheClearByTag('forum_posts');
 }
@@ -241,7 +243,7 @@ export async function deleteComment(id: string, postId?: string): Promise<void> 
     method: "DELETE",
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to delete comment");
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete comment");
   if (postId) cacheInvalidate(`comments:${postId}`);
 }
 
@@ -280,15 +282,26 @@ export async function vote(data: {
   targetType: 'post' | 'comment';
   targetId: string;
   voteValue: 1 | -1;
+  /** For a comment vote: the post whose cached comment list holds the old count. */
+  postId?: string;
 }) {
+  const { postId, ...body } = data;
   const token = await getAuthToken();
   if (!token) throw new Error("Unauthorized");
 
   const res = await fetch(`${API_BASE}/forum/vote`, {
     method: "POST",
     headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to vote");
+  // The cached copies still hold the old count and userVote: a click on one would send +1 again, which the server
+  // takes as an undo (#992)
+  if (data.targetType === 'post') {
+    cacheInvalidate(`post:${data.targetId}`);
+    cacheClearByTag('forum_posts');
+  } else if (postId) {
+    cacheInvalidate(`comments:${postId}`);
+  }
   return res.json() as Promise<{ upvotes: number; downvotes: number }>;
 }

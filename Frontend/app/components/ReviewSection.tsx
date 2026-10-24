@@ -1,10 +1,15 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
+import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
+import Loader from "./ui/Loader";
+import LoadError from "./ui/LoadError";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
 
 type Props = { mangaId: string; mangaTitle: string };
@@ -18,26 +23,36 @@ const BASE = (id: string) => `/api/proxy/reviews/${encodeURIComponent(id)}`;
 
 export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
 
   const [summary, setSummary] = useState<ReviewSummary>({ averageRating: 0, count: 0 });
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [myReview, setMyReview] = useState<ReviewItem | null>(null);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewsFailed, setReviewsFailed] = useState(false); // a failed load is not "no reviews yet" (#954)
 
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [deletingReview, setDeletingReview] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const fetchPublic = useCallback(async () => {
     setLoadingReviews(true);
+    setReviewsFailed(false);
     try {
       const [sumRes, listRes] = await Promise.all([
         fetch(`${BASE(mangaId)}/summary`),
         fetch(BASE(mangaId)),
       ]);
-      if (sumRes.ok) setSummary(await sumRes.json());
-      if (listRes.ok) setReviews(await listRes.json());
+      if (!sumRes.ok || !listRes.ok) throw new Error(`reviews: ${sumRes.status}/${listRes.status}`);
+      // Both parsed before either is shown: the header and the list come from the same answer
+      const [nextSummary, nextReviews] = await Promise.all([sumRes.json(), listRes.json()]);
+      setSummary(nextSummary);
+      setReviews(nextReviews);
+    } catch {
+      setReviewsFailed(true);
     } finally {
       setLoadingReviews(false);
     }
@@ -50,7 +65,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      const data = await res.json();
+      const data = await parseJsonOrNull<ReviewItem>(res);
       setMyReview(data);
       if (data) {
         setRating(data.rating);
@@ -73,8 +88,10 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
     if (!user) { showLoginPrompt(); return; }
     if (rating === 0) return;
     setSubmitting(true);
+    setSubmitError("");
     try {
       const token = await getToken();
+      if (!token) { showLoginPrompt(); return; }
       const res = await fetch(BASE(mangaId), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -83,43 +100,54 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       if (res.ok) {
         setShowForm(false);
         await Promise.all([fetchPublic(), fetchMyReview()]);
+      } else {
+        setSubmitError("บันทึกรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง");
       }
+    } catch {
+      setSubmitError("บันทึกรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
-    const token = await getToken();
-    if (!token) return;
-    const res = await fetch(BASE(mangaId), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
+    if (deletingReview) return;
+    setDeletingReview(true);
+    try {
+      const token = await getToken();
+      if (!token) { showLoginPrompt(); return; } // as handleSubmit does: retrying can't help a dead session
+      const res = await fetch(BASE(mangaId), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`review delete ${res.status}`);
       setMyReview(null);
       setRating(0);
       setBody("");
       await fetchPublic();
+    } catch {
+      showToast({ type: "error", message: "ลบรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // was silent, with no guard against a second click (#987)
+    } finally {
+      setDeletingReview(false);
     }
   }
 
   const others = reviews.filter((r) => !myReview || r.id !== myReview.id);
 
   return (
-    <section className="mt-8">
+    <section className="mt-8 px-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-white/90">รีวิวจากผู้อ่าน</h3>
+        <h3 className="text-base font-semibold text-ink">รีวิวจากผู้อ่าน</h3>
         <div className="flex items-center gap-2">
-          {summary.count > 0 && (
-            <span className="text-sm text-white/50">
+          {summary.count > 0 && !reviewsFailed && ( // a failed reload must not keep showing the old count
+            <span className="text-sm text-ink-2">
               {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
             </span>
           )}
           {user && !myReview && !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70 transition hover:border-white/20 hover:text-white/90"
+              className="rounded-lg border border-line bg-fill px-3 py-1 text-xs font-medium text-ink-2 transition hover:border-ink-3 hover:text-ink"
             >
               เขียนรีวิว
             </button>
@@ -127,7 +155,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
           {user && myReview && !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-400 transition hover:bg-indigo-500/20"
+              className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent/20"
             >
               แก้ไขรีวิว
             </button>
@@ -139,40 +167,43 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-5 rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4"
+          className="mb-5 rounded-xl border border-accent/40 bg-accent/10 p-4"
         >
-          <p className="mb-3 text-sm font-medium text-white/80">
+          <p className="mb-3 text-sm font-medium text-ink">
             {myReview ? "แก้ไขรีวิวของคุณ" : "เขียนรีวิว"}
           </p>
           <div className="mb-3 flex items-center gap-2">
             <StarRating value={rating} onChange={setRating} size="lg" />
             {rating > 0 && (
-              <span className="text-sm text-white/50">{rating} / 5</span>
+              <span className="text-sm text-ink-2">{rating} / 5</span>
             )}
           </div>
-          <textarea
+          <textarea aria-label="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            maxLength={5000} // the server's UpsertReviewDto cap (#1015)
             placeholder="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             rows={3}
-            className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-indigo-500/50 focus:bg-white/8"
+            className="w-full resize-none rounded-lg border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 transition focus:border-ink-3 focus:bg-raised"
           />
+          <div role="alert">{submitError && <p className="mt-2 text-xs text-danger">{submitError}</p>}</div>
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => {
                 setShowForm(false);
+                setSubmitError("");
                 if (myReview) { setRating(myReview.rating); setBody(myReview.body ?? ""); }
                 else { setRating(0); setBody(""); }
               }}
-              className="rounded-lg px-3 py-1.5 text-sm text-white/40 transition hover:text-white/70"
+              className="rounded-lg px-3 py-1.5 text-sm text-ink-2 transition hover:text-ink"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={submitting || rating === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white transition enabled:hover:bg-indigo-500 disabled:opacity-40"
+              className={`${PRIMARY_FILL} rounded-lg px-4 py-1.5 text-sm font-semibold transition disabled:opacity-40`}
             >
               {submitting ? "กำลังบันทึก..." : myReview ? "อัปเดต" : "ส่งรีวิว"}
             </button>
@@ -183,15 +214,19 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {/* Own review preview */}
       {myReview && !showForm && (
         <div className="mb-4">
-          <ReviewCard review={myReview} isOwn onDelete={handleDelete} />
+          <ReviewCard review={myReview} isOwn onDelete={handleDelete} deleting={deletingReview} />
         </div>
       )}
 
       {/* Other reviews */}
       {loadingReviews ? (
-        <div className="py-6 text-center text-sm text-white/30">กำลังโหลด...</div>
+        <div className="flex justify-center py-6 text-ink-3">
+          <Loader context="section" label="กำลังโหลดรีวิว" />
+        </div>
+      ) : reviewsFailed ? (
+        <LoadError what="รีวิว" onRetry={fetchPublic} />
       ) : others.length === 0 && !myReview ? (
-        <div className="py-6 text-center text-sm text-white/30">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
+        <div className="py-6 text-center text-sm text-ink-3">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
       ) : (
         <div className="flex flex-col gap-3">
           {others.map((r) => (
@@ -203,7 +238,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {!user && (
         <button
           onClick={showLoginPrompt}
-          className="mt-4 w-full rounded-xl border border-white/8 py-3 text-sm text-white/40 transition hover:border-white/15 hover:text-white/60"
+          className="mt-4 w-full rounded-xl border border-line py-3 text-sm text-ink-2 transition hover:border-line hover:text-ink"
         >
           เข้าสู่ระบบเพื่อเขียนรีวิว
         </button>

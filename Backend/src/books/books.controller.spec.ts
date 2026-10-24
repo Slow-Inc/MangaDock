@@ -21,7 +21,7 @@ describe('BooksController.verifyCaptcha', () => {
   let loggerErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    controller = new BooksController({} as any, {} as any);
+    controller = new BooksController({} as any, {} as any, {} as any);
     loggerErrorSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);

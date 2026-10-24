@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from "react";
+import PostImage from "../../../components/PostImage";
+import PostImageViewer from "../../../components/PostImageViewer";
+import Mascot from "../../../components/mascot/Mascot";
+import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -9,15 +13,25 @@ import { PostDetailSkeleton } from "../../../components/ForumSkeleton";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { getPost, listComments, createComment, updatePost, deletePost } from "../../../lib/communityApi";
+import { FORUM_LIMITS } from "../../../lib/forumLimits";
+import LimitCounter from "../../../components/ui/LimitCounter";
 import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { usePostStream } from "../../../hooks/useForumStream";
+import { usePageVisible } from "../../../hooks/pageVisibility";
+import { cacheInvalidate } from "../../../lib/apiCache";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
-import { isSocialCdnUrl } from '../../../lib/avatarUpload';
+import Loader from "../../../components/ui/Loader";
+import { PRIMARY_FILL } from "../../../components/ui/Button";
+import { usePageTitle } from "../../../hooks/pageTitle";
+import LoadError from "../../../components/ui/LoadError";
+import { isNotFound } from "../../../lib/httpError";
+import { goBackOr } from "../../../lib/inAppBack";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,14 +72,20 @@ export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
+  const editTitleLimitId = useId();
+  const editContentLimitId = useId();
+  const commentLimitId = useId();
   
   const [post, setPost] = useState<ForumPost | null>(null);
+  usePageTitle(post?.title);
   const [comments, setComments] = useState<ForumComment[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+  const [viewerAt, setViewerAt] = useState<number | null>(null); // the post image open full size (#1094)
 
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostTitle, setEditPostTitle] = useState("");
@@ -152,18 +172,25 @@ export default function PostDetailPage() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [menuOpen]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const fetchData = useCallback(async (silent = false) => {
     if (!id) return;
-    if (!silent) setLoading(true);
+    if (!silent) { setLoading(true); setLoadFailed(false); }
     try {
-      const [postRes, commentsRes] = await Promise.all([
-        getPost(id),
-        listComments(id)
-      ]);
+      // Both start at once, but the post decides "not found": with Promise.all a 500 from the comments could win the
+      // race against the post's 404 and turn a missing post into "failed to load" (#913)
+      const postReq = getPost(id);
+      const commentsReq = listComments(id);
+      commentsReq.catch(() => {}); // observed below; avoids an unhandled rejection when the post fails first
+      const postRes = await postReq;
+      const commentsRes = await commentsReq;
       setPost(postRes);
       setComments(commentsRes);
     } catch (err) {
       console.error(err);
+      // "not found" only for a confirmed 404; anything else is a failed load with a retry (#913)
+      if (!silent && !isNotFound(err)) setLoadFailed(true);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -172,6 +199,28 @@ export default function PostDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // The stream is closed while the tab is hidden (#821), so events from that time never arrive: on coming
+  // back, re-read the post and comments (fresh, not from cache) and leave if the post was deleted meanwhile.
+  const visible = usePageVisible();
+  const wasHiddenRef = useRef(false);
+  useEffect(() => {
+    if (!visible) { wasHiddenRef.current = true; return; }
+    if (!wasHiddenRef.current || !id) return;
+    wasHiddenRef.current = false;
+    cacheInvalidate(`post:${id}`, `comments:${id}`);
+    Promise.all([getPost(id), listComments(id)])
+      .then(([postRes, commentsRes]) => {
+        if (!mountedRef.current) return;
+        setPost(postRes);
+        setComments(commentsRes);
+        setVoteCounts(new Map());
+      })
+      .catch((err) => {
+        // Leave only when the post is really gone — getPost's error carries the status now (#913)
+        if (mountedRef.current && isNotFound(err)) router.push("/community");
+      });
+  }, [visible, id, router]);
 
   // Stable identity so the React.memo'd CommentThread items are not invalidated
   // on every post re-render (plan 2026-07-11 Perf 3).
@@ -183,8 +232,8 @@ export default function PostDetailPage() {
     try {
       await deletePost(post.id);
       router.push('/community');
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "ลบโพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
       setDeletingPost(false);
       setConfirmDeletePost(false);
     }
@@ -205,8 +254,8 @@ export default function PostDetailPage() {
       const updated = await updatePost(post.id, { title: editPostTitle, content: editPostContent });
       setPost(updated);
       setIsEditingPost(false);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "บันทึกโพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the edit stays open with its text
     } finally {
       setSavingPost(false);
     }
@@ -225,9 +274,11 @@ export default function PostDetailPage() {
       const created = await createComment({ postId: post.id, content });
       if (!mountedRef.current) return;
       setComments(prev => [...prev, created]);
-    } catch (err) {
-      console.error(err);
-      if (mountedRef.current) setNewComment(content);
+    } catch {
+      if (mountedRef.current) {
+        setNewComment(content);
+        showToast({ type: "error", message: "ส่งความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+      }
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
@@ -237,82 +288,70 @@ export default function PostDetailPage() {
     return <PostDetailSkeleton />;
   }
 
-  if (!post) return (
-    <div className="py-20 text-center text-white/40">ไม่พบข้อมูลกระทู้</div>
+  if (!post) return loadFailed ? (
+    <div className="py-12">
+      <h1 className="sr-only">โหลดกระทู้ไม่สำเร็จ</h1>
+      <LoadError what="กระทู้" area="community" onRetry={() => fetchData()} />
+    </div>
+  ) : (
+    <h1 className="py-20 text-center text-ink-3">ไม่พบข้อมูลกระทู้</h1>
   );
 
   return (
-    <div className="relative [overflow-x:clip]">
+    <div className="relative">
       {/* 
         Sticky Secondary Header (Bar) 
         - Always present back button
         - Dynamic background and title on scroll
       */}
       <div
-        className={`sticky top-16 z-50 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
+        className={`sticky top-16 z-40 -mx-4 px-4 lg:mx-0 lg:px-0 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
           headerScrolled
-            ? "bg-[#141414]/80 backdrop-blur-md border-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
+            ? "bg-surface/80 backdrop-blur-md border-line shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
             : "bg-transparent border-transparent"
         }`}
       >
         <button
-          onClick={() => router.back()}
+          onClick={() => goBackOr(router, "/community")}
           className="group relative flex items-center gap-2 h-9 px-3 sm:px-5 rounded-full overflow-hidden shrink-0
-            bg-white/[0.07] hover:bg-white/[0.13]
-            border border-white/[0.13] hover:border-white/25
-            backdrop-blur-xl
-            shadow-[0_2px_10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.10)]
-            hover:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.18)]
-            text-white/70 hover:text-white
+            bg-fill hover:bg-raised
+            border border-line hover:border-ink-3
+            text-ink-2 hover:text-ink
             transition-all duration-200"
           aria-label="ย้อนกลับ"
         >
-          {/* Liquid Glass top shimmer */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
           <svg
             className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5"
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
-          <span className="hidden sm:block text-xs font-bold tracking-wide">ย้อนกลับ</span>
+          <span className="hidden sm:block text-xs font-bold">ย้อนกลับ</span>
         </button>
 
         <div className={`min-w-0 flex-1 transition-opacity duration-300 ${headerScrolled ? "opacity-100" : "opacity-0"}`}>
           <MarqueeText
             text={post.title}
-            textClassName="text-sm font-semibold text-white"
+            textClassName="text-sm font-semibold text-ink"
             active={headerScrolled}
           />
         </div>
       </div>
 
-      <article className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden mb-8 shadow-xl">
+      <article className="bg-surface border border-line rounded-2xl overflow-hidden mb-8 shadow-xl">
           <div className="p-4 sm:p-8">
-            <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-white/40 relative">
-              <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
-                {post.authorPhotoUrl && (
-                  <Image
-                    src={post.authorPhotoUrl}
-                    alt={post.authorName || 'user'}
-                    width={24}
-                    height={24}
-                    className="object-cover"
-                    unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                )}
-              </div>
+            <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-ink-3 relative">
+              <UserAvatar uid={post.authorUid} photoUrl={post.authorPhotoUrl} size={24} className="ring-1 ring-line" />
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  post.authorRole === 1 ? "text-indigo-400" :
-                  post.authorRole === 2 ? "text-orange-400" : "text-white/80"
+                  post.authorRole === 1 ? "text-accent" :
+                  post.authorRole === 2 ? "text-ink" : "text-ink"
                 }`}
               >
                 {post.authorName || 'Unknown User'}
                 {post.authorRole > 0 && (
-                  <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
+                  <span className="ml-1.5 px-1 bg-fill rounded text-[9px] uppercase tracking-tighter text-ink-2">
                     {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
                   </span>
                 )}
@@ -324,7 +363,7 @@ export default function PostDetailPage() {
               {post.category !== 'general' && (
                 <>
                   <span>•</span>
-                  <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-bold uppercase tracking-wider text-[10px] border border-indigo-500/20">
+                  <span className="px-2.5 py-1 rounded-full bg-fill text-accent font-bold uppercase tracking-wider text-[10px] border border-accent/20">
                     {post.category}
                   </span>
                 </>
@@ -332,9 +371,9 @@ export default function PostDetailPage() {
               {post.targetMangaTitle && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-bold border border-accent/20">
                     {post.targetMangaCover && (
-                      <div className="w-3.5 h-3.5 rounded-sm overflow-hidden relative border border-amber-500/20 shrink-0">
+                      <div className="w-3.5 h-3.5 rounded-sm overflow-hidden relative border border-accent/20 shrink-0">
                         <Image src={post.targetMangaCover} alt="manga" fill sizes="14px" className="object-cover" />
                       </div>
                     )}
@@ -346,7 +385,7 @@ export default function PostDetailPage() {
                 <div ref={menuRef} className="ml-auto relative shrink-0">
                   <button
                     onClick={() => menuOpen ? closeMenu() : openMenu()}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 hover:bg-white/8 active:bg-white/12 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-2 hover:text-ink hover:bg-fill active:bg-fill transition-colors"
                     aria-label="ตัวเลือกโพสต์"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -356,7 +395,7 @@ export default function PostDetailPage() {
 
                   {menuOpen && (
                     <div
-                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-[#202020] border border-white/10 rounded-2xl shadow-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
+                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-surface border border-line rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform,translate,scale,rotate] duration-150 ease-out ${
                         menuVisible
                           ? "opacity-100 scale-100 translate-y-0"
                           : "opacity-0 scale-95 -translate-y-1"
@@ -364,20 +403,20 @@ export default function PostDetailPage() {
                     >
                       {confirmDeletePost ? (
                         <div key="confirm" className="p-3 space-y-2.5 animate-in fade-in slide-in-from-right-2 duration-150">
-                          <p className="text-xs text-white/40 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
+                          <p className="text-xs text-ink-3 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
                           <div className="flex gap-2">
                             <button
                               onClick={() => setConfirmDeletePost(false)}
-                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white/50 hover:bg-white/8 active:bg-white/12 transition-colors"
+                              className="flex-1 py-2 rounded-xl text-xs font-bold text-ink-2 hover:bg-fill active:bg-fill transition-colors"
                             >
                               ยกเลิก
                             </button>
                             <button
                               onClick={handleDeletePost}
                               disabled={deletingPost}
-                              className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 active:bg-red-500/35 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                              className="flex-1 py-2 rounded-xl text-xs font-bold bg-danger/15 text-danger hover:bg-danger/25 active:bg-danger/35 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
                             >
-                              {deletingPost && <div className="w-3 h-3 border border-red-400/30 border-t-red-400 rounded-full animate-spin" />}
+                              {deletingPost && <Loader context="inline" />}
                               {deletingPost ? "กำลังลบ..." : "ลบ"}
                             </button>
                           </div>
@@ -386,7 +425,7 @@ export default function PostDetailPage() {
                         <div key="menu" className="animate-in fade-in slide-in-from-left-2 duration-150">
                           <button
                             onClick={() => { handleEditPostStart(); closeMenu(); }}
-                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/5 active:bg-white/8 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-ink-2 hover:bg-fill active:bg-fill transition-colors"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -394,10 +433,10 @@ export default function PostDetailPage() {
                             <span className="sm:hidden">แก้ไข</span>
                             <span className="hidden sm:inline">แก้ไขโพสต์</span>
                           </button>
-                          <div className="h-px bg-white/5 mx-3" />
+                          <div className="h-px bg-fill mx-3" />
                           <button
                             onClick={() => setConfirmDeletePost(true)}
-                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-red-400/70 hover:bg-red-500/8 active:bg-red-500/12 hover:text-red-400 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-danger/70 hover:bg-danger/8 active:bg-danger/12 hover:text-danger transition-colors"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -415,30 +454,36 @@ export default function PostDetailPage() {
 
             {isEditingPost ? (
               <div className="mb-4 sm:mb-6 animate-in fade-in duration-200">
-                <input
+                <input aria-label="หัวข้อกระทู้"
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-white focus:outline-none focus:border-indigo-500 transition-colors mb-3"
+                  maxLength={FORUM_LIMITS.title}
+                  aria-describedby={editTitleLimitId}
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:border-accent transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
-                <textarea
+                <LimitCounter id={editTitleLimitId} value={editPostTitle} max={FORUM_LIMITS.title} />
+                <textarea aria-label="เนื้อหากระทู้"
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
+                  maxLength={FORUM_LIMITS.content}
+                  aria-describedby={editContentLimitId}
                   rows={8}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm sm:text-base text-white/90 focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:border-accent transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
+                <LimitCounter id={editContentLimitId} value={editPostContent} max={FORUM_LIMITS.content} />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
                     onClick={() => setIsEditingPost(false)}
-                    className="px-4 py-2 rounded-xl text-sm font-bold text-white/50 hover:bg-white/5 transition-colors"
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-ink-2 hover:bg-fill transition-colors"
                   >
                     ยกเลิก
                   </button>
                   <button
                     onClick={handleSavePost}
                     disabled={savingPost || !editPostTitle.trim() || !editPostContent.trim()}
-                    className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className={`px-6 py-2 rounded-xl ${PRIMARY_FILL} text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                   >
                     {savingPost ? "กำลังบันทึก..." : "บันทึก"}
                   </button>
@@ -446,7 +491,7 @@ export default function PostDetailPage() {
               </div>
             ) : (
               <>
-                <h1 className="text-xl sm:text-3xl font-black text-white mb-3 sm:mb-6 leading-tight tracking-tight">
+                <h1 className="text-xl sm:text-3xl font-black text-ink mb-3 sm:mb-6 leading-tight">
                   {post.title}
                 </h1>
 
@@ -454,28 +499,28 @@ export default function PostDetailPage() {
                 {post.category === 'spoiler' ? (
                   <div className="relative mb-4 sm:mb-6">
                     <div
-                      className={`text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap ${spoilerRevealed ? '' : 'select-none pointer-events-none line-clamp-4'}`}
+                      className={`text-ink text-sm sm:text-base leading-relaxed whitespace-pre-wrap ${spoilerRevealed ? '' : 'select-none pointer-events-none line-clamp-4'}`}
                       style={{ filter: spoilerRevealed ? 'blur(0px)' : 'blur(4px)', transition: 'filter 0.5s ease' }}
                     >
                       {post.content}
                     </div>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 rounded-xl backdrop-blur-[2px] transition-opacity duration-500 ${
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 bg-scrim/30 rounded-xl backdrop-blur-[2px] transition-opacity duration-500 ${
                       spoilerRevealed ? 'opacity-0 pointer-events-none' : 'opacity-100'
                     }`}>
-                      <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
-                      <p className="text-amber-400 font-bold text-sm">เนื้อหานี้มีสปอยล์</p>
+                      <p className="text-accent font-bold text-sm">เนื้อหานี้มีสปอยล์</p>
                       <button
                         onClick={() => setSpoilerRevealed(true)}
-                        className="px-5 py-2 rounded-full bg-amber-500 text-black font-black text-sm hover:bg-amber-400 active:scale-95 transition-all duration-150"
+                        className={`px-5 py-2 rounded-full ${PRIMARY_FILL} font-black text-sm active:scale-95 transition-all duration-150`}
                       >
                         คลิกเพื่อดูสปอยล์
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap mb-4 sm:mb-6">
+                  <div className="text-ink text-sm sm:text-base leading-relaxed whitespace-pre-wrap mb-4 sm:mb-6">
                     {post.content}
                   </div>
                 )}
@@ -495,34 +540,32 @@ export default function PostDetailPage() {
                   const trimmed = url.trim();
                   const safeUrl = /^\s*(javascript|data|vbscript|file):/i.test(trimmed) ? '#' : trimmed;
                   return (
-                  <a
+                  <button
                     key={i}
-                    href={safeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`relative block overflow-hidden bg-white/5 rounded-lg group ${
+                    type="button"
+                    onClick={() => setViewerAt(i)}
+                    disabled={post.category === 'spoiler' && !spoilerRevealed}
+                    aria-label={`ดูรูปที่ ${i + 1} ขนาดใหญ่`}
+                    className={`relative block w-full overflow-hidden bg-fill rounded-lg group ${
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
-                    <Image
-                      src={safeUrl}
-                      alt={`รูปที่ ${i + 1}`}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      unoptimized
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <PostImage url={safeUrl} alt={`รูปที่ ${i + 1}`} className="group-hover:scale-105 transition-transform duration-300" priority={i === 0} />
+                    <div className="absolute inset-0 bg-scrim/0 group-hover:bg-scrim/20 transition-colors flex items-center justify-center">
+                      <svg className="w-8 h-8 text-ink opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </div>
-                  </a>
+                  </button>
                   );
                 })}
+                {viewerAt !== null && (
+                  <PostImageViewer urls={post.imageUrls} start={viewerAt} onClose={() => setViewerAt(null)} />
+                )}
               </div>
             )}
 
-            <footer className="pt-4 sm:pt-6 border-t border-white/5 flex items-center gap-6">
+            <footer className="pt-4 sm:pt-6 border-t border-line flex items-center gap-6">
               <VoteButtons
                 targetType="post"
                 targetId={post.id}
@@ -531,7 +574,7 @@ export default function PostDetailPage() {
                 initialUserVote={post.userVote}
                 externalCounts={voteCounts.get(`post:${post.id}`)}
               />
-              <div className="text-sm font-bold text-white/30">
+              <div className="text-sm font-bold text-ink-3">
                 {post.commentCount} ความคิดเห็น
               </div>
             </footer>
@@ -540,36 +583,36 @@ export default function PostDetailPage() {
 
       {/* Comment Input */}
       <section id="comments" className="mb-10">
-        <h2 className="text-xl font-bold text-white mb-6">
+        <h2 className="text-xl font-bold text-ink mb-6">
           ความคิดเห็น
           {post.commentCount > 0 && (
-            <span className="ml-2 text-base font-medium text-white/30">({post.commentCount})</span>
+            <span className="ml-2 text-base font-medium text-ink-3">({post.commentCount})</span>
           )}
         </h2>
         
         {user ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-4">
+          <div className="bg-surface border border-line rounded-2xl p-4">
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5 mt-1">
-                {user.photoURL && (
-                  <img src={user.photoURL} alt={user.displayName || 'user'} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                )}
-              </div>
+              <UserAvatar uid={user.uid} photoUrl={user.photoURL} size={32} className="mt-1 ring-1 ring-line" />
               <div className="flex-1">
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
+                  maxLength={FORUM_LIMITS.comment}
+                  aria-describedby={commentLimitId}
+                  aria-label="ความคิดเห็นของคุณ"
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition-all resize-none mb-3"
+                  className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:border-accent transition-all resize-none mb-3"
                 />
+                <LimitCounter id={commentLimitId} value={newComment} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end">
                   <button
                     onClick={handlePostComment}
                     disabled={!newComment.trim() || submitting}
-                    className="px-6 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-500 disabled:opacity-50 transition-all flex items-center gap-2"
+                    className={`px-6 py-2 rounded-xl ${PRIMARY_FILL} font-bold text-sm disabled:opacity-50 transition-all flex items-center gap-2`}
                   >
-                    {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    {submitting && <Loader context="inline" />}
                     {submitting ? "กำลังส่ง..." : "ส่งความคิดเห็น"}
                   </button>
                 </div>
@@ -577,14 +620,14 @@ export default function PostDetailPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white/5 border border-dashed border-white/10 rounded-2xl py-10 text-center space-y-3">
-            <div className="w-10 h-10 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-fill border border-dashed border-line rounded-2xl py-10 text-center space-y-3">
+            <div className="w-10 h-10 mx-auto rounded-2xl bg-fill flex items-center justify-center">
+              <svg className="w-5 h-5 text-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-white/40 text-sm font-medium">เข้าสู่ระบบเพื่อร่วมแสดงความคิดเห็น</p>
-            <button onClick={showLoginPrompt} className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 smooth-hover">
+            <p className="text-ink-3 text-sm font-medium">เข้าสู่ระบบเพื่อร่วมแสดงความคิดเห็น</p>
+            <button onClick={showLoginPrompt} className={`px-5 py-2 rounded-xl ${PRIMARY_FILL} text-sm font-bold smooth-hover`}>
               เข้าสู่ระบบ
             </button>
           </div>
@@ -602,8 +645,11 @@ export default function PostDetailPage() {
             />
           ))
         ) : (
-          <div className="py-10 text-center">
-            <p className="text-white/20 font-bold">ยังไม่มีใครมาแสดงความเห็นเลย...</p>
+          <div className="py-10 text-center space-y-2">
+            <div className="flex justify-center">
+              <Mascot area="community" size={56} />
+            </div>
+            <p className="text-ink-3 font-medium">ยังไม่มีความคิดเห็น — เริ่มเป็นคนแรกได้เลย</p>
           </div>
         )}
       </section>

@@ -119,7 +119,10 @@ describe('LlmService — openai provider', () => {
 
     const result = await make(env).complete('Hello', 'gpt-4o-mini');
 
-    expect(OpenAI).toHaveBeenCalledWith({ apiKey: 'sk-test' });
+    expect(OpenAI).toHaveBeenCalledWith({
+      apiKey: 'sk-test',
+      fetch: expect.any(Function),
+    });
     expect(mockCreate).toHaveBeenCalledWith({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Hello' }],
@@ -157,6 +160,37 @@ describe('LlmService — custom provider', () => {
     expect(OpenAI).toHaveBeenCalledWith({
       apiKey: 'sk-local',
       baseURL: 'http://localhost:11434/v1',
+      fetch: expect.any(Function),
+    });
+  });
+
+  it("uses Node's native fetch, not the SDK's bundled node-fetch (which fails with 'Premature close' on Node 26)", () => {
+    (OpenAI as jest.Mock).mockImplementation(() => ({}));
+
+    make({
+      LLM_PROVIDER: 'custom',
+      LLM_API_KEY: 'sk-local',
+      LLM_BASE_URL: 'http://localhost:11434/v1',
+    });
+
+    const options = (OpenAI as unknown as jest.Mock).mock.calls[0][0];
+    expect(options.fetch).toBe(globalThis.fetch);
+  });
+
+  it('sends a session id header to OpenCode (it rejects requests without one: 400 MissingSessionID)', () => {
+    (OpenAI as jest.Mock).mockImplementation(() => ({}));
+
+    make({
+      LLM_PROVIDER: 'custom',
+      LLM_API_KEY: 'oc-key',
+      LLM_BASE_URL: 'https://opencode.ai/zen/go/v1',
+    });
+
+    expect(OpenAI).toHaveBeenCalledWith({
+      apiKey: 'oc-key',
+      baseURL: 'https://opencode.ai/zen/go/v1',
+      fetch: expect.any(Function),
+      defaultHeaders: { 'x-opencode-session': expect.stringMatching(/\S+/) },
     });
   });
 });

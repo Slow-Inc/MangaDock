@@ -35,8 +35,8 @@ export default function DevMangaTranslateModelToggle() {
   };
 
   return (
-    <div className="fixed bottom-16 right-4 z-9999 rounded-xl border border-white/15 bg-black/75 p-2 backdrop-blur-sm">
-      <p className="mb-1 text-[10px] font-semibold tracking-wide text-white/70">MANGA AI MODEL</p>
+    <div className="fixed bottom-16 right-4 z-9999 rounded-xl border border-line bg-surface/90 p-2 backdrop-blur-sm">
+      <p className="mb-1 text-[10px] font-semibold tracking-wide text-ink-2">MANGA AI MODEL</p>
       <div className="flex items-center gap-1">
         {MANGA_TRANSLATE_MODELS.map((option) => {
           const active = model === option;
@@ -46,8 +46,8 @@ export default function DevMangaTranslateModelToggle() {
               onClick={() => changeModel(option)}
               className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${
                 active
-                  ? "border-blue-400/70 bg-blue-500/20 text-blue-200"
-                  : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                  ? "border-accent/70 bg-accent/15 text-accent"
+                  : "border-line bg-fill text-ink-2 hover:bg-raised"
               }`}
               title={`เลือกโมเดล ${LABELS[option]} สำหรับระบบแปลมังงะในตอน (Dev)`}
               aria-label={`เลือกโมเดล ${LABELS[option]} สำหรับระบบแปลมังงะในตอน (Dev)`}

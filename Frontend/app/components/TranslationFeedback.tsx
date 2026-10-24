@@ -2,7 +2,9 @@
 
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
+import { parseJsonOrNull } from "../lib/safeJson";
 
 type Props = {
   mangaId: string;
@@ -17,64 +19,80 @@ async function getToken(): Promise<string | null> {
 
 export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
   const [vote, setVote] = useState<1 | -1 | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchMyVote = useCallback(async () => {
+  const fetchMyVote = useCallback(async (signal: AbortSignal) => {
     const token = await getToken();
-    if (!token) return;
-    const res = await fetch(
-      `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (res.ok) {
-      const data = await res.json();
-      setVote(data?.vote ?? null);
+    if (!token || signal.aborted) return;
+    try {
+      const res = await fetch(
+        `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal },
+      );
+      if (res.ok) {
+        const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
+        // A newer page's request superseded this one — never let it overwrite.
+        if (!signal.aborted) setVote(data?.vote ?? null);
+      }
+    } catch (err) {
+      if (!signal.aborted) throw err;
     }
   }, [mangaId, chapterId, pageNumber]);
 
   useEffect(() => {
     setVote(null);
-    if (user) fetchMyVote();
+    if (!user) return;
+    const controller = new AbortController();
+    fetchMyVote(controller.signal);
+    return () => controller.abort();
   }, [user, fetchMyVote]);
 
   async function handleVote(v: 1 | -1) {
     if (!user) { showLoginPrompt(); return; }
     if (submitting) return;
     setSubmitting(true);
+    const prev = vote;
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) { showLoginPrompt(); return; }
 
+      let res: Response;
       if (vote === v) {
         // Toggle off — delete vote
         setVote(null);
-        await fetch(
+        res = await fetch(
           `/api/proxy/translation-feedback?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
           { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
         setVote(v);
-        await fetch("/api/proxy/translation-feedback", {
+        res = await fetch("/api/proxy/translation-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ mangaId, chapterId, pageNumber, vote: v }),
         });
       }
+      if (!res.ok) throw new Error(`vote failed: ${res.status}`);
+    } catch {
+      // Roll back the optimistic vote so the UI matches the server.
+      setVote(prev);
+      showToast({ type: "error", message: "บันทึกโหวตไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-sm">
-      <span className="mr-1 text-xs text-white/40">คุณภาพแปล</span>
+    <div className="flex items-center gap-1 rounded-full border border-line bg-bg/85 px-2 py-1">
+      <span className="mr-1 text-xs text-ink-2">คุณภาพแปล</span>
       <button
         onClick={() => handleVote(1)}
         disabled={submitting}
         title="แปลได้ดี"
         className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
-          vote === 1 ? "bg-green-500/20 text-green-400" : "text-white/40 hover:text-green-400"
+          vote === 1 ? "bg-ok/20 text-ok" : "text-ink-3 hover:text-ok"
         }`}
       >
         <svg viewBox="0 0 24 24" fill={vote === 1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
@@ -86,7 +104,7 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
         disabled={submitting}
         title="แปลไม่ดี"
         className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
-          vote === -1 ? "bg-red-500/20 text-red-400" : "text-white/40 hover:text-red-400"
+          vote === -1 ? "bg-danger/20 text-danger" : "text-ink-3 hover:text-danger"
         }`}
       >
         <svg viewBox="0 0 24 24" fill={vote === -1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">

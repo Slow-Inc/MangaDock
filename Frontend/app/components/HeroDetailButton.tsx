@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { levelKey } from "../lib/contentLevel";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -29,8 +30,12 @@ export default function HeroDetailButton({ book }: Props) {
     const qs = forceLocal ? "?forceLocal=true" : "";
 
     cacheOrFetch<MangaChapterSummary[]>(
-      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}`,
-      () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.json()),
+      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}${levelKey()}`,
+      // a failed load must not be cached — it would hide อ่านเลย until the entry expires (#983)
+      () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
+        if (!r.ok) throw new Error(`chapters ${r.status}`);
+        return r.json();
+      }),
       TTL.MEDIUM,
     )
       .then((d) => {
@@ -61,14 +66,14 @@ export default function HeroDetailButton({ book }: Props) {
         {isManga && hasReadable === true && (
           <button
             onClick={openRead}
-            className="rounded-lg bg-white px-8 py-2.5 text-sm font-bold text-black transition hover:bg-white/90"
+            className="rounded-lg bg-ink px-8 py-2.5 text-sm font-bold text-bg transition hover:bg-ink/90"
           >
             อ่านเลย
           </button>
         )}
         <button
           onClick={openDetail}
-          className="rounded-lg border border-white/25 bg-white/10 px-8 py-2.5 text-sm font-bold text-white backdrop-blur-xl transition hover:bg-white/20"
+          className="rounded-lg border border-ink-3 bg-fill px-8 py-2.5 text-sm font-bold text-ink backdrop-blur-xl transition hover:bg-raised"
         >
           รายละเอียดเพิ่มเติม
         </button>

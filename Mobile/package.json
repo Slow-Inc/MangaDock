@@ -2,12 +2,14 @@
   "name": "mangadock-mobile",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "expo/AppEntry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.ts",
     "validate:env": "node --env-file-if-exists=.env scripts/validate-env.mjs"
   },
   "dependencies": {
@@ -15,22 +17,27 @@
     "@supabase/supabase-js": "^2.108.2",
     "expo": "~56.0.15",
     "expo-application": "~56.0.3",
-    "expo-auth-session": "~56.0.15",
     "expo-build-properties": "~56.0.22",
     "expo-constants": "~56.0.20",
+    "expo-crypto": "56.0.4",
+    "expo-file-system": "~56.0.11",
+    "expo-image-picker": "~56.0.25",
     "expo-linking": "~56.0.15",
     "expo-media-library": "~56.0.9",
+    "expo-sharing": "~56.0.26",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
     "expo-web-browser": "~56.0.5",
     "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-url-polyfill": "^3.0.0",
-    "react-native-webview": "13.16.1"
+    "react-native-url-polyfill": "^3.0.0"
   },
   "devDependencies": {
+    "@types/node": "26.0.1",
     "@types/react": "~19.2.7",
+    "@types/react-test-renderer": "^19.1.0",
+    "react-test-renderer": "^19.2.3",
     "typescript": "~6.0.3"
   }
 }

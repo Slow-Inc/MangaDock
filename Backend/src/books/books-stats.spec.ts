@@ -18,6 +18,7 @@ function makeController(books = makeBooks(), stats = makeStats()) {
     ctrl: new BooksController(
       books as any,
       stats as unknown as StatsIncrementService,
+      {} as never,
     ),
     books,
     stats,

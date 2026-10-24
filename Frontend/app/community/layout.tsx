@@ -5,7 +5,11 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Navbar from "../components/Navbar";
 import ForumSideMenu from "../components/ForumSideMenu";
 import { ReactLenis } from 'lenis/react';
+import { useReducedMotion } from "../hooks/reducedMotion";
+import { useDialogFocus } from "../hooks/useDialogFocus";
+import { lockPageScroll } from "../lib/scrollLock";
 import type { ForumCategory } from "../lib/types";
+import Loader from "../components/ui/Loader";
 
 function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,6 +17,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
 
   // Derive active states from URL to keep sidebar in sync across pages
   const category = (searchParams.get('category') as ForumCategory) || undefined;
@@ -28,14 +33,17 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('toggleMobileMenu', handleToggle);
   }, []);
 
-  // Focus trap: move focus to first focusable element when drawer opens
+  // The drawer is a dialog (#940): focus moves in, Tab stays inside, focus returns to the menu button; the page behind
+  // is locked while it is open.
+  useDialogFocus(drawerRef, () => true, isMobileMenuOpen);
+  useEffect(() => (isMobileMenuOpen ? lockPageScroll() : undefined), [isMobileMenuOpen]);
+  // Widening past lg hides the drawer (lg:hidden) and its button: close it, or its lock would outlive it unseen
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      const firstFocusable = drawerRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      firstFocusable?.focus();
-    }
+    if (!isMobileMenuOpen) return;
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const close = () => { if (wide.matches) setIsMobileMenuOpen(false); };
+    wide.addEventListener("change", close);
+    return () => wide.removeEventListener("change", close);
   }, [isMobileMenuOpen]);
 
   // Escape key handler: close drawer when Escape is pressed
@@ -62,29 +70,31 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[--surface-base]">
+    <div className="min-h-screen bg-bg">
       <Navbar />
       
       {/* Mobile Drawer Overlay */}
-      <div 
-        className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+      <div
+        inert={!isMobileMenuOpen} // only faded and slid out while closed: keep its controls out of the Tab order
+        className={`fixed inset-0 z-50 bg-scrim/80 transition-opacity duration-300 lg:hidden ${
           isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setIsMobileMenuOpen(false)}
       >
         <div
           ref={drawerRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label="เมนู"
-          className={`absolute top-0 left-0 w-[300px] h-full bg-[--surface-overlay] shadow-2xl border-r border-white/10 transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
+          className={`absolute top-0 left-0 w-[300px] h-full bg-surface shadow-2xl border-r border-line outline-none transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-            <h2 className="font-black text-white uppercase tracking-widest text-xs">Community</h2>
-            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-white/40 hover:text-white">
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-line">
+            <h2 className="font-black text-ink uppercase tracking-[0.1em] text-xs">Community</h2>
+            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-ink-2 hover:text-ink">
               <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
@@ -101,12 +111,12 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="pt-24 lg:pt-28 pb-20 px-4 lg:px-10 max-w-7xl mx-auto [overflow-x:clip]">
+      <main id="main" className="pt-24 lg:pt-28 pb-20 px-4 lg:px-10 max-w-7xl mx-auto [overflow-x:clip]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
           {/* Sidebar Column (Left) - Persistent and Pre-loaded */}
           <aside className="hidden lg:block lg:col-span-4 xl:col-span-3 sticky top-28 self-start h-[calc(100vh-8rem)]">
             <ReactLenis 
-              options={{ lerp: 0.08, wheelMultiplier: 1, smoothWheel: true }} 
+              options={{ lerp: 0.08, wheelMultiplier: 1, smoothWheel: !reducedMotion }} // #849 
               className="h-full overflow-y-auto overscroll-contain custom-scrollbar pr-2 pb-6"
             >
               <ForumSideMenu
@@ -134,8 +144,8 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={
-        <div className="min-h-screen bg-[--surface-base] flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        <div className="min-h-screen bg-bg flex items-center justify-center">
+            <Loader context="page" />
         </div>
     }>
       <CommunityLayoutContent>{children}</CommunityLayoutContent>

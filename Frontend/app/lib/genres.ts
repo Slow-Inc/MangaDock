@@ -1,0 +1,21 @@
+/** The genres the app offers, in menu order: the navbar menu, and the only slugs /categories/[genre] serves (#971). */
+export const GENRES = [
+  { slug: "action",        label: "แอคชัน" },
+  { slug: "adventure",     label: "ผจญภัย" },
+  { slug: "comedy",        label: "ตลก" },
+  { slug: "romance",       label: "โรแมนติก" },
+  { slug: "fantasy",       label: "แฟนตาซี" },
+  { slug: "drama",         label: "ดราม่า" },
+  { slug: "horror",        label: "สยองขวัญ" },
+  { slug: "sci-fi",        label: "ไซไฟ" },
+  { slug: "slice-of-life", label: "ชีวิตประจำวัน" },
+  { slug: "sports",        label: "กีฬา" },
+  { slug: "mystery",       label: "ลึกลับ" },
+  { slug: "psychological", label: "จิตวิทยา" },
+  { slug: "supernatural",  label: "เหนือธรรมชาติ" },
+  { slug: "historical",    label: "ประวัติศาสตร์" },
+  { slug: "isekai",        label: "อิเซไค" },
+  { slug: "mecha",         label: "หุ่นยนต์" },
+  { slug: "school-life",   label: "ชีวิตนักเรียน" },
+  { slug: "thriller",      label: "ระทึกขวัญ" },
+] as const;

@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -12,6 +13,8 @@ import {
   STORAGE_PROVIDER,
   type StorageProvider,
 } from '../common/storage/storage-provider.interface';
+import type { MascotDto } from './mascot.dto';
+import { PROFILE_LIMITS } from './profile.dto';
 
 export const ROLE = {
   USER: 0,
@@ -121,6 +124,23 @@ export function isSocialCdnUrl(url: string): boolean {
   );
 }
 
+/**
+ * profiles.mascot arrives with migrations/2026-10-20-profiles-mascot.sql. Until it is applied the column
+ * is missing (42703 on select, PGRST204 on update): answer 503 so the editor can say "not yet" instead
+ * of a generic failure.
+ */
+function mascotError(
+  error: { code?: string; message: string },
+  op: 'read' | 'save',
+): Error {
+  if (error.code === '42703' || error.code === 'PGRST204') {
+    return new ServiceUnavailableException(
+      'Mascots are not enabled on this server yet',
+    );
+  }
+  return new Error(`Failed to ${op} mascot: ${error.message}`);
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -185,6 +205,14 @@ export class UsersService {
     },
   ) {
     const now = new Date().toISOString();
+    // The token's name / picture are user-editable Supabase metadata: bounded like PATCH /users/me (#1025). A cut URL
+    // would be broken, so an over-long one is dropped.
+    const displayName =
+      data.displayName?.slice(0, PROFILE_LIMITS.displayName) ?? null;
+    const photoURL =
+      data.photoURL && data.photoURL.length <= PROFILE_LIMITS.photoURL
+        ? data.photoURL
+        : null;
 
     // Atomic create-if-missing (INSERT ... ON CONFLICT (uid) DO NOTHING). Removes the
     // read-then-write window that let concurrent logins race into a duplicate-key error.
@@ -193,8 +221,8 @@ export class UsersService {
       {
         uid,
         email: data.email ?? null,
-        display_name: data.displayName ?? null,
-        photo_url: data.photoURL ?? null,
+        display_name: displayName,
+        photo_url: photoURL,
         created_at: now,
         updated_at: now,
       },
@@ -215,18 +243,18 @@ export class UsersService {
 
     // Backfill display_name / photo_url only when still empty — never overwrite a value
     // the user already has. The `.is(col, null)` filter makes this a no-op otherwise.
-    if (data.displayName) {
+    if (displayName) {
       const { error } = await this.db
         .from('profiles')
-        .update({ display_name: data.displayName })
+        .update({ display_name: displayName })
         .eq('uid', uid)
         .is('display_name', null);
       if (error) {
         throw new Error(`Failed to backfill display name: ${error.message}`);
       }
     }
-    if (data.photoURL) {
-      if (isSocialCdnUrl(data.photoURL)) {
+    if (photoURL) {
+      if (isSocialCdnUrl(photoURL)) {
         // Social CDN URLs (Google lh3, Facebook fbcdn) carry signed tokens that
         // expire. Refresh on every login — but only when the stored URL is also
         // social CDN or null; never overwrite a custom uploaded avatar.
@@ -242,7 +270,7 @@ export class UsersService {
         if (currentUrl === null || isSocialCdnUrl(currentUrl)) {
           const { error } = await this.db
             .from('profiles')
-            .update({ photo_url: data.photoURL })
+            .update({ photo_url: photoURL })
             .eq('uid', uid);
           if (error) {
             throw new Error(`Failed to refresh photo URL: ${error.message}`);
@@ -252,7 +280,7 @@ export class UsersService {
         // Non-social URL (uploaded avatar): original behavior — only write when null.
         const { error } = await this.db
           .from('profiles')
-          .update({ photo_url: data.photoURL })
+          .update({ photo_url: photoURL })
           .eq('uid', uid)
           .is('photo_url', null);
         if (error) {
@@ -283,6 +311,26 @@ export class UsersService {
       throw new Error(`Failed to update user profile: ${error.message}`);
     }
     this.logger.log(`Updated profile for user: ${uid}`);
+  }
+
+  /** The caller's mascot config (Epic D), or null when they never dressed one. */
+  async getMascot(uid: string): Promise<MascotDto | null> {
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('mascot')
+      .eq('uid', uid)
+      .maybeSingle<{ mascot: MascotDto | null }>();
+    if (error) throw mascotError(error, 'read');
+    return data?.mascot ?? null;
+  }
+
+  /** Saves an already-validated mascot (MascotDto, allow-listed) on the caller's own row. */
+  async setMascot(uid: string, mascot: MascotDto): Promise<void> {
+    const { error } = await this.db
+      .from('profiles')
+      .update({ mascot, updated_at: new Date().toISOString() })
+      .eq('uid', uid);
+    if (error) throw mascotError(error, 'save');
   }
 
   async getProfile(uid: string): Promise<UserProfile> {
@@ -664,7 +712,12 @@ export class UsersService {
   async deleteUserAccount(uid: string): Promise<void> {
     // Child tables are independent of each other — delete them in parallel.
     // They FK-reference profiles(uid), so the parent row must be deleted AFTER them.
-    const tables = ['user_favorites', 'user_liked', 'user_history', 'series_follows'];
+    const tables = [
+      'user_favorites',
+      'user_liked',
+      'user_history',
+      'series_follows',
+    ];
     const results = await Promise.all(
       tables.map((table) => this.db.from(table).delete().eq('uid', uid)),
     );

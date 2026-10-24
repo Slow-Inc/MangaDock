@@ -105,6 +105,20 @@ export async function getMyVersions(token: string): Promise<ChapterVersion[]> {
   });
 }
 
+/** Backend GET /studio/stats (Epic C #787): the caller's own unlocks, revenue, earnings and uploads per UTC day. */
+export type StudioDayStat = { date: string; unlocks: number; revenue: number; earnings: number; uploads: number };
+export type StudioStats = {
+  days: StudioDayStat[];
+  titles: { titleId: string; titleName: string; unlocks: number; revenue: number }[];
+  totals: { unlocks: number; revenue: number; earnings: number; uploads: number };
+};
+
+export async function getStudioStats(token: string, days: number): Promise<StudioStats> {
+  return apiFetch<StudioStats>(`/studio/stats?days=${encodeURIComponent(String(days))}`, {
+    headers: createAuthHeaders(token),
+  });
+}
+
 export async function getVersion(token: string, versionId: string): Promise<ChapterVersion> {
   return apiFetch<ChapterVersion>(`/versions/${encodeURIComponent(versionId)}`, {
     headers: createAuthHeaders(token),

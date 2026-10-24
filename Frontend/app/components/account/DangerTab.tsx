@@ -5,6 +5,8 @@ import { errMessage } from "@/lib/errMessage";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import type { FormState, FormAction } from "./formReducer";
+import Loader from "../ui/Loader";
+import { PRIMARY_FILL } from "../ui/Button";
 
 interface DangerTabProps {
   formState: FormState;
@@ -98,7 +100,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
         message: (
           <>
             ลบบัญชีสำเร็จแล้ว —{" "}
-            <span className="font-semibold text-white">ขอบคุณที่ใช้บริการ MangaDock</span>
+            <span className="font-semibold text-ink">ขอบคุณที่ใช้บริการ MangaDock</span>
           </>
         ),
         duration: 5000,
@@ -111,29 +113,29 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
   };
 
   return (
-    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 space-y-4">
+    <div className="rounded-2xl border border-danger/40 bg-danger/5 p-5 space-y-4">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/20">
-          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10">
+          <svg className="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86l-8.17 14.17A1 1 0 003 19.5h18a1 1 0 00.88-1.47L13.71 3.86a2 2 0 00-3.52.14z" />
           </svg>
         </div>
         <div>
-          <p className="text-sm font-semibold text-red-300">ลบบัญชีถาวร</p>
-          <p className="text-xs text-white/50 mt-0.5">ข้อมูลทั้งหมดจะถูกลบอย่างถาวร ไม่สามารถย้อนกลับได้</p>
+          <p className="text-sm font-semibold text-danger">ลบบัญชีถาวร</p>
+          <p className="text-xs text-ink-2 mt-0.5">ข้อมูลทั้งหมดจะถูกลบอย่างถาวร ไม่สามารถย้อนกลับได้</p>
         </div>
       </div>
 
-      <ul className="space-y-1.5 text-xs text-white/40 pl-1">
-        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-white/30" />ประวัติการอ่านทั้งหมด</li>
-        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-white/30" />รายการโปรดทั้งหมด</li>
-        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-white/30" />รูปโปรไฟล์ที่อัปโหลดทั้งหมด</li>
-        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-white/30" />บัญชีผู้ใช้และข้อมูลทั้งหมด</li>
+      <ul className="space-y-1.5 text-xs text-ink-3 pl-1">
+        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-ink-3" />ประวัติการอ่านทั้งหมด</li>
+        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-ink-3" />รายการโปรดทั้งหมด</li>
+        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-ink-3" />รูปโปรไฟล์ที่อัปโหลดทั้งหมด</li>
+        <li className="flex items-center gap-2"><span className="h-1 w-1 shrink-0 rounded-full bg-ink-3" />บัญชีผู้ใช้และข้อมูลทั้งหมด</li>
       </ul>
 
       {errorMessage && (
-        <div className="rounded-xl bg-red-500/20 border border-red-500/30 px-4 py-2.5 text-sm text-red-300">
+        <div className="rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
           {errorMessage}
         </div>
       )}
@@ -141,7 +143,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
       {deleteStep === "idle" && (
         <button
           onClick={() => { dispatch({ type: "CLEAR" }); setDeleteStep("reauth"); }}
-          className="w-full rounded-xl border border-red-500/40 bg-red-500/10 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 active:scale-95"
+          className="w-full rounded-xl border border-danger/40 bg-danger/10 py-2.5 text-sm font-semibold text-danger transition hover:bg-danger/20 active:scale-95"
         >
           ลบบัญชีของฉัน
         </button>
@@ -149,29 +151,26 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
 
       {deleteStep === "reauth" && (
         <div className="space-y-3">
-          <p className="text-xs font-medium text-yellow-300/80">เพื่อความปลอดภัย กรุณายืนยันตัวตนด้วยวิธีที่คุณเชื่อมต่อไว้</p>
+          <p className="text-xs font-medium text-accent">เพื่อความปลอดภัย กรุณายืนยันตัวตนด้วยวิธีที่คุณเชื่อมต่อไว้</p>
           {hasPasswordProvider && (
             <div className="space-y-2">
-              <input
+              <input aria-label="รหัสผ่านของคุณ"
                 type="password"
                 value={reauthPassword}
                 onChange={(e) => setReauthPassword(e.target.value)}
                 placeholder="รหัสผ่านของคุณ"
                 autoFocus
-                className="w-full rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/30"
+                className="w-full rounded-xl border border-accent/40 bg-accent/5 px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/40"
                 onKeyDown={(e) => { if (e.key === "Enter" && reauthPassword) handlePasswordReauthForDelete(); }}
               />
               <button
                 onClick={handlePasswordReauthForDelete}
                 disabled={!reauthPassword || !!reauthenticating}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-yellow-600 py-2.5 text-sm font-semibold text-white transition hover:bg-yellow-500 active:scale-95 disabled:opacity-50"
+                className={`w-full flex items-center justify-center gap-2 rounded-xl ${PRIMARY_FILL} py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50`}
               >
                 {reauthenticating === "password" ? (
                   <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                    </svg>
+                    <Loader context="inline" className="text-current!" />
                     กำลังยืนยัน…
                   </>
                 ) : "ยืนยันด้วยรหัสผ่าน"}
@@ -180,22 +179,19 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
           )}
           {hasPasswordProvider && (hasGoogleProvider || hasFacebookProvider) && (
             <div className="flex items-center gap-2">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="text-[10px] text-white/30">หรือ</span>
-              <span className="h-px flex-1 bg-white/10" />
+              <span className="h-px flex-1 bg-line" />
+              <span className="text-[10px] text-ink-3">หรือ</span>
+              <span className="h-px flex-1 bg-line" />
             </div>
           )}
           {hasGoogleProvider && (
             <button
               onClick={handleDeleteReauthGoogle}
               disabled={!!reauthenticating}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 active:scale-95 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-line bg-fill py-2.5 text-sm font-semibold text-ink transition hover:bg-raised active:scale-95 disabled:opacity-50"
             >
               {reauthenticating === "google" ? (
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                </svg>
+                <Loader context="inline" />
               ) : (
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -211,13 +207,10 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
             <button
               onClick={handleDeleteReauthFacebook}
               disabled={!!reauthenticating}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#1877F2]/30 bg-[#1877F2]/10 py-2.5 text-sm font-semibold text-[#74a9f5] transition hover:bg-[#1877F2]/20 active:scale-95 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-line bg-fill py-2.5 text-sm font-semibold text-ink transition hover:bg-raised active:scale-95 disabled:opacity-50"
             >
               {reauthenticating === "facebook" ? (
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                </svg>
+                <Loader context="inline" />
               ) : (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -229,7 +222,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
           <button
             onClick={() => { setDeleteStep("idle"); setReauthPassword(""); dispatch({ type: "CLEAR" }); }}
             disabled={!!reauthenticating}
-            className="w-full rounded-xl border border-white/15 py-2 text-xs font-medium text-white/40 transition hover:bg-white/5 hover:text-white/60 active:scale-95"
+            className="w-full rounded-xl border border-line py-2 text-xs font-medium text-ink-3 transition hover:bg-fill hover:text-ink-2 active:scale-95"
           >
             ยกเลิก
           </button>
@@ -238,15 +231,15 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
 
       {deleteStep === "confirm" && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 space-y-1">
-            <p className="text-xs font-semibold text-red-300">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
-            <p className="text-[11px] text-white/40">ข้อมูล รูปโปรไฟล์ ประวัติการอ่าน และรายการโปรดทั้งหมดจะหายไปตลอดกาล</p>
+          <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 space-y-1">
+            <p className="text-xs font-semibold text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+            <p className="text-[11px] text-ink-3">ข้อมูล รูปโปรไฟล์ ประวัติการอ่าน และรายการโปรดทั้งหมดจะหายไปตลอดกาล</p>
           </div>
           <div className="space-y-1.5">
-            <p className="text-[11px] text-white/50">
-              พิมพ์ <span className="font-mono font-semibold text-red-300">ลบบัญชี</span> เพื่อยืนยัน
+            <p className="text-[11px] text-ink-2">
+              พิมพ์ <span className="font-mono font-semibold text-danger">ลบบัญชี</span> เพื่อยืนยัน
             </p>
-            <input
+            <input aria-label="พิมพ์ ลบบัญชี เพื่อยืนยัน"
               type="text"
               value={deleteConfirmText}
               onChange={(e) => { setDeleteConfirmText(e.target.value); dispatch({ type: "CLEAR" }); }}
@@ -254,7 +247,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              className="w-full rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none font-mono transition focus:border-red-400/60 focus:ring-1 focus:ring-red-400/30"
+              className="w-full rounded-xl border border-danger/40 bg-danger/5 px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none font-mono transition focus:border-danger focus:ring-1 focus:ring-danger/40"
               onKeyDown={(e) => { if (e.key === "Enter" && deleteConfirmText === "ลบบัญชี") handleDeleteAccount(); }}
             />
           </div>
@@ -262,14 +255,14 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
             <button
               onClick={handleDeleteAccount}
               disabled={deleteConfirmText !== "ลบบัญชี" || loading}
-              className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex-1 rounded-xl bg-danger py-2.5 text-sm font-semibold text-bg transition hover:bg-danger/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
             >
               {loading ? "กำลังลบ..." : "ลบบัญชีนี้"}
             </button>
             <button
               onClick={() => { setDeleteStep("idle"); setDeleteConfirmText(""); dispatch({ type: "CLEAR" }); }}
               disabled={loading}
-              className="flex-1 rounded-xl border border-white/15 py-2.5 text-sm font-semibold text-white/60 transition hover:bg-white/5 hover:text-white/80 active:scale-95"
+              className="flex-1 rounded-xl border border-line py-2.5 text-sm font-semibold text-ink-2 transition hover:bg-fill hover:text-ink active:scale-95"
             >
               ยกเลิก
             </button>
