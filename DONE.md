@@ -1,5 +1,12 @@
 <!-- lang:en -->
 
+## Native Phase 5 follow-up — 2026-10-24
+
+- Continued the pushed Phase 5 head `a790711` in `C:/Users/woral/md-phase5-mobile`. Added Native Collections CRUD/search/items/private-public/share, personal Following/ranked feeds, UUID collection routes, destination-preserving login and account/cancellation isolation. Existing post/spoiler component and six tabs retained. No new runtime dependency, Backend contract, remote migration/deployment or push configuration.
+- Baseline Mobile254; updated suite268/268 and types pass. New real HTTP/Nest/PostgreSQL integration passes; existing Backend Phase5 integration18/18 passes. Final ARM64+x86_64 assembleRelease/vital analysis pass (320 tasks/18s); bundle836 modules/assets11; v2 signature verifies. QA APK SHA256 `16FD5BF20CABCEA38E6D7335558487D461BB9E4BDD429EEF21528FCDF0ED8ABE`. Evidence, commands and visual/live acceptance limits: [delivery record](Mobile/docs/2026-10-24-native-retention.md). User requested a local commit of source/tests/docs; APK and raw QA logs are excluded. No physical install, push or merge performed.
+- Automatic approval review rejected the isolated Metro launch with `blocked by policy` and no detailed reason; no equivalent workaround was used. Native visual/device acceptance remains open. Local settings still lack EAS/Firebase configuration; rollout remains disabled.
+- ภาษาไทย: เพิ่มหน้าจอ Collections/Feed แบบ native พร้อม deep link กลับหลังล็อกอินและแยกข้อมูลบัญชี ใช้ API เดิม tests268/types และ HTTP/Nest/SQL ผ่าน BackendPhase5เดิม18ผ่าน ยังไม่รับรองภาพ/เครื่องจริงใหม่เพราะคำสั่ง Metro QA ถูก policy ปฏิเสธ ผู้ใช้สั่ง commit source/tests/docs ในเครื่อง ไม่รวม APK/raw QA logs คง push ปิด ไม่ migrate/deploy/push/merge ดูรายงานเพื่อรับงานต่อ
+
 ## Phase 5 physical Z Flip4 QA — 2026-10-24
 
 - Started the full branch Backend on 4001 with existing configuration, left it and Metro running, and verified physical phone connectivity through ADB reverse. Installed the Phase 5 debug APK without clearing app data; previous APK backed up and signature matched. Native home/account and session restoration observed.

@@ -1,6 +1,8 @@
 <!-- lang:en -->
 
 Phase 5 development: see the [implementation, local acceptance and release gates](docs/reports/phase5-2026-10-24/README.md). Run `npm run test:phase5` from `Backend/` for isolated database/HTTP/worker integration. Web routes: `/feed`, `/collections`, `/collections/:id`. Source is implemented; production migrations and real push acceptance remain pending.
+
+Native Phase 5 follow-up: [Collections, personal feeds and installed-app deep links](Mobile/docs/2026-10-24-native-retention.md). After building Backend, run `node scripts/phase5-native-integration.cjs` from the root to verify the Mobile session/controller against isolated real HTTP/Nest/SQL. `node scripts/phase5-native-preview.cjs` starts the optional loopback-only QA service with synthetic Auth/catalog; it never uses production credentials. ภาษาไทย: เพิ่ม Collections/Feed แบบ native และ deep link แล้ว ใช้คำสั่งข้างต้นตรวจ session/controller กับ HTTP/Nest/SQL ใน QA แยก ยังรอภาพและบริการจริง รายละเอียดตามรายงาน
 # MangaDock
 
 MangaDock is split into 3 main parts:

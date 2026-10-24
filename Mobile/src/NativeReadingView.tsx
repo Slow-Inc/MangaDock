@@ -60,16 +60,23 @@ import { NativeCommunityView } from "./NativeCommunityView.tsx";
 import { NativeStudioView } from "./NativeStudioView.tsx";
 import { NativeStaffView } from "./NativeStaffView.tsx";
 import type { NotificationDestination } from "./notification-links.ts";
+import { createRetention } from "./retention.ts";
+import {
+  NativeCollectionsView,
+  NativePersonalFeedView,
+} from "./NativeRetentionView.tsx";
 
 export function NativeReadingView({
   runtime,
   onAccount,
+  onAccountDestination,
   accountLabel,
   initialDestination,
   onDestinationHandled,
 }: {
   runtime: MobileRuntime;
   onAccount(): void;
+  onAccountDestination?(destination: NotificationDestination): void;
   accountLabel: string;
   initialDestination?: NotificationDestination | null;
   onDestinationHandled?(): void;
@@ -105,6 +112,23 @@ export function NativeReadingView({
   const [showWallet, setShowWallet] = useState(false);
   const [showStudio, setShowStudio] = useState(false);
   const [showStaff, setShowStaff] = useState(false);
+  const [retention] = useState(() => createRetention(runtime));
+  const [retentionScreen, setRetentionScreen] = useState<
+    "collections" | "feed" | null
+  >(null);
+  function retentionAccount() {
+    const id = retention.snapshot().id;
+    const next: NotificationDestination | undefined =
+      retentionScreen === "collections"
+        ? id
+          ? { kind: "collection", id }
+          : { kind: "collections" }
+        : retentionScreen === "feed"
+          ? { kind: "feed" }
+          : undefined;
+    if (next && onAccountDestination) onAccountDestination(next);
+    else onAccount();
+  }
   const [discovery] = useState(() => createDiscovery(runtime));
   const [tabs] = useState(createNativeNavigation);
   const [personal] = useState(() => createPersonal(runtime));
@@ -134,6 +158,7 @@ export function NativeReadingView({
     profiles.activate();
     activity.activate();
     community.activate();
+    retention.activate();
     void personal.load("history");
     return () => {
       personal.dispose();
@@ -141,8 +166,9 @@ export function NativeReadingView({
       profiles.dispose();
       activity.dispose();
       community.dispose();
+      retention.dispose();
     };
-  }, [personal, community, social, profiles, activity]);
+  }, [personal, community, social, profiles, activity, retention]);
   useEffect(() => {
     if (runtime.session.snapshot().status !== "signedIn") return;
     const refresh = () => {
@@ -178,6 +204,7 @@ export function NativeReadingView({
   }
   function selectTab(next: NativeTab) {
     navigation.current++;
+    setRetentionScreen(null);
     catalog.closeBook();
     reader.close();
     setError(null);
@@ -288,7 +315,10 @@ export function NativeReadingView({
     if (wasClosed) {
       if (library.book) catalog.backBook();
       else if (tab === "community" && community.back()) return;
-      else tabs.back();
+      else if (retentionScreen) {
+        if (retentionScreen === "collections" && retention.back()) return;
+        setRetentionScreen(null);
+      } else tabs.back();
     }
   }
   useEffect(() => {
@@ -325,6 +355,10 @@ export function NativeReadingView({
   }, [wallet]);
   useEffect(() => {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (retentionScreen && !showWallet && !showStudio && !showStaff) {
+        back();
+        return true;
+      }
       if (
         !showWallet &&
         !showStudio &&
@@ -347,6 +381,7 @@ export function NativeReadingView({
     showStaff,
     tab,
     forum.postId,
+    retentionScreen,
   ]);
   useEffect(
     () => () => {
@@ -393,6 +428,7 @@ export function NativeReadingView({
     catalog.closeBook();
     setActivityScreen(null);
     setError(null);
+    setRetentionScreen(null);
     if (destination.kind === "post") {
       selectTab("community");
       void community.open(destination.id);
@@ -403,6 +439,20 @@ export function NativeReadingView({
     else if (destination.kind === "forumManga") {
       selectTab("community");
       void community.load({ mangaId: destination.id, sort: "new" });
+    } else if (
+      destination.kind === "collection" ||
+      destination.kind === "collections"
+    ) {
+      tabs.select("library");
+      community.back();
+      setRetentionScreen("collections");
+      if (destination.kind === "collection")
+        void retention.open(destination.id);
+      else retention.back();
+    } else if (destination.kind === "feed") {
+      tabs.select("community");
+      community.back();
+      setRetentionScreen("feed");
     } else if (destination.kind === "home") selectTab("home");
     else if (destination.kind === "account") onAccount();
     else if (destination.kind === "wallet" && wallet) setShowWallet(true);
@@ -497,7 +547,10 @@ export function NativeReadingView({
     <View style={styles.root}>
       <NativeTopBar
         onBack={
-          library.book || reading.status !== "closed" || tab !== "home"
+          library.book ||
+          reading.status !== "closed" ||
+          tab !== "home" ||
+          retentionScreen
             ? back
             : undefined
         }
@@ -505,7 +558,7 @@ export function NativeReadingView({
           navigation.current++;
           persistProgress();
           reader.close();
-          onAccount();
+          retentionAccount();
         }}
         accountLabel={accountLabel}
         onNotifications={
@@ -718,6 +771,25 @@ export function NativeReadingView({
             onBook={(id) => void run(() => catalog.openBook(id))}
           />
         </ScrollView>
+      ) : retentionScreen === "collections" ? (
+        <NativeCollectionsView
+          retention={retention}
+          runtime={runtime}
+          onAccount={retentionAccount}
+          onBook={(id) => void run(() => catalog.openBook(id))}
+        />
+      ) : retentionScreen === "feed" && !forum.postId ? (
+        <NativePersonalFeedView
+          retention={retention}
+          runtime={runtime}
+          onAccount={retentionAccount}
+          onPost={(id) => {
+            tabs.select("community");
+            void community.open(id);
+          }}
+          onManga={(id) => void run(() => catalog.openBook(id))}
+          onProfile={(id) => void profiles.open(id)}
+        />
       ) : tab === "home" || tab === "new" || tab === "categories" ? (
         <NativeDiscoveryView
           discovery={discovery}
@@ -753,6 +825,7 @@ export function NativeReadingView({
           onBook={(id) => void run(() => catalog.openBook(id))}
           onAccount={onAccount}
           onContinue={continueReading}
+          onCollections={() => setRetentionScreen("collections")}
         />
       ) : tab === "community" ? (
         <NativeCommunityView
@@ -762,6 +835,7 @@ export function NativeReadingView({
           apiOrigin={runtime.apiOrigin}
           onManga={(id) => void run(() => catalog.openBook(id))}
           onProfile={(uid) => void profiles.open(uid)}
+          onPersonalFeed={() => setRetentionScreen("feed")}
         />
       ) : (
         <View style={styles.root}>

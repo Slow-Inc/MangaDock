@@ -34,12 +34,14 @@ export function NativeLibraryView({
   onBook,
   onAccount,
   onContinue,
+  onCollections,
 }: {
   personal: ReturnType<typeof createPersonal>;
   apiOrigin: string;
   onBook(id: string): void;
   onAccount(): void;
   onContinue(item: HistoryBook): void;
+  onCollections?(): void;
 }) {
   const state = useSyncExternalStore(personal.subscribe, personal.snapshot);
   const { width } = useWindowDimensions();
@@ -140,6 +142,15 @@ export function NativeLibraryView({
       ListHeaderComponent={
         <View style={{ gap: 16 }}>
           <Text style={styles.title}>รายการของฉัน</Text>
+          {onCollections && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onCollections}
+              style={[styles.chip, { minHeight: 48, justifyContent: "center" }]}
+            >
+              <Text style={styles.caption}>คอลเลกชันของฉัน</Text>
+            </Pressable>
+          )}
           {!state.loginRequired && state.tab === "history" && (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               <Pressable

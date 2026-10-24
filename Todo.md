@@ -73,7 +73,8 @@
 - [X]  [Mobile source] Android Expo Push opt-in, token lifecycle and existing native destination routing (2026-10-23; rollout disabled)
 - [X]  [Backend source] Implement the [push-device API and delivery pipeline](docs/reports/phase5-2026-10-24/README.md): durable outbox, independent Redis queue, leases/retries/receipts (local integration tests)
 - [ ]  [Release] Verify real schema, apply migrations and deploy; validate real Redis/provider throughput and outbox housekeeping
-- [ ]  [Native follow-up] Native feed/collection screens and collection deep links; Web URL sharing already works
+- [X]  [Native source] Feed/collection screens, installed-app collection deep links and login return ([verification](Mobile/docs/2026-10-24-native-retention.md)); physical visual/live-service acceptance remains open
+- [ ]  [Native QA] Verify new retention screens, share/cancel, font/keyboard and cold/warm links on devices
 - [X]  [Device QA] Physical Z Flip4 Chrome: 8 Web groups passed with isolated QA data; Native install/home/account restoration passed ([evidence](docs/reports/phase5-zflip4-2026-10-24/README.md))
 - [ ]  [Operational QA] Distinguish real Redis connectivity and missing migrations from misleading status/offline errors
 - [ ]  [Mobile QA] EAS/Firebase setup, enabled native build and physical remote-push acceptance
@@ -154,7 +155,8 @@
 - [X]  [Mobile source] เปิด/ปิด Expo Push บน Android จัดการ token และเปิดหน้า Native เดิม (2026-10-23; ยังปิด rollout)
 - [X]  [Backend source] ทำ [API ลงทะเบียนและท่อส่ง Push](docs/reports/phase5-2026-10-24/README.md) มี durable outbox, Redis queue แยก, lease/retry/receipt (ผ่าน integration ภายในเครื่อง)
 - [ ]  [Release] ตรวจ schema จริง ลง migration และ deploy รับผล Redis/provider throughput จริงและจัด housekeeping outbox
-- [ ]  [Native งานต่อ] หน้าจอ Feed/คอลเลกชันและ collection deep link; แชร์ URL เปิดเว็บได้แล้ว
+- [X]  [Native source] หน้าจอ Feed/คอลเลกชัน deep link เปิดในแอปและกลับหลังล็อกอิน ([หลักฐาน](Mobile/docs/2026-10-24-native-retention.md)); ยังไม่รับรองภาพ/บริการจริง
+- [ ]  [Native QA] ตรวจหน้าจอใหม่ share/cancel ฟอนต์/keyboard และ cold/warm links บนอุปกรณ์
 - [X]  [Device QA] Chrome บน Z Flip4 จริงผ่านเว็บ 8 กลุ่มด้วยข้อมูล QA แยก ติดตั้ง/เปิด Native และกู้ session บัญชีผ่าน ([หลักฐาน](docs/reports/phase5-zflip4-2026-10-24/README.md))
 - [ ]  [Operational QA] แยกสถานะ Redis จริงและ migration ที่ยังขาดจากข้อความ status/offline ที่รายงานคลาดเคลื่อน
 - [ ]  [Mobile QA] ตั้ง EAS/Firebase สร้าง Native build ที่เปิดฟีเจอร์ และรับผล remote push บนเครื่องจริง

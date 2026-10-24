@@ -44,7 +44,7 @@ function Chip({
     </Pressable>
   );
 }
-function Post({
+export function NativeFeedPost({
   post,
   apiOrigin,
   detail,
@@ -128,9 +128,11 @@ export function NativeCommunityView({
   onProfile,
   runtime,
   onAccount,
+  onPersonalFeed,
 }: {
   runtime: MobileRuntime;
   onAccount(): void;
+  onPersonalFeed?(): void;
   community: ReturnType<typeof createCommunity>;
   apiOrigin: string;
   onManga(id: string): void;
@@ -249,6 +251,9 @@ export function NativeCommunityView({
               </View>
             )}
             <Text style={styles.pageTitle}>คอมมูนิตี้</Text>
+            {onPersonalFeed && (
+              <Chip label="ฟีดของฉัน" onPress={onPersonalFeed} />
+            )}
             <View style={styles.meta}>
               <Chip
                 label="ใหม่ล่าสุด"
@@ -329,7 +334,7 @@ export function NativeCommunityView({
           ) : null
         }
         renderItem={({ item }) => (
-          <Post
+          <NativeFeedPost
             post={item}
             apiOrigin={apiOrigin}
             onOpen={() => void community.open(item.id)}

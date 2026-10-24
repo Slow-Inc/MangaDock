@@ -157,6 +157,11 @@ export function NativeSessionView({ runtime }: { runtime: MobileRuntime }) {
           setGuest(false);
           setShowAccount(true);
         }}
+        onAccountDestination={(next) => {
+          setDestination(next);
+          setGuest(false);
+          setShowAccount(true);
+        }}
       />
     );
   if (state.status === "signedIn")

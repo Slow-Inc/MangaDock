@@ -13,6 +13,11 @@ export const native = {
     assets: [] as Array<{ uri: string; mimeType: string; fileName: string }>,
   },
   files: new Map<string, Blob>(),
+  shares: [] as Array<{ title?: string; message: string }>,
+  alerts: [] as Array<{
+    title: string;
+    buttons: Array<{ text: string; onPress?(): void }>;
+  }>,
   scrolls: [] as Array<{ index?: number; offset?: number }>,
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
   pressBack() {
@@ -31,11 +36,12 @@ const mocks: Record<string, string> = {
     export const View='View', Text='Text', TextInput='TextInput', Pressable='Pressable', ScrollView='ScrollView', Modal='Modal', ActivityIndicator='ActivityIndicator', KeyboardAvoidingView='KeyboardAvoidingView';
     export const Platform={OS:'android'}, StyleSheet={create:x=>x,absoluteFillObject:{}};
     export const Linking={openSettings:async()=>{}};
-    export const Alert={alert(){}}, AppState={currentState:'active',addEventListener:()=>({remove(){}})};
+    export const Alert={alert(title,message,buttons){os.alerts.push({title,buttons:buttons??[]})}}, AppState={currentState:'active',addEventListener:()=>({remove(){}})};
+    export const Share={share:async value=>{os.shares.push(value);return {action:'sharedAction'}}};
     export const BackHandler={addEventListener:(name,fn)=>{os.back.push(fn);return {remove(){const i=os.back.indexOf(fn);if(i>=0)os.back.splice(i,1);}}}};
     export const Image=Object.assign((props)=>React.createElement('Image',props),{getSize:(uri,done)=>done(100,140),prefetch:async()=>true,abortPrefetch(){}});
     export const PanResponder={create:handlers=>({panHandlers:handlers})}, useWindowDimensions=()=>({width:390,height:844,scale:1,fontScale:1});
-    export const FlatList=React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({scrollToIndex(args){os.scrolls.push(args)},scrollToOffset(args){os.scrolls.push(args)}}));return React.createElement('FlatList',p,p.ListHeaderComponent,(p.data??[]).map((item,index)=>React.createElement(React.Fragment,{key:p.keyExtractor?.(item,index)??index},p.renderItem?.({item,index}))),p.ListFooterComponent);});`,
+    export const FlatList=React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({scrollToIndex(args){os.scrolls.push(args)},scrollToOffset(args){os.scrolls.push(args)}}));return React.createElement('FlatList',p,p.ListHeaderComponent,p.data?.length?(p.data??[]).map((item,index)=>React.createElement(React.Fragment,{key:p.keyExtractor?.(item,index)??index},p.renderItem?.({item,index}))):p.ListEmptyComponent,p.ListFooterComponent);});`,
   "react-native-safe-area-context":
     "export const SafeAreaView='SafeAreaView'; export const useSafeAreaInsets=()=>globalThis.__mangaNativeBoundary.insets;",
   "@react-native-async-storage/async-storage":

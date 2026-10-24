@@ -1,6 +1,16 @@
 export type NotificationDestination =
   | { kind: "post" | "profile" | "book" | "forumManga"; id: string }
-  | { kind: "home" | "account" | "wallet" | "studio" | "staff" };
+  | { kind: "collection"; id: string }
+  | {
+      kind:
+        | "home"
+        | "account"
+        | "wallet"
+        | "studio"
+        | "staff"
+        | "collections"
+        | "feed";
+    };
 export function notificationDestination(
   link: string | null,
 ): NotificationDestination | null {
@@ -35,7 +45,21 @@ export function notificationDestination(
   )
     return null;
   try {
+    if (
+      link
+        .split(/[?#]/)[0]
+        .split("/")
+        .some((part) => [".", ".."].includes(decodeURIComponent(part)))
+    )
+      return null;
     const path = new URL(link, "https://native.invalid").pathname;
+    if (path === "/feed" || path === "/feed/") return { kind: "feed" };
+    if (path === "/collections" || path === "/collections/")
+      return { kind: "collections" };
+    const collection = path.match(
+      /^\/collections\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i,
+    );
+    if (collection) return { kind: "collection", id: collection[1] };
     const match = path.match(
       /^\/(community\/p|community\/profile|community\/manga|book)\/([^/]+)(?:\/reviews)?\/?$/,
     );
@@ -52,7 +76,10 @@ export function notificationDestination(
         } as const
       )[
         match[1] as
-          "community/p" | "community/profile" | "community/manga" | "book"
+          | "community/p"
+          | "community/profile"
+          | "community/manga"
+          | "book"
       ];
       return { kind, id };
     }

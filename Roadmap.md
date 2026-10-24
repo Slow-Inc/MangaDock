@@ -32,7 +32,7 @@ Status is based on code in the default branch, dated engineering reports, and ou
 | **2: Scaling & Cloud** | **WIP** | Multi-node cache/leader/queue exist. Xendit and R2 integrations have code, but production rollout/payment acceptance, GPU cloud and full device-security goals are not confirmed complete. |
 | **3: Hybrid Mobile** | **COMPLETED (historical) / SUPERSEDED** | The WebView shell/bridge was the transitional solution. The current Mobile app uses native views; the hybrid is no longer the release target. |
 | **4: Fully Native Mobile** | **WIP (code integrated, release pending)** | Native screens and Reader are on main without an embedded WebView. Physical-device, live-service, signing and release acceptance are still open. |
-| **5: Retention & Community 2.0** | **NOT STARTED (dedicated Phase 5 scope)** | Existing follows and in-app notifications provide reusable foundations, not a personalized Following feed, shareable custom collections or OS push service. |
+| **5: Retention & Community 2.0** | **WIP (source implemented; live release pending)** | Phase 5 branch has Web/native feeds and collections plus gated push source. Native visual, live migration/provider/Redis and release acceptance remain open; see the dated 24 October follow-up below. |
 
 **Evidence:** [Native integration report](Mobile/docs/2026-10-22-main-integration.md), [Native status/acceptance audit](Mobile/docs/2026-10-16-native-status-audit.md), [test APK limitations](Mobile/docs/2026-10-20-test-apk.md), [cache leader](Backend/src/status/election.service.ts), [payment integration](Backend/src/wallet/xendit.service.ts), [R2 storage selection](Backend/src/common/storage/storage.module.ts), [user follows](Backend/src/user-follows/user-follows.service.ts), [in-app notifications](Backend/src/notifications/notifications.service.ts), and [Native release gate #753](https://github.com/Slow-Inc/MangaDock/issues/753).
 
@@ -123,6 +123,8 @@ Status is based on code in the default branch, dated engineering reports, and ou
 ### Phase 5: Retention Ecosystem & Community 2.0
 **Status:** WIP — Web feeds/collections and Backend push source locally verified on the Phase 5 branch; live migration, provider configuration and device acceptance remain pending
 
+**Native follow-up 2026-10-24:** [Native Collections, feeds, installed-app collection links and login return](Mobile/docs/2026-10-24-native-retention.md) are implemented and verified through React and real HTTP/Nest/SQL fixtures. Native visual/device and live-service acceptance remain open.
+
 **2026-10-24:** [Implementation, tests, screenshots and release gates](docs/reports/phase5-2026-10-24/README.md). Following and rule-ranked feeds, private/public collections and the durable server push contract/pipeline are implemented. Native/provider rollout remains disabled; this is not production acceptance.
 
 **Physical QA 2026-10-24:** [Z Flip4 evidence and current blockers](docs/reports/phase5-zflip4-2026-10-24/README.md): Web flows passed on the phone with isolated QA data; Native startup/account restoration passed. The configured live database still lacks the migrations, and real push/provider/Redis acceptance remains pending.
@@ -190,7 +192,7 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 | **2: Scaling & Cloud** | **WIP** | Multi-node Cache/Leader/Queue มีโค้ดแล้ว มี Xendit และ R2 Integration แต่ยังไม่ยืนยัน Production Rollout/Payment จริง, GPU Cloud และ Device Security ครบ |
 | **3: Hybrid Mobile** | **COMPLETED (เดิม) / SUPERSEDED** | WebView Shell/Bridge เป็นระบบช่วงเปลี่ยนผ่าน ปัจจุบันแอปใช้ Native Views แล้ว จึงไม่ใช่เป้าหมาย Release อีก |
 | **4: Fully Native Mobile** | **WIP (รวมโค้ดแล้ว; Release ยังไม่ผ่าน)** | Native UI/Reader อยู่ใน main ไม่ฝัง WebView แต่ยังต้องรับผลเครื่องจริง บริการจริง การเซ็น และ Release |
-| **5: Retention & Community 2.0** | **NOT STARTED (Scope Phase 5 ใหม่)** | มี Follow และ In-app Notifications เดิมเป็นฐาน แต่ยังไม่ได้ยืนยัน Personalized Following Feed, Custom Collections ที่แชร์ได้ และ OS Push |
+| **5: Retention & Community 2.0** | **WIP (มี source; รอรับผลใช้งานจริง)** | Branch Phase 5 มี Feed/Collections เว็บและ native พร้อม push source ที่ยังปิด rollout รอภาพ native, migration/provider/Redis และ release ดูรายงานวันที่ 24 ต.ค. |
 
 **หลักฐาน:** [รายงาน Native Integration](Mobile/docs/2026-10-22-main-integration.md), [Native Status/Acceptance](Mobile/docs/2026-10-16-native-status-audit.md), [ข้อจำกัด Test APK](Mobile/docs/2026-10-20-test-apk.md), [Cache Leader](Backend/src/status/election.service.ts), [Payment Integration](Backend/src/wallet/xendit.service.ts), [R2 Storage](Backend/src/common/storage/storage.module.ts), [User Follows](Backend/src/user-follows/user-follows.service.ts), [In-app Notifications](Backend/src/notifications/notifications.service.ts) และ [Native Release Gate #753](https://github.com/Slow-Inc/MangaDock/issues/753)
 
@@ -281,6 +283,8 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 
 ### Phase 5: Retention Ecosystem & Community 2.0
 **สถานะ:** WIP — ทำและตรวจ Feed/คอลเลกชันเว็บกับ source ท่อส่ง Backend Push บน branch Phase 5 แล้ว ยังรอ migration จริง ตั้งค่า provider และรับผลบนอุปกรณ์
+
+**Native ต่อเนื่อง 2026-10-24:** เพิ่ม [Collections, Feed, collection deep link เปิดในแอปและกลับหลังล็อกอิน](Mobile/docs/2026-10-24-native-retention.md) แล้ว ผ่าน React และ HTTP/Nest/SQL ใน QA แยก ยังรอภาพ/อุปกรณ์และบริการจริง
 
 **2026-10-24:** [รายละเอียดการพัฒนา ผลทดสอบ ภาพหน้าจอ และเกณฑ์ก่อนเปิดใช้](docs/reports/phase5-2026-10-24/README.md) มี Following/Personalized Feed, คอลเลกชันส่วนตัว/สาธารณะ และสัญญา/ท่อส่ง Push แบบ durable แล้ว ยังปิด rollout และไม่อ้างตรวจรับ production
 

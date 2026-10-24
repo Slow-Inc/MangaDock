@@ -32,6 +32,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [029](029-frontend-strata-design-system-and-mascots.md) | Frontend design system: Strata tokens, dark default + 3 modes, no purple, one loader family, bot-avatars mascots as profile identity, on-demand ECharts in Studio | Frontend | Accepted — **implementing** (#764) |
 | [032](032-mobile-phase5-push-lifecycle.md) | Android Expo Push token lifecycle, recipient-scoped native routing and disabled rollout | Mobile | Accepted for Mobile slice; Backend/provider acceptance pending |
 | [033](033-phase5-retention-and-push-delivery.md) | Following/ranked feeds, private/public reading collections and durable multi-node Expo dispatch | Backend · Web | Source implemented; live migration/provider/device acceptance pending |
+| [034](034-native-retention-surfaces-and-links.md) | Native Collections/personal feeds, account isolation, installed-app links and login return | Mobile | Source implemented; visual/live acceptance pending |
 
 ## Conventions
 

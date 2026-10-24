@@ -1,5 +1,12 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-24 — Native Phase 5 retention follow-up
+
+- Added Mobile Collections CRUD/search/items/public-private/native share, personal feeds and validated collection links on the existing Phase 5 branch. Existing Backend contracts, six tabs, post/spoiler behavior and rollout settings are retained; no runtime dependency or production schema/provider change.
+- Identity-isolated controller channels bound fetch/body waits, reject stale results and block duplicate writes. Guest login returns to the intended retention screen. Verification: Mobile268/268, TypeScript, actual loopback HTTP/Nest/PostgreSQL fixture integration and existing BackendPhase5 18/18. Android dual-ABI assemble/vital analysis passed; final source rebuild recorded in the [delivery record](../../Mobile/docs/2026-10-24-native-retention.md).
+- Native visual/device acceptance remains open after automatic approval rejected the isolated Metro command (`blocked by policy`). EAS/Firebase settings are absent locally; enabled push/live migrations/Redis/housekeeping remain release work. The user requested a local source/tests/docs commit; APK/raw QA logs are excluded. No push, merge or deployment performed.
+- ภาษาไทย: เพิ่ม Collections/Feed/deep link แบบ native ใช้ API เดิม แยกข้อมูลบัญชีและคำขอเก่า tests268/types/HTTP-Nest-SQL และ BackendPhase5เดิม18ผ่าน build Androidผ่าน ยังไม่อ้างผลภาพ/อุปกรณ์ใหม่ คง rolloutปิด ไม่เปลี่ยนฐานข้อมูลหรือ provider จริง รายละเอียดและคำสั่งตามรายงาน
+
 ## 2026-10-24 — Physical Z Flip4 Phase 5 QA
 
 | Field | Record |
