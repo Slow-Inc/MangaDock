@@ -111,3 +111,12 @@ def test_trailing_malformed_markers_stripped_from_text():
     out = normalize_numbered_output(raw, 2)
     assert out[0] == 'เริ่มจากตัวเอก'
     assert out[1] == 'ถึงอิริส'                       # trailing "<|3| <|4| <|5|" stripped
+
+
+def test_contract_gap_detects_merged_and_split_blocks_997():
+    from manga_translator.translators.numbered_contract import contract_gap
+    assert contract_gap("<|1|>a <|2|>b <|3|>c", 3) is False
+    assert contract_gap("<|1|>a <|2|>b", 3) is True            # dropped line
+    assert contract_gap("<|1|>a <|2|>b <|3|>c <|4|>d", 3) is True   # split/extraneous block
+    assert contract_gap("<|1|>a <|2|>b <|2|>bb", 3) is True    # duplicate index, lost line
+    assert contract_gap("", 1) is False                         # single-query shortcut

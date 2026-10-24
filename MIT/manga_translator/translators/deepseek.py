@@ -86,7 +86,7 @@ class DeepseekTranslator(CommonGPTTranslator):
         if to_lang in self.chat_sample:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 self.chat_sample[to_lang][0],
                 'Assistant:',
@@ -97,7 +97,7 @@ class DeepseekTranslator(CommonGPTTranslator):
         else:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 prompt,
             ])

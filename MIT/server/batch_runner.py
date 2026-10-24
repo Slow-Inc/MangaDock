@@ -45,6 +45,77 @@ async def _translate_page(config_str: str, img_bytes: bytes, progress_meta: dict
     return await get_patch_ctx(DummyRequest(), page_conf, img_bytes, progress_meta=progress_meta)
 
 
+
+
+def _pipeline_enabled() -> bool:
+    """#905 opt-in: run the batch on one worker with the page phases overlapped."""
+    return str(os.environ.get('MIT_BATCH_PIPELINE', '') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _load_pipeline_deps():
+    """Deferred so this module stays ML-free unless the opt-in path is actually used."""
+    from PIL import Image
+
+    from manga_translator.config import parse_and_validate_config
+    from server.instance import executor_instances
+
+    return Image, parse_and_validate_config, executor_instances
+
+
+async def _run_batch_pipelined(index_list, images_data, config_str, taskId, callback_url, callback_secret,
+                               deps=None):
+    """#905: translate the whole batch on one worker, then deliver the per-page webhooks.
+
+    The worker runs MangaTranslator.translate_batch_pipelined, which keeps the translation order and the
+    #159 rolling context but overlaps each page's GPU phases with the neighbouring page's gateway wait.
+    Cancellation is honoured before the batch starts and before each delivered page (the worker cannot read
+    the server's cancel registry mid-batch, so a cancel that lands mid-batch drops the remaining deliveries).
+    """
+    Image, parse_config, executors = deps if deps is not None else _load_pipeline_deps()
+    from io import BytesIO
+
+    images = [Image.open(BytesIO(b)).convert('RGB') for b in images_data]
+    config = parse_config(config_str)
+
+    raw_results = None
+    error = None
+    executor = await executors.find_executor()
+    try:
+        raw_results = await executor.sent_batch_pipeline(images, config)
+    except Exception as exc:  # the whole batch failed: report it per page like the serial path
+        error = str(exc)
+    finally:
+        await executors.free_executor(executor)
+
+    for pos, page_idx in enumerate(index_list):
+        if is_cancelled(taskId):
+            print(f"[batch] task {taskId} cancelled - stopping before page {page_idx}")
+            break
+        if error is not None:
+            payload = {
+                "taskId": taskId,
+                "pageIndex": page_idx,
+                "imgWidth": 0,
+                "imgHeight": 0,
+                "patches": [],
+                "error": error,
+            }
+        else:
+            normalized = normalize_patch_result(raw_results[pos])
+            payload = {
+                "taskId": taskId,
+                "pageIndex": page_idx,
+                "imgWidth": normalized["img_width"],
+                "imgHeight": normalized["img_height"],
+                "patches": normalized["patches"],
+                "regions": normalized["regions"],
+                "error": None,
+            }
+        if is_cancelled(taskId):
+            print(f"[batch] task {taskId} cancelled - dropping page {page_idx} result")
+            break
+        await send_webhook(callback_url, callback_secret, payload)
+
 async def run_batch_with_callbacks(
     index_list: list[int],
     images_data: list[bytes],
@@ -75,6 +146,10 @@ async def run_batch_with_callbacks(
         max_chars=_env_int('MIT_CONTEXT_MAX_CHARS', 1500),
     )
     try:
+        if _pipeline_enabled():
+            await _run_batch_pipelined(index_list, images_data, config_str, taskId,
+                                       callback_url, callback_secret)
+            return
         for img_bytes, page_idx in zip(images_data, index_list):
             # Stop before starting a new page if the Batch Job was cancelled.
             if is_cancelled(taskId):

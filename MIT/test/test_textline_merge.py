@@ -1,6 +1,7 @@
 import os
 import cv2
 import pytest
+from types import SimpleNamespace
 from typing import List
 import numpy as np
 from manga_translator.textline_merge import dispatch as dispatch_merge
@@ -365,3 +366,69 @@ async def test_merge_image10():
     # print((await generate_combinations(lines, width, height))[0])
     expected_combinations = [[0, 9], [1, 6, 8, 11], [2], [3, 4], [5, 7, 10], [12, 13]]
     await run_test(lines, expected_combinations, width, height, '10.png')
+
+
+def _box(x1, y1, x2, y2):
+    return [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+
+
+@pytest.mark.asyncio
+async def test_a_region_of_rescue_placeholders_is_marked():
+    lines = [Quadrilateral(np.array(_box(100, 100, 200, 300)), 'w', 1),
+             Quadrilateral(np.array(_box(500, 100, 600, 130)), 'HELLO', 1)]
+    lines[0].rescue_placeholder = True
+    regions = await dispatch_merge(lines, 800, 800)
+    by_text = {r.text: r for r in regions}
+    assert by_text['w'].speculative and not by_text['HELLO'].speculative
+    assert by_text['w'].rescue_placeholder and not by_text['HELLO'].rescue_placeholder
+
+
+@pytest.mark.asyncio
+async def test_a_real_line_merged_with_a_det_sfx_line_is_not_speculative():
+    """Review 2026-10-20: provenance was any(line is det_sfx), so a real DBNet line merged with a
+    det_sfx fragment counted as speculative and could be dropped as a false positive."""
+    lines = [Quadrilateral(np.array(_box(520, 700, 773, 709)), 'DO NOT REHOST', 1),
+             Quadrilateral(np.array(_box(520, 712, 773, 721)), 'THIS CHAPTER', 1, is_sfx=True)]
+    regions = await dispatch_merge(lines, 800, 800)
+    assert len(regions) == 1 and not regions[0].speculative
+
+
+def test_stamp_text_raw_keeps_the_raw_ocr_text_885():
+    """#885: the raw OCR text has to survive on the FINAL merged regions, before the
+    pre-translation dictionary rewrites `text` (the old stamp landed on a dispatch whose regions
+    were thrown away, so every consumer silently saw the rewritten text)."""
+    from manga_translator.textline_merge import stamp_text_raw
+    raw = SimpleNamespace(text="I'VE BEEN KILLED BY IT")
+    stamp_text_raw([raw])
+    assert raw.text_raw == "I'VE BEEN KILLED BY IT"
+
+
+def test_stamp_text_raw_never_overwrites_an_existing_value_885():
+    from manga_translator.textline_merge import stamp_text_raw
+    r = SimpleNamespace(text='raw', text_raw='first')
+    r.text = 'rewritten by the pre-translation dictionary'
+    stamp_text_raw([r])
+    assert r.text_raw == 'first'
+
+
+def test_stamp_text_raw_tolerates_none_and_empty_885():
+    from manga_translator.textline_merge import stamp_text_raw
+    stamp_text_raw(None)
+    stamp_text_raw([])
+
+
+def test_merged_region_records_its_source_line_direction_1006():
+    """#1006: the renderer must know a region came from a vertical SOURCE (target presets report horizontal)."""
+    import asyncio
+    tall = np.array([[10, 10], [14, 10], [14, 120], [10, 120]], dtype=float)
+    regions = asyncio.run(dispatch_merge([Quadrilateral(tall, 'あ', 1.0)], 200, 200))
+    assert regions
+    assert regions[0].source_direction == 'v'
+
+
+def test_merged_region_records_a_horizontal_source_direction_1006():
+    import asyncio
+    wide = np.array([[10, 10], [120, 10], [120, 20], [10, 20]], dtype=float)
+    regions = asyncio.run(dispatch_merge([Quadrilateral(wide, 'A', 1.0)], 200, 200))
+    assert regions
+    assert regions[0].source_direction == 'h'

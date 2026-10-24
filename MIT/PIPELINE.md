@@ -83,6 +83,11 @@ returns the (upscaled) original, untranslated. This is why an "empty" page is fa
   region sort (`force_simple_sort` falls back to plain top-to-bottom).
 - **Gotcha (#111, fixed in our fork):** the merged-prob denominator summed the wrong variable
   upstream; our `textline_merge/__init__.py` carries the fix — do not revert from upstream.
+- **Gotcha (2026-10-20):** two lines join only when their gap is `< 1.0 ×` the smaller font size
+  (`quadrilateral_can_merge_region`, `char_gap_tolerance=1`). Caption boxes are typically spaced
+  1.0–1.3×, so they split into one region per line and get translated as fragments. Diagnose
+  any page with `tools/doctor_page.py` (Pipeline Doctor page mode, #756) — its `merge` row
+  prints the measured `gap/char` per split.
 
 ### 3.4 Translation stage
 Covered by `ARCHITECTURE.md` §7 (translator subsystem) and §7.1 (dormant page-context engine).

@@ -115,6 +115,21 @@ def test_dense_dark_art_is_rejected():
     assert got == []                                          # too dense = art, not text
 
 
+
+def test_panel_wide_light_art_is_not_a_text_cluster():
+    """2026-10-20 corpus (Lv2 p1): a light panel showing a UI screen — sparse thin strokes on a
+    light background — passed the density/background gates as ONE cluster 93% of the page wide;
+    OCR read it as 'd' and the renderer drew a 120 px glyph over the art. Text blocks are not
+    panel-wide, so a cluster spanning most of the page width is art."""
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        for y in range(120, 190, 26):                 # UI rows: thin frames + tick marks (~20% area)
+            cv2.rectangle(img, (14, y), (386, y + 14), 0, 1)
+            for x in range(20, 380, 18):
+                cv2.line(img, (x, y + 3), (x + 6, y + 3), 0, 1)
+    img = _page_with(draw)
+    assert uncovered_text_clusters(img, covered_boxes=[]) == []
+
 # ---- #535 white caption boxes: bright rectangles are balloons the YOLO can't see ----
 
 def test_white_caption_box_detected():
@@ -247,3 +262,41 @@ def test_flatten_skips_art_boxes():
     inpainted = np.stack([orig]*3, axis=2).copy()
     out = flatten_white_captions(inpainted, orig)
     assert out[220, 220, 0] == 15                  # art preserved, box skipped
+
+
+def test_rescue_placeholders_are_marked_so_a_junk_read_can_be_dropped(monkeypatch):
+    """2026-10-20 corpus probe: the empty-balloon / ink-cluster placeholders exist for the VLM
+    rescue; with the rescue unserved the line-OCR reads the whole box ('w', 'I', 'V', '7') and the
+    junk was translated ('w' -> 'ว' at 84 px over 'อ่า...', Mushoku p0). They must be identifiable."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    img = np.full((400, 400, 3), 255, np.uint8)
+    img[150:250, 150:250] = 0                                   # ink inside the balloon
+    monkeypatch.setattr(bd, 'detect_bubbles',
+                        lambda image, device='cuda': [[(100, 100), (300, 100), (300, 300), (100, 300)]])
+    textlines, _, _ = merge_empty_balloons(SimpleNamespace(img_rgb=img), ([], None, None), 'cpu')
+    assert textlines and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_empty_balloon_rescue_shares_the_pages_balloon_detection(monkeypatch):
+    """Speed (2026-10-21): the balloon YOLO ran twice per page — once here, once (cached on ctx)
+    for container merge and balloon tagging. Same image, same model: detect once, share it."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    calls = {'n': 0}
+
+    def detect(image, device='cuda'):
+        calls['n'] += 1
+        return [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+
+    monkeypatch.setattr(bd, 'detect_bubbles', detect)
+    img = np.full((400, 400, 3), 255, np.uint8)
+    ctx = SimpleNamespace(img_rgb=img)
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert ctx.bubble_polygons == [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')        # a second consumer on the same page
+    assert calls['n'] == 1

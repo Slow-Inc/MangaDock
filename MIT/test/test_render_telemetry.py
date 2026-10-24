@@ -23,7 +23,7 @@ def stubs(monkeypatch):
     monkeypatch.setattr(rend, '_bubble_fit_font_size',
                         lambda region, wh, ratio: 42)
     monkeypatch.setattr(rend, '_clean_layout_dst',
-                        lambda region, shape, fmin, fmax, page_shape=None: (20, 80.0, 30.0))
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 80.0, 30.0))
     return monkeypatch
 
 
@@ -269,3 +269,421 @@ def test_duplicate_translation_display_sfx_keeps_largest(stubs, monkeypatch):
                                      bubble_fit=False, clean_layout=True)
     assert big.render_branch == 'sfx_display'
     assert small.render_branch == 'suppressed' and not small.translation
+
+
+def test_anti_overlap_does_not_push_a_region_out_of_the_balloon_it_shares(monkeypatch):
+    """Tsuki p1 (2026-10-20): two regions shared one balloon; the sibling's territory is that
+    whole balloon, so clamping against it shoved the block out of its own balloon and onto the
+    neighbouring balloon's text. Siblings in one balloon are not neighbours to avoid."""
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 89.0, 96.0))
+    img = np.full((800, 800, 3), 255, np.uint8)
+    balloon = (477.0, 473.0, 560.0, 694.0)
+    a = FakeRegion(horizontal=True, translation='BUT THAT SORT OF', xyxy=(483, 522, 543, 584),
+                   bubble_box=balloon)
+    b = FakeRegion(horizontal=True, translation='MY APOLOGIES', xyxy=(488, 603, 544, 633),
+                   bubble_box=balloon)
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=False, anti_overlap=True,
+                                     clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert (x1 + x2) / 2 == pytest.approx(513.0)
+
+
+def test_anti_overlap_never_pushes_a_block_out_of_its_own_balloon(monkeypatch):
+    """#795 follow-up (Tsuki p1, 2026-10-21): dodging a balloon-less neighbour shifted 'ARE YOU
+    SERIOUS?' 12 px past its own balloon's left edge. After the dodge the block is kept inside
+    its balloon whenever it fits there."""
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 93.0, 48.0))
+    img = np.full((800, 800, 3), 255, np.uint8)
+    a = FakeRegion(horizontal=True, translation='ARE YOU SERIOUS?', xyxy=(73, 550, 136, 580),
+                   bubble_box=(68.0, 473.0, 161.0, 654.0))
+    b = FakeRegion(horizontal=True, translation='IT WONT KILL ME', xyxy=(150, 502, 211, 544))
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=False, anti_overlap=True,
+                                     clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert x1 >= 68.0 - 0.5 and x2 <= 161.0 + 0.5, a.render_dst_box
+
+
+def test_a_clean_layout_block_is_fitted_into_its_narrow_balloon_832():
+    """#832 (Iruma p0): the English covered 43 of a 59 px balloon, so the region went to clean_layout,
+    whose column was floored at the widest Thai word — an 89 px block spilling past the balloon.
+    When the block is wider than the balloon interior it is laid out again on that interior."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1000, 800, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='เธอฉลาดมากนะ โย-ชาน!', xyxy=(66.4, 743, 109.0, 805),
+                   bubble_box=(58.0, 710.0, 117.9, 834.0), target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, y1, x2, y2 = r.render_dst_box
+    assert x2 - x1 <= 59 * 1.05 and x1 >= 58 - 1 and x2 <= 117 + 1, r.render_dst_box
+
+
+def test_a_dodge_that_narrows_the_space_relays_the_text_to_fit_it_795():
+    """Iruma p0 (2026-10-21): the balloon detector merged three balloons into one box; dodging the
+    neighbour shrank the free space to ~69 px but the 91 px block was only re-centred, so it still
+    ran into the next balloon's text. When the dodge leaves a narrower space, lay the text out to it."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1000, 800, 3), 255, np.uint8)
+    merged = (418.0, 367.0, 777.0, 610.0)
+    a = FakeRegion(horizontal=True, translation='แม้แต่ของฟรีที่ได้มาไม่พอจะรั้งเธอไว้ได้ตลอด',
+                   xyxy=(409.0, 485.0, 472.0, 626.0), bubble_box=merged, target_lang='THA', font_size=14)
+    b = FakeRegion(horizontal=True, translation='ถ้าเธอไม่มีพลังที่มีประโยชน์แบบนี้ ก็คงไม่มีใครคบกับตัวป่วนอย่างเธอ',
+                   xyxy=(489.0, 438.0, 607.0, 566.0), bubble_box=merged, target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    ax2 = a.render_dst_box[2]
+    assert ax2 <= 489.0 + 1, (a.render_dst_box, b.render_dst_box)
+
+
+def test_a_block_taller_than_the_dodged_space_still_moves_off_the_neighbour_795():
+    """Anta p1 (2026-10-21): the caption above pushed the balloon text's top edge down, leaving less
+    height than the block; e9f36bb6 dropped the vertical dodge, so the block stayed put over the
+    caption (19 px). The block moves flush against the edge the neighbour pushed in."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1100, 3), 255, np.uint8)
+    balloon = (821.0, 953.0, 1051.0, 1404.0)
+    caption = FakeRegion(horizontal=True, translation='RUA-HIME โจมตีไอดอลยอดนิยม 20, 000 วิว. 3 ชั่วโมงที่แล้ว',
+                         xyxy=(551.0, 1206.0, 1016.0, 1275.0), target_lang='THA', font_size=14)
+    text = FakeRegion(horizontal=True, translation='วิดีโอมียอดวิวหลายหมื่น',
+                      xyxy=(848.0, 1241.0, 993.0, 1364.0), bubble_box=balloon, target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [caption, text], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    assert text.render_dst_box[1] >= 1275.0, (caption.render_dst_box, text.render_dst_box)
+    assert text.render_dst_box[3] <= balloon[3] + 1, text.render_dst_box
+
+
+def test_a_dodge_that_runs_into_another_neighbour_shares_the_gap_795():
+    """Mieruko p0 (2026-10-21): the balloon above pushed the sign text's top edge down; moving the
+    block flush with that edge ran it 29 px into the line below, which it had not touched. A block
+    taller than the gap between two neighbours is centred in that gap instead."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    _, y1, _, y2 = sign.render_dst_box
+    assert y2 - y1 > 1206 - 1086, 'precondition: the block is taller than the gap'
+    assert abs((y2 - 1206.0) - (1086.0 - y1)) <= 2, sign.render_dst_box
+
+
+def test_a_relaid_block_is_dodged_with_its_new_size_795():
+    """Review of bfc9a64d: a block re-laid to a narrower free space is taller, but it was placed
+    against the dodge of the OLD block — both edges looked pushed, so it was centred back over the
+    neighbour above (top 73.5 under a neighbour ending at 100). The dodge is redone at its new size."""
+    above = (0.0, 0.0, 200.0, 100.0)
+    cx, cy = rend._place_off_neighbours(100.0, 150.0, 60.0, 160.0, [above], None)
+    assert cy - 80.0 >= 100.0, cy
+
+
+def test_a_one_sided_second_dodge_moves_flush_not_to_a_phantom_gap_795():
+    """Review of bfc9a64d: when the move hits a neighbour on an axis the first dodge never touched,
+    the far side is no neighbour — the block sits flush against the one it hit instead of being
+    centred between it and the block's own old edge (which left it still overlapping)."""
+    left = (0.0, 90.0, 110.0, 150.0)       # pushes the 100x40 block right, flush at x=112
+    low_right = (205.0, 135.0, 300.0, 300.0)  # untouched before; the move to x 112..212 runs into it
+    cx, cy = rend._place_off_neighbours(150.0, 120.0, 100.0, 40.0, [left, low_right], None)
+    x2, y2 = cx + 50.0, cy + 20.0
+    assert x2 <= 205.0 or y2 <= 135.0, (cx, cy)
+
+
+_SHRINK_BY = {'หนึ่ง': 2, 'สอง': 2, 'ยาวมาก!': 3, 'เล็กลงมาก': 12}   # per-text shrink of the stub fit
+
+
+def _echo_stubs(monkeypatch):
+    monkeypatch.setattr(rend, '_bubble_interior_box',
+                        lambda region, bubble_box, shape: (60.0, 40.0, (50.0, 50.0)))
+    monkeypatch.setattr(rend, '_bubble_fit_font_size', lambda region, wh, ratio: 42)
+
+    def laid(region, shape, fmin, fmax, page_shape=None, shrink_to_fit=False, **kw):
+        tall = getattr(region, 'tall', False) and not shrink_to_fit
+        if shrink_to_fit:   # the shrink fit: wrap into the box, 6 px smaller (or as the region says)
+            return (fmax - _SHRINK_BY.get(region.translation, 6), min(50.0, region.xyxy[2] - region.xyxy[0]), 30.0)
+        return (fmax, 50.0, 90.0 if tall else 30.0)
+    monkeypatch.setattr(rend, '_clean_layout_dst', laid)
+
+
+def _in_balloon(y, font, text='เฮ้', **kw):
+    # a narrow source column in a wider balloon -> the clean_layout branch
+    kw.setdefault('horizontal', True)
+    return FakeRegion(translation=text, xyxy=(300, y, 340, y + 40),
+                      bubble_box=(290, y - 10, 400, y + 50), font_size=font, **kw)
+
+
+def _page():
+    lines = [_in_balloon(100 + 70 * k, s) for k, s in enumerate((18, 20, 16))]
+    credit = _in_balloon(400, 8, 'อย่ารีโฮสต์')
+    sole = FakeRegion(horizontal=True, translation='เปลี่ยนเรื่อง', xyxy=(20, 20, 100, 100),
+                      bubble_box=(10, 10, 110, 110), font_size=18)
+    return lines, credit, sole
+
+
+def test_font_src_scale_sets_one_dialogue_size_per_page_851(monkeypatch):
+    """#851: the dialogue on one page rendered at 20 px (absolute font_size_max) next to a sole balloon
+    filled to 35-37 px, both blind to the source lettering. With font_src_scale the page's dialogue
+    size is scale x the median source size; bubble_fit_sole stops above it; a region far below the
+    median (8 px credits) keeps its own scaled size."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in lines] == [25, 25, 25]      # round(1.4 x median 18)
+    assert credit.render_font_px == 11                            # round(1.4 x its own 8)
+    assert sole.render_font_px == 25                              # was 42: filled past the page size
+
+
+def test_font_src_scale_zero_keeps_the_absolute_font_851(monkeypatch):
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True)
+    assert [r.render_font_px for r in lines] == [20, 20, 20] and sole.render_font_px == 42
+
+
+def test_the_page_size_survives_patch_grouping_851(monkeypatch):
+    """The /patches path renders one group of regions at a time, so the page median is fixed on the
+    whole page first (annotate_page_font) and a group alone still gets it."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    rend.annotate_page_font(lines + [credit, sole], 1.4)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, [lines[1]], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert lines[1].render_font_px == 25                          # not round(1.4 x its own 20) = 28
+
+
+def test_lettering_far_above_the_page_size_keeps_the_absolute_font_851(monkeypatch):
+    """Iruma p0 candidates (2026-10-21): an SFX the detector did not tag ('PRK', 44 px against a 13 px
+    page median) took scale x its own size — 79 px at 1.8. Only regions below the band (credits)
+    scale from their own size; one far above it keeps the absolute font as before."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    sfx = _in_balloon(600, 44, 'ปึ่ก')
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, sfx], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert sfx.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_text_outside_any_balloon_keeps_the_absolute_font_851(monkeypatch):
+    """A/B at 1.4 (2026-10-21): balloon-less text — a table of contents, a sign — is packed tight
+    against its neighbours; growing it to the page size overlapped 10 pairs. Only text in a balloon
+    takes the page size."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    caption = FakeRegion(horizontal=True, translation='ตอนที่ 1', xyxy=(500, 600, 700, 630), font_size=18)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, caption], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert caption.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_a_block_too_tall_for_its_balloon_is_relaid_851(monkeypatch):
+    """A/B at 1.4 (Akuyaku p1): a clean-layout block at the page size fit the balloon's width but not
+    its height and spilled. With the page size on, a block taller than the interior is laid out
+    again on it (wrap, then shrink) like one that is too wide (#832)."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    tall = _in_balloon(600, 18, 'ยาวมาก', tall=True)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert tall.render_font_px == 19                              # re-laid with shrink: 25 - 6
+
+
+def test_a_tall_balloon_keeps_the_letterers_column_width():
+    """Kaoru p0 (2026-10-21): 'THINK OF THE SIGHTSEEING!' is lettered as two 152 px lines in a tall
+    octagon; bubble_fit_tall squeezed the Thai until it filled the interior's height — a 60 px column
+    of one word per line ('สวย / แค่ / ไหน!'). The Thai column is never narrower than the source
+    column the letterer chose: the squeeze aims at the height the source text used, not the balloon's."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1070, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='คิดดูสิว่าวิวมันจะสวยแค่ไหน!', xyxy=(843.0, 158.0, 995.0, 213.0),
+                   bubble_box=(825.0, 40.0, 1019.0, 483.0), target_lang='THA', font_size=25)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, _, x2, _ = r.render_dst_box
+    assert r.render_branch == 'bubble_fit_tall' and x2 - x1 >= 0.75 * 152, (r.render_dst_box, r.render_font_px)
+
+
+def test_a_tall_balloon_keeps_the_letterers_column_width_too():
+    """Replay of a10a303c (Kage p0): with the squeeze aimed at the source height, the Thai wrapped to
+    the full interior width and touched the narration box's border (block 614..771 in a 616..769
+    box) — the old one-word column had hidden it. The column also keeps the letterer's width (the
+    134 px source column), widening toward the interior only if the text does not fit."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1100, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='ผู้ที่ทำได้เช่นนั้น คือเพียงผู้ถือครองพลังธรรมดาๆ',
+                   xyxy=(624.0, 1231.0, 758.0, 1296.0), bubble_box=(616.0, 1146.0, 769.0, 1382.0),
+                   target_lang='THA', font_size=20)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, _, x2, _ = r.render_dst_box
+    assert r.render_branch == 'bubble_fit_tall' and 616 + 4 <= x1 and x2 <= 769 - 4, r.render_dst_box
+
+
+def test_page_size_review_fixes_851(monkeypatch):
+    """Review of d5fda3a3: (a) a page-size font never drops below font_size_minimum; (b) an SFX region
+    gets no page size; (c) clean layout does not grow past the page size toward a bigger own size."""
+    lines = [_in_balloon(100 + 70 * k, s) for k, s in enumerate((30, 30, 50))]
+    tiny = _in_balloon(400, 10)
+    sfx = _in_balloon(500, 30, 'ตูม', from_sfx_detection=True)
+    rend.annotate_page_font(lines + [tiny, sfx], 0.5)
+    assert sfx.page_font is None
+    _echo_stubs(monkeypatch)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [tiny], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=0.5)
+    assert tiny.render_font_px >= 8                                # round(0.5 x 10) = 5 -> the minimum
+
+
+def test_clean_layout_does_not_grow_past_the_page_size_851():
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    from types import SimpleNamespace
+    r = SimpleNamespace(translation='สวัสดี', target_lang='THA', font_size=50, xyxy=(0.0, 0.0, 400.0, 300.0))
+    assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30, grow=False)[0] == 30
+    assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30)[0] == 50     # default unchanged
+
+
+def test_page_size_applies_only_where_it_fits_851(monkeypatch):
+    """A/B at 1.4 (2026-10-21): two regions sharing one balloon both grew to the page size and
+    collided (Akuyaku p1, Iruma p1), and a tall narration block outgrew its balloon (Kage p1). The
+    page size goes only to a balloon's sole occupant, and a page-sized block that does not fit its
+    balloon falls back to the absolute font — never worse than without the knob."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    shared = [_in_balloon(600, 18, 'ซ้าย'), _in_balloon(600, 18, 'ขวา')]       # same bubble_box
+    tall = _in_balloon(500, 18, 'ยาวมาก', tall=True, horizontal=False)          # no #832 re-lay
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole] + shared + [tall], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in shared] == [20, 20]
+    assert tall.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_a_page_size_that_does_not_fit_shrinks_to_fit_before_falling_back_851(monkeypatch):
+    """A/B at 1.4 with the fallback (7cd7e0d1): a region that did not fit dropped straight to the absolute
+    20 px next to 39 px neighbours — pages got LESS consistent (Akuyaku p1 1.55x -> 1.95x). It now takes the
+    largest size <= the page size that fits its balloon interior (or, sharing a balloon, its own
+    footprint), and only below the absolute font falls back to it."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    shared = [_in_balloon(600, 18, 'หนึ่ง'), _in_balloon(600, 18, 'สอง')]
+    tall = _in_balloon(500, 18, 'ยาวมาก!', tall=True, horizontal=False)
+    small = _in_balloon(300, 18, 'เล็กลงมาก', tall=True, horizontal=False)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole] + shared + [tall, small], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in shared] == [23, 23]     # fits its own 40 px footprint at 25 - 2
+    assert tall.render_font_px == 22                           # fits the interior at 25 - 3
+    assert small.render_font_px == 20                          # 25 - 12 < 20: the absolute font
+
+
+def test_a_page_sized_block_slightly_taller_than_its_box_is_refitted_851(monkeypatch):
+    """A/B on 8d67df60 (Kage p1): a 303 px block passed the fit check of a 292 px box under 5 % slack
+    and spilled. The page-size fit has no slack."""
+    _echo_stubs(monkeypatch)
+    monkeypatch.setattr(rend, '_bubble_interior_box', lambda region, bubble_box, shape: (60.0, 88.0, (50.0, 50.0)))
+    lines, credit, sole = _page()
+    tall = _in_balloon(500, 18, 'ยาวมาก!', tall=True, horizontal=False)     # laid 90 tall in an 88 px box
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert tall.render_font_px == 22                                         # refitted, not 25 at 90 px
+
+
+def test_a_clean_block_stays_on_the_page(monkeypatch):
+    """Otome p0 (2026-10-21): narration in the page's left gutter ('WE'LL MARCH ON…', source x 0..79)
+    laid out wider than its source and centred on it — the block started at x = -7 and its first
+    letters were cut by the page edge. A clean-layout block is kept inside the page: the whole image
+    on a full-page render, region.page_bounds (page edges in crop coordinates) on a patch."""
+    monkeypatch.setattr(rend, '_clean_layout_dst', lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 93.0, 140.0))
+    img = np.full((1200, 836, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='เราจะก้าวเดินต่อไป', xyxy=(0.0, 364.0, 79.0, 486.0))
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, clean_layout=True)
+    assert r.render_dst_box[0] >= 0, r.render_dst_box
+    patch = np.full((300, 300, 3), 255, np.uint8)                   # a crop whose left edge is 10 px past the page's
+    p = FakeRegion(horizontal=True, translation='เราจะก้าวเดินต่อไป', xyxy=(10.0, 80.0, 89.0, 202.0),
+                   page_bounds=(10.0, 0.0, 846.0, 1200.0))
+    rend.resize_regions_to_font_size(patch, [p], None, 0, 8, clean_layout=True, page_shape=(1200, 836))
+    assert p.render_dst_box[0] >= 10.0, p.render_dst_box
+
+
+def test_a_balloon_interior_is_not_cut_by_the_next_balloons_bbox(monkeypatch):
+    """Third corpus, Horimiya p0 (2026-10-21): 'REJECT-ED!' in a tall box rendered at 13 px across the
+    box's left border. Its fit box (the balloon polygon's safe interior, 87 x 167) was clamped against
+    the NEXT balloon's bounding box — a big curved balloon whose bbox overlaps this one though the
+    polygons do not — leaving 14 px. Inside its own balloon interior a region only has to avoid the
+    neighbours' text."""
+    monkeypatch.setattr(rend, '_bubble_interior_box', lambda region, bubble_box, shape: (87.0, 167.0, (354.0, 98.0)))
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, region.xyxy[2] - region.xyxy[0], 30.0))
+    img = np.full((600, 600, 3), 255, np.uint8)
+    a = FakeRegion(horizontal=True, translation='ถูกปฏิเสธ!', xyxy=(316.0, 85.0, 392.0, 118.0),
+                   bubble_box=(308.0, 15.0, 407.0, 201.0),
+                   bubble_polygon=[(308, 15), (407, 15), (407, 201), (308, 201)])
+    b = FakeRegion(horizontal=True, translation='โฮริ!', xyxy=(438.0, 85.0, 505.0, 198.0),
+                   bubble_box=(327.0, 3.0, 519.0, 434.0))
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=True, anti_overlap=True, clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert x2 - x1 > 60 and x1 >= 308, a.render_dst_box
+
+
+def test_fit_below_floor_shrinks_a_block_that_cannot_fit_its_gap_883():
+    """Mieruko p0 geometry from #795: the block is taller than the gap between its neighbours, so the
+    default path centres it in the gap and it overlaps. With the #883 opt-in the block shrinks below
+    the readable floor until it fits — small text beats overlapping text."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True, fit_below_floor=True)
+    _, y1, _, y2 = sign.render_dst_box
+    assert y2 - y1 <= (1206 - 1086) + 2          # fits between the neighbours instead of overlapping
+    assert sign.render_font_px < 20              # below the readable floor
+
+
+def test_fit_below_floor_is_off_by_default_883():
+    """The opt-in must leave the default untouched: same fixture, flag off -> the #795 behaviour
+    (taller block centred in the gap, font at the floor)."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    assert sign.render_font_px >= 18             # floor respected

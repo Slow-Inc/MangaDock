@@ -1,9 +1,14 @@
+import os
 import re
 import time
 import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
+from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
+                                   runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script,
+                          dropped_question, untranslated_source_word, content_loss,
+                          consider_as_please, normalize_common_typos, use_segment_retry)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -180,17 +185,36 @@ class CommonTranslator(InfererModule):
             await self._ratelimit_sleep()
 
             # Translate
-            _translations = await self._translate(*self.parse_language_codes(from_lang, to_lang, fatal=True), queries)
+            _langs = self.parse_language_codes(from_lang, to_lang, fatal=True)
+            _segment_retry = use_segment_retry(i, len(queries))
+            if _segment_retry:
+                # #1055 (opt-in): a retry only needs the segments that are still invalid. Sending the whole page
+                # again re-translates clean lines (most of the page) for every glitch; this sends the flagged
+                # subset instead. The tradeoff is that the retried line loses its page-mates as context, so the
+                # whole-page retry stays the default.
+                # #1055 (opt-in): a retry only needs the segments that are still invalid. Sending the whole page
+                # again re-translates clean lines (most of the page) for every glitch; this sends the flagged
+                # subset instead. The tradeoff is that the retried line loses its page-mates as context, so the
+                # whole-page retry stays the default. (A neighbour-context note was tried and did not reproducibly
+                # restore quality — see 2026-10-23-1055-forced-retry.md — so the simple subset stays.)
+                _subset = [queries[j] for j in untranslated_indices]
+                _sub = await self._translate(*_langs, _subset)
+                if len(_sub) < len(untranslated_indices):
+                    _sub.extend([''] * (len(untranslated_indices) - len(_sub)))
+                for _k, j in enumerate(untranslated_indices):
+                    translations[j] = _sub[_k]
+            else:
+                _translations = await self._translate(*_langs, queries)
 
-            # Extend returned translations list to have the same size as queries
-            if len(_translations) < len(queries):
-                _translations.extend([''] * (len(queries) - len(_translations)))
-            elif len(_translations) > len(queries):
-                _translations = _translations[:len(queries)]
+                # Extend returned translations list to have the same size as queries
+                if len(_translations) < len(queries):
+                    _translations.extend([''] * (len(queries) - len(_translations)))
+                elif len(_translations) > len(queries):
+                    _translations = _translations[:len(queries)]
 
-            # Only overwrite yet untranslated indices
-            for j in untranslated_indices:
-                translations[j] = _translations[j]
+                # Only overwrite yet untranslated indices
+                for j in untranslated_indices:
+                    translations[j] = _translations[j]
 
             if self._INVALID_REPEAT_COUNT == 0:
                 break
@@ -199,7 +223,7 @@ class CommonTranslator(InfererModule):
             for j in untranslated_indices:
                 q, t = queries[j], translations[j]
                 # Repeat invalid translations with slightly modified queries
-                if self._is_translation_invalid(q, t):
+                if self._is_translation_invalid(q, t) or self._is_glitched(q, t, to_lang):
                     new_untranslated_indices.append(j)
                     queries[j] = self._modify_invalid_translation_query(q, t)
             untranslated_indices = new_untranslated_indices
@@ -248,11 +272,77 @@ class CommonTranslator(InfererModule):
             return True
         return False
 
+    def _is_glitched(self, query: str, trans: str, to_lang: str) -> bool:
+        """A translation that leaks a script foreign to the target, drops a Japanese clausal negation
+        (#898), repeats itself into a runaway length (#901), adds Thai filler the source never says
+        (#1039), or swaps LOST for หายาก/rare (#1052). Counts as invalid so the repeat above re-asks it.
+
+        NOTE (round 83): the #1039/#1052 predicates were previously only wired into the retry *note*,
+        not into this trigger, so those re-asks never fired. The direct unit tests below pin the trigger.
+        """
+        if not trans:
+            return False
+        reasons = []
+        if foreign_script(trans, to_lang, query):
+            reasons.append('foreign_script')
+        if negation_lost(query, trans, to_lang):
+            reasons.append('negation_lost')
+        if runaway_translation(query, trans):
+            reasons.append('runaway')
+        if spurious_filler(trans, query):
+            reasons.append('spurious_filler')
+        if lost_as_rare(trans, query):
+            reasons.append('lost_as_rare')
+        if consider_as_please(trans, query):
+            reasons.append('consider_as_please')
+        if dropped_question(query, trans, to_lang):
+            reasons.append('dropped_question')
+        if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and untranslated_source_word(query, trans, to_lang)):
+            reasons.append('untranslated_word')
+        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and content_loss(query, trans, to_lang)):
+            reasons.append('content_loss')
+        if reasons and os.environ.get('MIT_LOG_GLITCH'):
+            print(f'[glitch] {",".join(reasons)} | src={query[:44]!r} -> dst={trans[:44]!r}', flush=True)
+        return bool(reasons)
+
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
         """
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #1058 (opt-in): the answer is far shorter than the source; ask for the whole line.
+        if (str(os.environ.get('MIT_CONTENT_LOSS_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and content_loss(query, trans)):
+            return query + ('\n\n[note: the previous answer is much shorter than the source line and dropped part of it. Translate the WHOLE line; do not omit clauses or names.]')
+        # #1057 (opt-in): the answer kept an English word that the source says; ask for a translation.
+        if (str(os.environ.get('MIT_LEAK_LATIN_GUARD', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and untranslated_source_word(query, trans)):
+            return query + ('\n\n[note: the answer kept an English word from the source untranslated (possibly glued to Thai). Translate it into Thai in this answer; proper names and credits may stay as they are.]')
+        # #1056: a source question whose answer lost every question marker.
+        if dropped_question(query, trans):
+            return query + ("\n\n[note: the source line asks a question ('?'); keep the question in the translation, e.g. end it with a Thai question particle such as ไหม or หรือเปล่า.]")
+        # #1052: LOST rendered as หายาก ("rare") — a meaning-changing near-homophone.
+        if lost_as_rare(trans, query):
+            return query + ('\n\n[note: LOST means หาย/สูญหาย. หายาก means RARE — do not use it here.]')
+        # CONSIDER is a soft suggestion, not a request.
+        if consider_as_please(trans, query):
+            return query + ('\n\n[note: CONSIDER means พิจารณา / ลอง (a suggestion), not a request. Do not use กรุณา here.]')
+        # #1039: the model added an endurance verb the source never says ('I heard your conversation' ->
+        # 'ฉันทนฟังบทสนทนา'). Tell the retry what to drop.
+        if spurious_filler(trans, query):
+            return query + ('\n\n[note: the previous answer added "ทน" (endure / put up with) although the '
+                            'source never says that. Do not add words about enduring, tolerating or timing. Translate the source verb literally and never use the word ทน in this answer.]')
+        # #898: make the retry say WHY when the previous answer dropped the source negation.
+        if negation_lost(query, trans):
+            return query + '\n\n[note: keep the negation of the source in the Thai output — ～ない means ไม่…]'
+        # #903: the model transliterated a name into Cyrillic and repeated itself through every retry.
+        leaked = leaked_script(trans, query)
+        if leaked:
+            return query + (f'\n\n[note: the previous answer used {leaked} letters that do not appear in the '
+                            'source. Write the whole answer in the target script only — transliterate names '
+                            'into Thai letters (Tsukuyomi -> สึกุโยมิ).]')
         return query
 
     def _clean_translation_output(self, query: str, trans: str, to_lang: str) -> str:
@@ -262,10 +352,20 @@ class CommonTranslator(InfererModule):
         if not query or not trans:
             return ''
 
+        # #889: Thai combining marks out of canonical order ('ท่ี') cannot be shaped correctly; normalise
+        # every translation here so no renderer sees the broken sequence. No-op for other scripts.
+        trans = normalize_thai_marks(trans)
+        trans = normalize_common_typos(trans)
+
+        # Last-resort salvage (#903 follow-up): the guards re-ask a leaked script, but when the repeat budget is
+        # exhausted the last answer ships. Remove leaked-script characters (never a script the source uses) so
+        # foreign glyphs do not end up on the artwork.
+        trans = strip_leaked_script(trans, query, to_lang)
+
         # '  ' -> ' '
         trans = re.sub(r'\s+', r' ', trans)
-        # 'text.text' -> 'text. text'
-        trans = re.sub(r'(?<![.,;!?])([.,;!?])(?=\w)', r'\1 ', trans)
+        # 'text.text' -> 'text. text' — but not a separator inside a number ('5,000', '1.5')
+        trans = re.sub(r'(?<![.,;!?])((?<!\d)[.,;!?]|[;!?]|[.,](?!\d))(?=\w)', r'\1 ', trans)
         # ' ! ! . . ' -> ' !!.. '
         trans = re.sub(r'([.,;!?])\s+(?=[.,;!?]|$)', r'\1', trans)
 
@@ -298,7 +398,8 @@ class CommonTranslator(InfererModule):
         #         el = re.escape(el)
         #         text = re.sub(r'(?: ' + el + r'){4} (' + el + r' )+', ' ', text)
 
-        return trans
+        # 42 stored regions carried edge whitespace ('ฮ่า ฮ่า ฮ่า '); it is never meaningful in a bubble line.
+        return trans.strip()
 
 class OfflineTranslator(CommonTranslator, ModelWrapper):
     _MODEL_SUB_DIR = 'translators'

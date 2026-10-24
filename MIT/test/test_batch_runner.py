@@ -189,3 +189,100 @@ def test_rolling_context_off_by_default_keeps_the_call_byte_identical(monkeypatc
     _run_batch(pages=(0, 1))
 
     assert seen_kwargs == [{}, {}]                       # prev_context never injected
+
+
+# ---- #905: the opt-in whole-batch pipeline path ----
+
+
+class _FakeImage:
+    @staticmethod
+    def open(_b):
+        return _FakeImage()
+
+    def convert(self, _mode):
+        return self
+
+
+class _FakeExecutor:
+    def __init__(self, results=None, error=None):
+        self.results = results
+        self.error = error
+        self.calls = 0
+
+    async def sent_batch_pipeline(self, images, config):
+        self.calls += 1
+        assert len(images) >= 1
+        if self.error:
+            raise RuntimeError(self.error)
+        return self.results
+
+
+class _FakeExecutors:
+    def __init__(self, executor):
+        self.executor = executor
+        self.freed = 0
+
+    async def find_executor(self):
+        return self.executor
+
+    async def free_executor(self, _executor):
+        self.freed += 1
+
+
+def _pipeline_deps(executor):
+    executors = _FakeExecutors(executor)
+    return (lambda: (_FakeImage, lambda _s: object(), executors)), executors
+
+
+def _page_result():
+    return {"img_width": 10, "img_height": 20, "patches": [], "regions": [{"src": "a", "dst": "b"}]}
+
+
+def _run_batch_pipelined(monkeypatch, executor, pages=(0, 1, 2)):
+    sent = []
+
+    async def fake_send(url, secret, payload):
+        sent.append((payload["pageIndex"], payload["error"], len(payload.get("regions") or [])))
+
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    deps_fn, executors = _pipeline_deps(executor)
+    asyncio.run(batch_runner._run_batch_pipelined(list(pages), [b'img'] * len(pages), '{}', TASK,
+                                                  "http://backend/cb", "", deps=deps_fn()))
+    return sent, executors
+
+
+def test_pipeline_path_delivers_one_webhook_per_page_in_order(monkeypatch):
+    executor = _FakeExecutor(results=[_page_result() for _ in range(3)])
+    sent, executors = _run_batch_pipelined(monkeypatch, executor)
+    assert executor.calls == 1, 'the whole batch must go to ONE worker'
+    assert executors.freed == 1, 'the worker must be released'
+    assert sent == [(0, None, 1), (1, None, 1), (2, None, 1)]
+
+
+def test_pipeline_path_reports_a_worker_failure_per_page(monkeypatch):
+    executor = _FakeExecutor(error='worker died')
+    sent, _ = _run_batch_pipelined(monkeypatch, executor)
+    assert [p for p, _e, _r in sent] == [0, 1, 2]
+    assert all(e == 'worker died' for _p, e, _r in sent)
+
+
+def test_pipeline_path_drops_deliveries_after_a_cancel(monkeypatch):
+    executor = _FakeExecutor(results=[_page_result() for _ in range(3)])
+    sent = []
+
+    async def fake_send(url, secret, payload):
+        sent.append(payload["pageIndex"])
+        cancellation.mark_cancelled(TASK)  # cancel lands right after page 0 is delivered
+
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    deps_fn, _ = _pipeline_deps(executor)
+    asyncio.run(batch_runner._run_batch_pipelined([0, 1, 2], [b'img'] * 3, '{}', TASK,
+                                                  "http://backend/cb", "", deps=deps_fn()))
+    assert sent == [0]
+
+
+def test_the_pipeline_path_is_opt_in(monkeypatch):
+    monkeypatch.delenv('MIT_BATCH_PIPELINE', raising=False)
+    assert batch_runner._pipeline_enabled() is False
+    monkeypatch.setenv('MIT_BATCH_PIPELINE', '1')
+    assert batch_runner._pipeline_enabled() is True

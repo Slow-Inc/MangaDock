@@ -175,6 +175,23 @@ export function buildJobKey(
  *   MIT_BUBBLE_SEG=1        — run a speech-balloon YOLO alongside DBNet and
  *                             tag each text-line region with its balloon mask
  *                             (renderer area, mask-aware crop, OCR scoping).
+ *   MIT_BUBBLE_MERGE=1      — (#757, needs MIT_BUBBLE_SEG) coalesce text lines that
+ *                             share one balloon/caption before translation, so a
+ *                             caption spaced >1x its font is one sentence, not
+ *                             per-line fragments.
+ *   MIT_BUBBLE_SYNTH=1      — (#170/#178, needs MIT_BUBBLE_SEG) synthesize a balloon with
+ *                             a classical flood-fill where the YOLO misses one (accepted
+ *                             only if it encloses the text). #894: MIT had the field;
+ *                             this is the flag that can finally reach it.
+ *
+ * #883 render opt-in (unset = config identical to before):
+ *   MIT_FIT_BELOW_FLOOR=1   — a clean-layout block that cannot fit between its neighbours
+ *                             even at font_size_minimum is shrunk below the floor instead of
+ *                             overlapping them (small text beats overlapping text).
+ *   MIT_WIDEN_VERTICAL_COLUMNS=1
+ *                           — (#1006) a vertical Japanese source may use a block up to 1.5x the
+ *                             source column so the Thai font is larger (measured 20-42% on the
+ *                             real JP pages); a layout change, so opt-in.
  */
 export function buildMitConfig(
   env: NodeJS.ProcessEnv,
@@ -216,6 +233,11 @@ export function buildMitConfig(
   const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
   const lamaReground = fracEnv('MIT_LAMA_LUM_REGROUND');
   const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
+  // #762 follow-up: sampling temperature. Absent -> MIT keeps its translator default (0.5).
+  const temperatureRaw = Number(env.MIT_TEMPERATURE);
+  const temperature = env.MIT_TEMPERATURE !== undefined && Number.isFinite(temperatureRaw) && temperatureRaw >= 0 && temperatureRaw <= 2
+    ? temperatureRaw
+    : undefined;
   const model = imageModelKey(imageModel);
   const provider = env.LLM_PROVIDER ?? 'gemini';
   return JSON.stringify({
@@ -231,6 +253,7 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      ...(temperature !== undefined ? { temperature } : {}),
       ...(provider !== 'gemini'
         ? {
             translator: 'chatgpt',
@@ -255,9 +278,16 @@ export function buildMitConfig(
       // and tag each text-line region with its balloon mask, so the renderer
       // can size text to the balloon area. Absent → stage off, byte-identical.
       ...(flagEnv('MIT_BUBBLE_SEG') ? { det_bubble_seg: true } : {}),
+      // Container merge (#757): coalesce caption/balloon line fragments before
+      // translation. Needs MIT_BUBBLE_SEG. Absent → byte-identical.
+      ...(flagEnv('MIT_BUBBLE_MERGE') ? { det_bubble_merge: true } : {}),
       // SFX detector (#168): second YOLO pass for stylized katakana SFX that
       // DBNet can't see. Absent → stage off, byte-identical.
       ...(flagEnv('MIT_SFX_DETECTOR') ? { det_sfx: true } : {}),
+      // Balloon synthesis (#170/#178): when the balloon YOLO misses a region, synthesize one
+      // with a classical flood-fill (accepted only if it encloses the text). Needs
+      // MIT_BUBBLE_SEG. Absent → byte-identical (#894: MIT had the field, no way to send it).
+      ...(flagEnv('MIT_BUBBLE_SYNTH') ? { det_bubble_synth: true } : {}),
     },
     // OCR prob floor (#167): the 48px OCR is underconfident on long thin
     // lines — at the default threshold it drops lines it read almost
@@ -372,6 +402,14 @@ export function buildMitConfig(
       ...(flagEnv('MIT_PATCH_CONTENT_ALPHA')
         ? { patch_content_alpha: true }
         : {}),
+      // #883 opt-in: when a clean-layout block cannot fit between its neighbours even at the
+      // readable floor, shrink below the floor instead of overlapping them (small text beats
+      // overlapping text). Absent → current behaviour, byte-identical (#894).
+      ...(flagEnv('MIT_FIT_BELOW_FLOOR') ? { fit_below_floor: true } : {}),
+      // #1006 opt-in: a vertical Japanese source rendered to a horizontal-only target may grow its
+      // wrap width toward 1.5x the source column instead of squeezing to the original height, so a
+      // floor-bound region gets a larger font. Absent -> byte-identical renders.
+      ...(flagEnv('MIT_WIDEN_VERTICAL_COLUMNS') ? { widen_vertical_columns: true } : {}),
     },
   });
 }

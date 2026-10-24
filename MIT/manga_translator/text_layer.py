@@ -7,7 +7,7 @@ memory #160) can see what a finished page contains without re-OCR.
 Stdlib-only on purpose: the payload shape must unit-test in <1s without the
 ML stack. Regions are duck-typed: anything with .text / .translation.
 """
-from typing import Iterable, List, Dict
+from typing import Iterable, List, Dict, Optional
 
 
 def _int_box(v):
@@ -41,6 +41,9 @@ def regions_payload(regions: Iterable) -> List[Dict[str, str]]:
             ('render_branch', 'branch', str),
             ('render_font_px', 'font_final_px', int),
             ('render_dst_box', 'dst_box', _float_box),
+            # #881: the doctor tells a rescued SFX (drawn at its source glyph size) from a
+            # detection error; present only when the rescue flagged the region.
+            ('sfx_rescued', 'sfx_rescued', bool),
         ):
             v = getattr(r, attr, None)
             if v is not None:
@@ -71,3 +74,10 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
         d['drop_reason'] = reason
         out.append(d)
     return out
+
+
+def empty_patch_result(img_w: int, img_h: int, dropped: Optional[Iterable]) -> Dict:
+    """The /patches result for a page that renders nothing — still listing what was dropped and
+    why, so "no text" and "every region dropped" are distinguishable (2026-10-20 quality loop)."""
+    return {'img_width': img_w, 'img_height': img_h, 'patches': [],
+            'regions': dropped_regions_payload(dropped or [])}

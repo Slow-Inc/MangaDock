@@ -10,7 +10,10 @@ including the `none` (only-blank-filtered) and `original` (no identical-check) c
 from types import SimpleNamespace
 
 from manga_translator.config import Translator
-from manga_translator.region_filter import filter_translated_regions
+from manga_translator.region_filter import (
+    filter_translated_regions,
+    filter_translated_regions_with_drops,
+)
 
 
 def _cfg(translator=Translator.gemini, filter_text='', re_filter_text=''):
@@ -106,3 +109,34 @@ def test_legacy_filter_unchanged_and_delegates():
     kept_legacy = filter_translated_regions(list(regions), _cfg())
     kept_new, _ = filter_translated_regions_with_drops(list(regions), _cfg())
     assert kept_legacy == kept_new
+
+
+def test_a_letter_name_spelling_is_dropped_882():
+    """Boku p0: `Siiig` (stylized 'Siiigh') rendered as the letter-name spelling `ซีไอไอ`. Dropping
+    the region keeps the original art instead of junk text (#882)."""
+    kept, dropped = filter_translated_regions_with_drops([_r('Siiig', 'ซีไอไอ')], _cfg())
+    assert kept == []
+    assert [reason for _, reason in dropped] == ['Letter-name spelling of stylized art']
+
+
+def test_real_dialogue_is_not_dropped_by_the_spelling_guard_882():
+    for src, dst in (('WAS IT LIKE THAT?', 'ใช่แบบนี้ไหม?'),
+                     ('SOR', 'ขอ...'),
+                     ('OMG', 'โอเอ็มจี'),
+                     ('LOOM', 'ลูม')):
+        r = _r(src, dst)
+        assert filter_translated_regions([r], _cfg()) == [r], (src, dst)
+
+
+def test_an_art_scale_cjk_glyph_is_dropped_886():
+    """Tsuki p0: the title logo `月が導く異世界道中` was detected as the single glyph `月` and rendered
+    as `เดือน`, mangling the logo. Art-scale single glyphs are dropped so the art stays."""
+    r = SimpleNamespace(text='月', translation='เดือน', font_size=120)
+    kept, dropped = filter_translated_regions_with_drops([r], _cfg())
+    assert kept == []
+    assert [reason for _, reason in dropped] == ['Oversized art glyph (logo/title)']
+
+
+def test_small_cjk_text_is_not_treated_as_art_886():
+    r = SimpleNamespace(text='月', translation='เดือน', font_size=40)
+    assert filter_translated_regions([r], _cfg()) == [r]

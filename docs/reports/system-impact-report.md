@@ -477,6 +477,28 @@ Scope: no additional Backend/Frontend/MIT migration source or schema changes; pr
 **ตรวจสอบ:** TDD พบข้อผิดพลาดจาก public service methods ผ่าน Supabase SDK จริงและ HTTP จำลอง ก่อนแก้จน regression tests ใหม่ 12 เคสผ่าน `npm.cmd run build` ผ่าน; ชุดทดสอบ Backend ทั้งหมด 90 suites / 960 tests ผ่าน ยังไม่ได้ทดสอบการเชื่อมต่อฐานข้อมูลจริง
 
 **ความเสี่ยง / ย้อนกลับ:** รูปแบบ array สมมติว่าผู้ใช้มีหนึ่ง profile และเลือกตัวแรก ไม่มีการเปลี่ยน schema/auth/payment สามารถย้อนเฉพาะสาม services และ specs แต่จะกลับไปพบ compile errors เดิม **ลิงก์ / สถานะ:** [history](../../DONE.md); แก้ในเครื่อง ยังไม่ได้ commit และไม่มี issue/PR ที่เผยแพร่
+## 2026-10-20 — MIT quality loop round 2: #793 Thai tone marks, #791/#792 spaces + punctuation, review fixes
+
+**What & where:** `rendering/text_render.py` — `_stacked_mark_lift` + line loop in `put_text_horizontal` (#793), `compact_special_symbols` (#792), `_insert_thai_word_breaks` / `_glue_thai_tokens` / `_fit_syllable` / `_greedy_pack` guard (#791 + review); `translation_quality.py` (shared script table, `classify_glitch`, source-aware `foreign_script`) + `translators/common.py` (`_is_glitched(query, …)`); `ocr_vlm.py` (half-open `_Breaker`); `text_layer.empty_patch_result`; `tools/doctor_page.py` (prod font).
+**Why:** every Thai page lost the tone mark of words like `ที่ นี้ ชื่อ ตั้งแต่` with the prod font (no OpenType shaping); spaces the translator wrote were dropped; English lost the space after `,`/`!` (`Well,I`); review found a mid-word split, a JP-source re-ask loop and a breaker that never recovered.
+**Before → after:** stacked marks visible in 66/156 corpus regions (42%) that showed them missing; `RTSD,ZERO` → `RTSD, / ZERO`; `ขับขี่รถ / ยนต์` → `ขับขี่ / รถยนต์`; JP page with a kept kana SFX 3 LLM calls → 1.
+**Perf Δ:** none measurable in the renderer (two glyph lookups per stacked mark; Thai segmentation now lru_cached across the fit scan). SFX rescue costs at most one trial call per 300 s while the breaker is open.
+**Quality:** replay A/B with identical translations — spill 7 → 7 in both A/Bs; font changes 5/177 (#791/#792) and 2/156 (#793).
+**Validation:** red-first unit tests for each fix (tone height, compaction, glue, recursive split, packer guard, source-aware glitch, one-trial breaker); full MIT suite 872 passed; benchmarks `2026-10-20-791-792-thai-spaces-punctuation.*`, `2026-10-20-793-thai-tone-marks.*`.
+**Also (#795/#754/#797; #796 reverted):** anti-overlap sibling territories (`rendering/__init__.py:_neighbor_territories`), junk-read DROP (`ocr_vlm.sfx_false_positive` / `speculative_box`, `TextBlock.speculative` = every line a det_sfx box or rescue placeholder, `detection_postproc._placeholder_quad`). Junk one-letter regions 6 → 0 on the corpus, real lettering kept; doctor `overlap` verdict added and replay made deterministic. #796 (2-line merge pitch 2×) shipped then reverted after review: it disabled the 2-line split for every aligned pair.
+**Risk / follow-up:** shaping is still absent (tall-consonant mark offsets, other scripts' GPOS) — HarfBuzz is the general fix; Chainsaw p0 red credit lines overlap (layout); #757 merge default still opt-in pending more pages.
+
+## 2026-10-20 — MIT quality loop: #756 doctor page mode, #757 container merge (opt-in), #760 ink-cluster gate, #761 bubble-fit scan
+
+**What & where:** `MIT/tools/doctor_page.py` + `tools/pipeline_doctor/page_probes.py` (new, tooling); `manga_translator/container_merge.py` (new) + `textline_merge/__init__.py` (+`containers` param) + `manga_translator.py` (`_bubble_polygons` cache, `_textline_containers`) + `config.py` (`det_bubble_merge`); `detection_postproc.uncovered_text_clusters` (`max_width_frac`); `font_fit.py` (descending scan, `area_font_cap`) + `rendering/__init__.py` (`_bubble_fit_font_size` cap); `Backend/src/books/mit-config.ts` (`MIT_BUBBLE_MERGE`).
+**Why:** EN→TH captions translated per line; junk panel-wide region rendered a 120 px glyph; sole-occupant balloons fitted at 13 px with room for 26.
+**Before → after:** caption page regions 21 → 8 (merge on); `'d'` junk region gone (detect FAIL → OK); bubble_fit_sole font 13/15/21 → 26/22/24 px with identical translations.
+**Perf Δ:** fit scan 6–24 ms/region (bounded by area cap); balloon detection is cached on ctx, so merge-on adds no second YOLO pass in the patches path.
+**Quality:** replay A/B (17 pages): no region smaller with identical translation; composite failures 0 → 0.
+**Validation:** unit tests red-first for every change (container_merge 10, doctor page 13, font_fit 10, detection_postproc 19, Backend spec 42); deterministic replay benchmark with PNG.
+**Also (same loop):** #759 Thai line breaking (`text_render._glue_thai_tokens`, atomic Thai words, `_thai_subwords`) — replay A/B 0 font changes, spill unchanged, bad breaks fixed; #763 `CommonTranslator._is_glitched` + `manga_translator/translation_quality.py` — foreign-script leaks 1–2 → 0 per corpus run, one extra LLM call only on a leaking page; #762 prompt A/B inconclusive on style, v2 YAML kept as an experiment.
+**Risk / follow-up:** merge stays opt-in until more pages; wrapper overshooting `max_width` (root of the non-monotonic fit) still open; SFX katakana transliteration junk (`ベ`→`เบ`) and translation prompt quality are next.
+
 ## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
 
 **What & where:** `MIT/manga_translator/manga_translator.py` (rescue call site), removed

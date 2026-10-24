@@ -1,3 +1,4 @@
+import ctypes
 import os
 import re
 import cv2
@@ -15,6 +16,8 @@ from ..utils import BASE_PATH, is_punctuation
 from ..line_break import find_optimal_line_breaks
 
 # ── Thai word segmentation (optional) ────────────────────────────────────────
+#: Number-like tokens (5,000 / 30,000 / 12:30 / 50%) must never be split across lines.
+_NUMERIC_TOKEN = re.compile(r'^[0-9][0-9.,:%/\\-]*$')
 _THAI_RE = re.compile(r'[\u0E00-\u0E7F]')
 _ZWSP = '\u200b'
 try:
@@ -60,6 +63,11 @@ _THAI_COMBINING = frozenset(
     + [chr(c) for c in range(0x0E34, 0x0E3B)]  # SARA I..U + PHINTHU
     + [chr(c) for c in range(0x0E47, 0x0E4F)]  # MAITAIKHU..YAMAKKAN (incl. tone marks)
 )
+# Stacking marks (#793): an upper vowel with a tone mark drawn above it; sara am carries a
+# nikhahit up there too, after the tone.
+_THAI_UPPER_VOWELS = frozenset([chr(0x0E31), *map(chr, range(0x0E34, 0x0E38)), chr(0x0E47), chr(0x0E4D)])
+_THAI_TONE_MARKS = frozenset(map(chr, range(0x0E48, 0x0E4D)))
+_SARA_AM = chr(0x0E33)
 
 
 def _safe_char_split(s: str) -> List[str]:
@@ -76,17 +84,148 @@ def _safe_char_split(s: str) -> List[str]:
     return clusters
 
 
+@functools.lru_cache(maxsize=1024)
 def _insert_thai_word_breaks(text: str) -> str:
     """If text contains Thai characters, segment it with pythainlp and
     insert zero-width spaces between tokens so calc_horizontal can wrap on
-    word boundaries without introducing visible spaces in rendered Thai text."""
+    word boundaries without introducing visible spaces in rendered Thai text. Cached: the font
+    fit scan measures the same text at every candidate size."""
     if not _HAS_PYTHAINLP or not _THAI_RE.search(text):
         return text
     try:
-        tokens = _thai_tokenize(text, engine='newmm', keep_whitespace=False)
-        return _ZWSP.join(t for t in tokens if t.strip())
+        tokens = _thai_tokenize(text, engine='newmm', keep_whitespace=True)
+        # A real space (Thai sentence/phrase separator, or between Latin words) stays visible:
+        # it rides on the end of the previous token, so the ZWSP split keeps it and the line
+        # assembly trims it when a break lands there.
+        # newmm can return a multi-word token with spaces inside ('ไป ๆ มา ๆ'): split it so its
+        # words break apart and the repetition mark glues back like any other.
+        words: List[str] = []
+        for t in (p for tok in tokens for p in re.findall(r'\S+|\s+', tok)):
+            if not t.strip():
+                if words and not words[-1].endswith(' '):
+                    words[-1] += ' '
+            else:
+                words.append(t)
+        return _ZWSP.join(_glue_thai_tokens(_retie_thai_pairs(words)))
     except Exception:
         return text
+
+
+@functools.lru_cache(maxsize=1024)
+def _thai_subwords(word: str) -> Optional[Tuple[str, ...]]:
+    """Split a Thai compound newmm kept whole ('ในเวลาเดียวกัน') into the fewest dictionary words,
+    excluding the word itself — the break points an over-wide compound should use. None when
+    the dictionary cannot cover it (a transliterated name). Pure DP over the default trie;
+    cached (and a tuple) because the font fit scan revisits the same word at each size."""
+    if not _HAS_PYTHAINLP:
+        return None
+    try:
+        from pythainlp.tokenize.core import word_dict_trie
+        trie = word_dict_trie()
+    except Exception:
+        return None
+    n = len(word)
+    best: List[Optional[List[str]]] = [None] * (n + 1)
+    best[0] = []
+    for i in range(n):
+        if best[i] is None:
+            continue
+        for p in trie.prefixes(word[i:]):
+            j = i + len(p)
+            if (i, j) == (0, n):
+                continue
+            if best[j] is None or len(best[i]) + 1 < len(best[j]):
+                best[j] = best[i] + [p]
+    return tuple(best[n]) if best[n] is not None else None
+
+
+# Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.
+_THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ', 'ชาว', 'ช่าง'])
+# Demonstratives always follow the noun/classifier they modify ('พวก|นั้น'): never start a line.
+_THAI_DEMONSTRATIVES = frozenset(['นี้', 'นั้น', 'โน้น'])
+_OPENERS = frozenset('([“‘「『')
+# Closing brackets/quotes and sentence punctuation never start a line.
+_CLOSERS = frozenset(')]”’」』,.!?:;…‥⁉‼⁈⁇！？、。')
+
+
+@functools.lru_cache(maxsize=4096)
+def _is_thai_word(token: str) -> bool:
+    try:
+        from pythainlp.tokenize.core import word_dict_trie
+        return token in word_dict_trie()
+    except Exception:
+        return True
+
+
+@functools.lru_cache(maxsize=1)
+def _thai_word_freqs() -> dict:
+    try:
+        from pythainlp.corpus import tnc
+        return dict(tnc.word_freqs())
+    except Exception:
+        return {}
+
+
+def _retie_thai_pairs(tokens: List[str]) -> List[str]:
+    """Re-split each pair of adjacent words that newmm cut at a tie: when their join also splits
+    into two other dictionary words that are both more common together (TNC frequency product),
+    take that split — 'นา|ทีละ' -> 'นาที|ละ', 'บอ|กว่า' -> 'บอก|ว่า' (Mieruko p0, 2026-10-21).
+    newmm breaks such ties toward the shorter first word. A new split needs both parts seen in
+    TNC; a dictionary word TNC lacks ('หน้าใหม่') counts as its rarest part, so a correct compound
+    is not re-split. A pair led by a bound prefix ('ผู้|ทรงพลัง') is left to the prefix glue. A kept
+    trailing space stays at the end of the pair."""
+    freq = _thai_word_freqs()
+    if not freq:
+        return tokens
+    from pythainlp.tokenize.core import word_dict_trie
+    trie = word_dict_trie()
+    def count(w):
+        if w in freq or w not in trie:
+            return freq.get(w, 0)
+        return min((freq.get(p, 0) for p in _thai_subwords(w) or ()), default=0)
+
+    out = list(tokens)
+    for i in range(len(out) - 1):
+        a, b = out[i], out[i + 1]
+        core = b.rstrip(' ')
+        if a != a.strip() or a in _THAI_PREFIXES or not _THAI_RE.search(a + core):
+            continue
+        word = a + core
+        best = (count(a) + 1) * (count(core) + 1), None
+        for k in range(1, len(word)):
+            x, y = word[:k], word[k:]
+            if k != len(a) and freq.get(x) and freq.get(y) and x in trie and y in trie:
+                score = (freq[x] + 1) * (freq[y] + 1)
+                if score > best[0]:
+                    best = score, k
+        if best[1] is not None:
+            out[i], out[i + 1] = word[:best[1]], word[best[1]:] + b[len(core):]
+    return out
+
+
+def _glue_thai_tokens(tokens: List[str]) -> List[str]:
+    """Join tokens that must not be separated by a line break: a prefix morpheme or an opening
+    bracket/quote with the next token, and a repetition mark (ๆ/ฯ), a demonstrative, punctuation
+    or a closing bracket/quote with the previous one. A straight `"` alternates: it opens, then
+    closes. Tokens may carry a kept trailing space, so the checks look at the stripped token."""
+    out: List[str] = []
+    bind_next = False
+    quote_open = False
+    for tok in tokens:
+        core = tok.strip()
+        opener = bool(core) and all(c in _OPENERS for c in core)
+        closer = core[:1] in _CLOSERS  # ',ZERO' too: newmm keeps it whole (#792)
+        if core == '"':
+            opener, closer = not quote_open, quote_open
+            quote_open = not quote_open
+        demonstrative = core in _THAI_DEMONSTRATIVES and not (out and out[-1].endswith(' '))
+        lone = len(core) == 1 and _THAI_RE.search(core) and not _is_thai_word(core)  # newmm's 'ซิ|ด'
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer or demonstrative or lone):
+            out[-1] += tok
+        else:
+            out.append(tok)
+        bind_next = (tok in _THAI_PREFIXES or opener) and not tok.endswith(' ')
+    return out
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -212,9 +351,11 @@ def CJK_Compatibility_Forms_translate(cdpt: str, direction: int):
 def compact_special_symbols(text: str) -> str:  
     text = text.replace('...', '…')  
     text = text.replace('..', '…')      
-    # Remove half-width and full-width spaces after each punctuation mark
-    pattern = r'([^\w\s])[ \u3000]+'  
-    text = re.sub(pattern, r'\1', text) 
+    # Drop the space after punctuation only where CJK typesetting wants none: after full-width /
+    # CJK punctuation, or before Han/kana. Spaced languages (Latin, Thai, Korean) keep it —
+    # deleting it everywhere rendered 'Well,I / so!Yes.' (#792).
+    text = re.sub(r'([\u3000-\u303f\uff00-\uffef])[ \u3000]+', r'\1', text)
+    text = re.sub(r'([^\w\s])[ \u3000]+(?=[\u3040-\u30ff\u4e00-\u9fff])', r'\1', text)
     return text
     
 def rotate_image(image, angle):
@@ -321,10 +462,20 @@ def set_font(font_path: str):
 class namespace:
     pass
 
+def _bitmap_bytes(bitmap) -> np.ndarray:
+    """The glyph bitmap's rows*pitch bytes as a uint8 array — the same bytes freetype-py's
+    ``bitmap.buffer`` returns, without building a Python list one byte at a time (#822: ~3 s of
+    every 6 pages went to that list)."""
+    n = bitmap.rows * bitmap.pitch
+    if n <= 0:
+        return np.zeros(0, dtype=np.uint8)
+    return np.frombuffer(ctypes.string_at(bitmap._FT_Bitmap.buffer, n), dtype=np.uint8).copy()
+
+
 class Glyph:
     def __init__(self, glyph):
         self.bitmap = namespace()
-        self.bitmap.buffer = glyph.bitmap.buffer
+        self.bitmap.buffer = _bitmap_bytes(glyph.bitmap)
         self.bitmap.rows = glyph.bitmap.rows
         self.bitmap.width = glyph.bitmap.width
         self.advance = namespace()
@@ -445,8 +596,9 @@ def _render_glyph_stroke(cdpt: str, font_size: int, direction: int) -> Optional[
     blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)
     bitmap_b = blyph.bitmap
     rows, width = bitmap_b.rows, bitmap_b.width
-    if rows * width > 0 and len(bitmap_b.buffer) == rows * width:
-        return np.array(bitmap_b.buffer, dtype=np.uint8).reshape((rows, width))
+    buf = _bitmap_bytes(bitmap_b)   # not bitmap_b.buffer: a byte-by-byte Python list, twice (#872)
+    if rows * width > 0 and len(buf) == rows * width:
+        return buf.reshape((rows, width))
     return None
 
 
@@ -697,7 +849,10 @@ def get_string_width(font_size: int, text: str):
 def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[int]]:
     """#186: split text on whitespace / zero-width-space and precompute each word's
     pixel width. Extracted verbatim from ``calc_horizontal``."""
-    words = re.split(rf'[\s{_ZWSP}]+', text)
+    if _ZWSP in text:  # pre-segmented (Thai/CJK): ZWSP is the break; real spaces stay in words
+        words = [w for w in text.split(_ZWSP) if w]
+    else:
+        words = re.split(rf'[\s{_ZWSP}]+', text)
     return words, [get_string_width(font_size, w) for w in words]
 
 
@@ -723,6 +878,11 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
     syllables = []
     hyphenator = select_hyphenator(language)
     for word in words:
+        if _NUMERIC_TOKEN.match(word.strip()):
+            # #842/#844: splitting a number is never acceptable (no meaningful hyphenation),
+            # so keep it atomic even if it overflows max_width.
+            syllables.append([word])
+            continue
         new_syls = []
         if hyphenator and len(word) <= 100:
             try:
@@ -730,21 +890,49 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
             except Exception:
                 new_syls = []
         if len(new_syls) == 0:
-            if len(word) <= 3:
+            # Thai has no hyphenation: a Thai word is atomic (char clusters as "syllables" let
+            # the line rebalancing break it mid-word — 'เดี|ยว'). An over-wide word is still
+            # char-split by the max_width pass below.
+            if len(word) <= 3 or _THAI_RE.search(word):
                 new_syls = [word]
             else:
                 new_syls = _safe_char_split(word)
 
-        # Split up syllables that are too large
+        # Split up syllables that are too large. An over-wide Thai compound ('ในเวลาเดียวกัน')
+        # breaks between its dictionary parts first; char clusters are the last resort.
         normalized_syls = []
         for syl in new_syls:
-            syl_width = get_string_width(font_size, syl)
-            if syl_width > max_width:
-                normalized_syls.extend(_safe_char_split(syl))
-            else:
-                normalized_syls.append(syl)
+            normalized_syls.extend(_fit_syllable(syl, font_size, max_width))
         syllables.append(normalized_syls)
     return syllables
+
+
+def _fit_syllable(syl: str, font_size: int, max_width: int) -> List[str]:
+    """Pieces of ``syl`` no wider than ``max_width``: an over-wide Thai compound breaks at its
+    dictionary parts, recursively (a part can itself be too wide); char clusters are the last
+    resort. A kept trailing space rides on the last piece, or stands alone when that piece would
+    no longer fit (the packers rely on every piece fitting)."""
+    if get_string_width(font_size, syl) <= max_width:
+        return [syl]
+    core = syl.rstrip(' ')
+    tail = syl[len(core):]
+    if tail and get_string_width(font_size, core) <= max_width:
+        return [core, tail]  # only the kept space overflowed — never cut the word for it
+    # Brackets/quotes glued on ('(ผู้ชาย)') are not dictionary text: split the body, re-attach them.
+    body = core.lstrip(''.join(_OPENERS))
+    lead = core[:len(core) - len(body)]
+    body = body.rstrip(''.join(_CLOSERS))
+    trail = core[len(lead) + len(body):]
+    parts = list(_thai_subwords(body) or ()) if _THAI_RE.search(body) else []
+    if not parts:
+        return _safe_char_split(syl)
+    parts[0], parts[-1] = lead + parts[0], parts[-1] + trail
+    pieces = [p for part in parts for p in _fit_syllable(part, font_size, max_width)]
+    if tail and get_string_width(font_size, pieces[-1] + tail) <= max_width:
+        pieces[-1] += tail
+    elif tail:
+        pieces.append(tail)
+    return pieces
 
 
 def _greedy_pack(words, word_widths, syllables, font_size, max_width,
@@ -785,13 +973,14 @@ def _greedy_pack(words, word_widths, syllables, font_size, max_width,
             line_width += current_width + word_widths[i]
             i += 1
         elif word_widths[i] > max_width:
-            # We know no syllable can be larger than max_width
+            # No syllable should be larger than max_width; one that is still goes on an empty
+            # line, or this loop would break empty lines forever (2026-10-20: 11 GB in tests).
             j = 0
             hyphenation_idx = 0
             while j < len(syllables[i]):
                 syl = syllables[i][j]
                 syl_width = get_string_width(font_size, syl)
-                if line_width + current_width + syl_width <= max_width:
+                if line_width + current_width + syl_width <= max_width or line_width + current_width == 0:
                     current_width += syl_width
                     j += 1
                     hyphenation_idx = j
@@ -919,6 +1108,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     text = _insert_thai_word_breaks(text)
     text = _insert_cjk_word_breaks(text)
     has_zwsp_breaks = _ZWSP in text
+    thai_text = bool(_THAI_RE.search(text))
     max_width = max(max_width, 2 * font_size)
 
     whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
@@ -1101,11 +1291,33 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         # print(line_text, get_string_width(font_size, line_text), line_width_list[i])
         # assert(line_width_list[i] == get_string_width(font_size, line_text))
 
+        if thai_text:  # a kept Thai space must not start or end a line
+            line_text = line_text.strip(' ')
         # Shouldn't be needed but there is apparently still a bug somewhere (See #458)
         line_width_list[i] = get_string_width(font_size, line_text)
         line_text_list.append(line_text)
 
     return line_text_list, line_width_list
+
+
+def _stacked_mark_lift(line_text: str, k: int, font_size: int) -> int:
+    """Pixels to raise the Thai tone mark at ``line_text[k]`` when it stacks on an upper vowel
+    before it or on sara am's nikhahit after it. Fonts such as Prompt (the prod face) set both at
+    the same height and rely on OpenType mark-to-mark positioning, which this per-glyph FreeType
+    renderer does not do — the tone drew inside the vowel and vanished (#793). Measured from the
+    two bitmaps, so 0 for a font that already sets it high."""
+    if line_text[k] not in _THAI_TONE_MARKS:
+        return 0
+    before, after = (line_text[k - 1] if k else ''), line_text[k + 1:k + 2]
+    upper = before if before in _THAI_UPPER_VOWELS else after if after == _SARA_AM else ''
+    if not upper:
+        return 0
+    vowel_top = get_char_glyph(upper, font_size, 0).bitmap_top
+    mark = get_char_glyph(line_text[k], font_size, 0)
+    overlap = vowel_top - (mark.bitmap_top - mark.bitmap.rows)
+    gap = max(1, font_size // 20)
+    # A font that already sets the tone high (Arial) touches at most by hinting — leave it alone.
+    return overlap + gap if overlap > gap else 0
 
 
 def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int):
@@ -1268,14 +1480,15 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
         # print((line_width, pen_line[0], canvas_w))
         # print(0, pen_line, line_text)
 
-        for c in line_text:
+        for k, c in enumerate(line_text):
             if reversed_direction:
                 cdpt, rot_degree = CJK_Compatibility_Forms_translate(c, 0)
                 glyph = get_char_glyph(cdpt, font_size, 0)
                 offset_x = glyph.metrics.horiAdvance >> 6
                 pen_line[0] -= offset_x
-            # print(1, pen_line, c)
-            offset_x = put_char_horizontal(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size)
+            lift = _stacked_mark_lift(line_text, k, font_size)
+            pen_char = [pen_line[0], pen_line[1] - lift] if lift else pen_line
+            offset_x = put_char_horizontal(font_size, c, pen_char, canvas_text, canvas_border, border_size=bg_size)
             if not reversed_direction:
                 pen_line[0] += offset_x
         pen_orig[1] += spacing_y + font_size

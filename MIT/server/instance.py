@@ -6,7 +6,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from manga_translator import Config
-from server.sent_data_internal import fetch_data_stream, NotifyType, fetch_data
+from server.sent_data_internal import fetch_batch_data, fetch_data_stream, NotifyType, fetch_data
 
 class ExecutorInstance(BaseModel):
     ip: str
@@ -25,6 +25,11 @@ class ExecutorInstance(BaseModel):
 
     async def sent_patches(self, image: Image, config: Config, progress_meta: dict | None = None):
         return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_patches", image, config, progress_meta=progress_meta)
+
+    async def sent_batch_pipeline(self, images: "list[Image]", config: Config):
+        """#905: run a whole batch on this worker with the cross-page pipeline overlapped."""
+        return await fetch_batch_data("http://" + self.ip + ":" + str(self.port) + "/simple_execute/translate_batch_pipeline",
+                                      images, config)
 
     async def sent_stream(self, image: Image, config: Config, sender: NotifyType):
         await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender)

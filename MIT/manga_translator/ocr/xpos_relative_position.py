@@ -36,7 +36,6 @@ def apply_rotary_pos_emb(x, sin, cos, scale=1):
     return (x * cos) + (rotate_every_two(x) * sin)
 
 def apply_rotary_pos_emb2d(x, sin, cos, scale=1):
-    breakpoint()
     sin, cos = map(lambda t: duplicate_interleave(t * scale), (sin, cos))
     # einsum notation for lambda t: repeat(t[offset:x.shape[1]+offset,:], "n d -> () n () (d j)", j=2)
     return (x * cos) + (rotate_every_two(x) * sin)
@@ -51,9 +50,22 @@ class XPOS(nn.Module):
         self.register_buffer(
             "scale", (torch.arange(0, head_dim, 2) + 0.4 * head_dim) / (1.4 * head_dim)
         )
+        self._tables = {}
 
     def forward(self, x, offset=0, downscale=False):
-        length = x.shape[1]
+        # #822: the scaled sin/cos tables depend only on (length, offset, downscale) and the
+        # buffer's dtype/device, but were rebuilt (CPU arange + host->device copy) on every
+        # decoder step of every layer. Same ops, cached: bit-identical output.
+        key = (x.shape[1], offset, downscale, self.scale.dtype, self.scale.device)
+        tables = self._tables.get(key)
+        if tables is None:
+            if len(self._tables) > 4096:
+                self._tables.clear()
+            tables = self._tables[key] = self._build_tables(x.shape[1], offset, downscale)
+        sin, cos = tables
+        return (x * cos) + (rotate_every_two(x) * sin)
+
+    def _build_tables(self, length, offset, downscale):
         min_pos = -(length + offset) // 2
         max_pos = length + offset + min_pos
         scale = self.scale ** torch.arange(min_pos, max_pos, 1).to(self.scale).div(self.scale_base)[:, None]
@@ -63,12 +75,10 @@ class XPOS(nn.Module):
             scale = scale[-length:]
             sin = sin[-length:]
             cos = cos[-length:]
-        
+
         if downscale:
             scale = 1 / scale
-
-        x = apply_rotary_pos_emb(x, sin, cos, scale)
-        return x
+        return tuple(duplicate_interleave(t * scale) for t in (sin, cos))
 
 
 class XPOS2D(nn.Module):

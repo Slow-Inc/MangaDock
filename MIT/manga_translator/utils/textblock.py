@@ -76,6 +76,8 @@ class TextBlock(object):
         # #278: True when this region originated from the det_sfx second pass — the SFX rescue
         # gates on this provenance instead of a bare ≤4-char length heuristic.
         self.from_sfx_detection = from_sfx_detection
+        self.speculative = False  # every line a detector guess — set by textline_merge (#754/#797)
+        self.rescue_placeholder = False  # every line an empty-balloon / ink-cluster placeholder (#797)
         # self.lines.sort()
         self.language = language
         self.font_size = round(font_size)

@@ -79,12 +79,14 @@ from .utils import (
     sort_regions,
 )
 from .utils.lang_ratio import target_script_ratio
-from .text_layer import regions_payload, dropped_regions_payload
+from .text_layer import regions_payload, dropped_regions_payload, empty_patch_result
+from .translation_quality import runaway_translation, strip_noise_glyphs
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
 from .ocr import dispatch as dispatch_ocr, prepare as prepare_ocr, unload as unload_ocr
-from .textline_merge import dispatch as dispatch_textline_merge
+from .ocr_reread import reread_enabled, reread_textlines
+from .textline_merge import dispatch as dispatch_textline_merge, stamp_text_raw
 from .mask_refinement import dispatch as dispatch_mask_refinement
 from .inpainting import dispatch as dispatch_inpainting, prepare as prepare_inpainting, unload as unload_inpainting
 from .translators import (
@@ -658,6 +660,9 @@ class MangaTranslator:
         # OCR debug-dir + MANGA_OCR_RESULT_DIR env dance — #187 S14: body in debug_sink
         with ocr_debug_dir_env(self.verbose, self._get_image_subfolder, self.result_sub_folder, BASE_PATH):
             textlines = await dispatch_ocr(config.ocr.ocr, ctx.img_rgb, ctx.textlines, config.ocr, self.device, self.verbose)
+        if reread_enabled():
+            await reread_textlines(ctx.img_rgb, textlines, config.ocr.ocr, config.ocr, self.device,
+                                   dispatch_ocr, self.verbose)
 
         new_textlines = []
         for textline in textlines:
@@ -673,11 +678,10 @@ class MangaTranslator:
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
-        text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],
-                                                     verbose=self.verbose)
-        for region in text_regions:
-            if not hasattr(region, "text_raw"):
-                region.text_raw = region.text      # <- Save the initial OCR results to expand the render detection box. Also, prevent affecting the forbidden translation function.       
+        # #885: the merge used to run TWICE here - a first dispatch whose regions were then thrown
+        # away after stamping `text_raw` on them (dispatch() builds new TextBlocks, so the stamp
+        # never reached the regions the pipeline keeps). That dead pass cost about half of this
+        # stage; the real dispatch below is the only one whose output is used.
         # Filter out languages to skip  
         if config.translator.skip_lang is not None:  
             skip_langs = [lang.strip().upper() for lang in config.translator.skip_lang.split(',')]  
@@ -702,9 +706,45 @@ class MangaTranslator:
             ctx.textlines = filtered_textlines  
     
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],  
-                                                     verbose=self.verbose)  
+                                                     verbose=self.verbose,
+                                                     containers=self._textline_containers(config, ctx))
+
+        stamp_text_raw(text_regions)
 
         new_text_regions = []
+        from .ocr_vlm import placeholder_junk, sfx_false_positive, speculative_box
+        dialogue_boxes = [r.xyxy for r in text_regions if not speculative_box(r)]
+        dialogue_regions = [(r.xyxy, r) for r in text_regions if not speculative_box(r)]
+        # Prefetch the vision SFX localizations concurrently: this loop used to make one blocking 4-5 s request per
+        # candidate (a 7-SFX page spent ~32 s in textline_merge). The calls are independent and order is preserved.
+        prefetched_sfx = {}
+        if bool(getattr(config.ocr, 'vlm_rescue', False)) and text_regions:
+            from .ocr_vlm import should_rescue_sfx as _should_rescue
+            from .ocr_vlm import swallows_dialogue as _swallows
+            from .ocr_vlm import localize_candidates as _localize_sfx
+            from .translators.keys import (CUSTOM_OPENAI_API_BASE as _sfx_base,
+                                           CUSTOM_OPENAI_API_KEY as _sfx_key,
+                                           CUSTOM_OPENAI_MODEL as _sfx_model)
+            _owners, _crops = [], []
+            for region in text_regions:
+                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+                if _swallows((x1, y1, x2, y2),
+                             [box for box, other in dialogue_regions if other is not region]):
+                    continue
+                if not _should_rescue(region.text, getattr(region, 'from_sfx_detection', False),
+                                      x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+                    continue
+                crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                if crop.size:
+                    _owners.append(region)
+                    _crops.append(crop)
+            if _crops:
+                _localized = await _localize_sfx(
+                    _crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
+                    target_lang=config.translator.target_lang)
+                # Keep empty results too: they are the model's "no SFX" answer, and re-asking the same region
+                # sequentially in the loop below would undo the batching (measured: 6 empty answers re-queried).
+                prefetched_sfx = {id(r): out for r, out in zip(_owners, _localized)}
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
             original_text = region.text  
@@ -800,18 +840,25 @@ class MangaTranslator:
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
             # #693: gated by should_rescue_sfx — det_sfx provenance + ADR 026 Addendum real-text
             # guard (no phantom SFX over an ASCII-read bubble) + size. See ADR 026.
-            from .ocr_vlm import should_rescue_sfx
+            from .ocr_vlm import should_rescue_sfx, swallows_dialogue
             x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-            if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
-                                 x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+            # #887 round 3: a merge container can fully cover a dialogue line while its own OCR read
+            # is junk; rescuing it lettered a SECOND meow over the bubble (Akuyaku p1).
+            swallows = swallows_dialogue((x1, y1, x2, y2),
+                                        [box for box, other in dialogue_regions if other is not region])
+            if not swallows and should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
+                                                  x2 - x1, y2 - y1, config.ocr.vlm_rescue):
                 from .ocr_vlm import vlm_localize_sfx
                 from .translators.keys import (CUSTOM_OPENAI_API_BASE,
                                                CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
                 crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
                 if crop.size:
-                    rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                               api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                               target_lang=config.translator.target_lang)
+                    rescued = prefetched_sfx.get(id(region))
+                    if rescued is None:
+                        # Not prefetched (the text changed after the pre-pass): fall back to the blocking call.
+                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                                   target_lang=config.translator.target_lang)
                     if rescued:
                         logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
                         # The rescue produced the FINAL SFX in the target language. Pre-setting
@@ -822,6 +869,15 @@ class MangaTranslator:
                         region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
                         new_text_regions.append(region)
                         continue
+
+            # #754 (ADR 026 Addendum DROP): a det_sfx box the OCR read as one stray ASCII char, or as
+            # real text over a dialogue line, is a detector false-positive — translated, it renders
+            # 'W'->'ว' over the art or the real line.
+            if sfx_false_positive(region.text, speculative_box(region), region.xyxy, dialogue_boxes)                     or placeholder_junk(region):
+                logger.info(f'Dropped det_sfx false-positive: "{region.text}"')
+                ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                ctx.dropped_regions.append((region, 'speculative box read as junk'))  # payload says why
+                continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \
@@ -891,11 +947,31 @@ class MangaTranslator:
             'cpu' if self._gpu_limited_memory else self.device
         )
 
+    def _strip_source_noise(self, regions, config: Config) -> None:
+        """#857: OCR misreads on Latin lettering ('피' for a lone 'I', '╩', '○') threw the LLM off
+        ('피 WONDER WHY..' -> 'เพราะ WONDER') or were copied into the Thai — strip them before translating."""
+        if str(getattr(config.translator, 'source_lang', '') or '').upper() in self._LATIN_SOURCE_LANGS:
+            for region in regions:
+                region.text = strip_noise_glyphs(region.text)
+
     @_timed_stage("translation")
     async def _run_text_translation(self, config: Config, ctx: Context):
         # 检查text_regions是否为None或空
         if not ctx.text_regions:
             return []
+        self._strip_source_noise(ctx.text_regions, config)
+
+        # #1051 (opt-in): drop regions that are not the requested source language right AFTER the noise strip,
+        # i.e. on exactly the text the translator is about to send. The finish stage then reuses this list
+        # instead of filtering again, so the rendered set equals the translated set and langdetect cannot flip
+        # between two calls. Falling back to the old behaviour when the env flag is unset.
+        if (str(os.environ.get('MIT_FILTER_AFTER_STRIP', '')).strip().lower() not in ('0', 'false', 'no', 'off')
+                and bool(getattr(config.translator, 'source_lang_only', False))
+                and bool(getattr(ctx, 'patch_mode', False))):
+            ctx.text_regions = self._apply_source_lang_filter(ctx, config)
+            ctx.source_lang_filtered = True
+            if os.environ.get('MIT_LOG_REGION_FILTER'):
+                print(f'[filter-after-strip] kept={len(ctx.text_regions or [])}', flush=True)
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  
@@ -964,11 +1040,13 @@ class MangaTranslator:
             for region in ctx.text_regions:
                 if region.translation and region.translation.strip():
                     # 只检查重复内容幻觉，不进行页面级目标语言检查
+                    # #901: a looping output cycles a short pattern and slips past the consecutive-repeat
+                    # check (4,462 chars of it did); an absurd length is the source-anchored signal.
                     if await self._check_repetition_hallucination(
                         region.translation, 
                         config.translator.post_check_repetition_threshold,
                         silent=False
-                    ):
+                    ) or runaway_translation(region.text, region.translation):
                         failed_regions.append(region)
             
             # 对失败的区域进行重试
@@ -1298,6 +1376,7 @@ class MangaTranslator:
         if finished:
             return ctx
 
+        ctx.patch_mode = True  # patch/batch paths only: enables the early source-lang filter
         # 保存当前图片上下文到ctx中，用于并发翻译时的路径管理
         if self._image_debug.current:
             ctx.image_context = self._image_debug.current.copy()
@@ -1305,13 +1384,7 @@ class MangaTranslator:
         return ctx
 
     def _detect_region_source_lang(self, region, requested_source_lang: str = '') -> str:
-        source_lang = str(getattr(region, 'source_lang', '') or '').upper()
-        if source_lang and source_lang != 'UNKNOWN':
-            return source_lang
-
         text = str(getattr(region, 'text', '') or '').strip()
-        if not text:
-            return 'UNKNOWN'
 
         # langid is unreliable for Latin-script text — it often confuses
         # English with Polish, French, Dutch, etc. even at high confidence.
@@ -1324,9 +1397,21 @@ class MangaTranslator:
             'NOR', 'DAN', 'FIN', 'CES', 'ROM', 'HUN', 'TUR', 'IND', 'MSA',
             'VIE', 'FIL', 'MAL',
         }
-        is_mostly_ascii = sum(1 for c in text if ord(c) < 128) / max(1, len(text)) > 0.85
+        # Checked BEFORE region.source_lang: on a TextBlock that is a lazy langid guess, never empty,
+        # so returning it first made this guard dead — 'I WONDER WHY' with one OCR-noise glyph
+        # ('피 WONDER WHY..') was guessed KO and dropped (Iruma p0, 2026-10-21).
+        # Latin share over LETTERS only: punctuation ('…') says nothing about the language
+        # (Horimiya p0: 'STRANGEレY…' was 9/11 ASCII characters but 8/9 Latin letters).
+        letters = [c for c in text if c.isalpha()]
+        is_mostly_ascii = bool(letters) and sum(1 for c in letters if ord(c) < 128) / len(letters) > 0.85
         if requested_source_lang in LATIN_SCRIPT_LANGS and is_mostly_ascii:
             return requested_source_lang
+
+        source_lang = str(getattr(region, 'source_lang', '') or '').upper()
+        if source_lang and source_lang != 'UNKNOWN':
+            return source_lang
+        if not text:
+            return 'UNKNOWN'
 
         try:
             detected_lang, confidence = langid.classify(text)
@@ -1334,6 +1419,18 @@ class MangaTranslator:
             return lang_tag
         except Exception:
             return 'UNKNOWN'
+
+    def _apply_source_lang_filter(self, ctx, config: Config) -> List[Any]:
+        """Run the source-language filter on ctx.text_regions and record what it drops in
+        ctx.dropped_regions, so the payload (and the doctor) see it — #857's two English balloons
+        were dropped here with no trace."""
+        kept = self._filter_regions_by_source_lang(ctx.text_regions, config)
+        kept_ids = {id(r) for r in kept}
+        dropped = [r for r in ctx.text_regions if id(r) not in kept_ids]
+        if dropped:
+            ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+            ctx.dropped_regions.extend((r, 'source language filter') for r in dropped)
+        return kept
 
     _LATIN_SOURCE_LANGS = {'ENG', 'ESP', 'FRA', 'DEU', 'ITA', 'PLK', 'PTB', 'ROM', 'IND', 'FIL', 'VIN', 'CSY', 'NLD', 'HUN', 'TRK'}
 
@@ -1406,6 +1503,28 @@ class MangaTranslator:
     ) -> np.ndarray:
         return crop_mask_for_patch(raw_mask_source, x1, y1, x2, y2, img_h, img_w)
 
+    def _bubble_polygons(self, ctx):
+        """Balloon/caption polygons for this page, detected once and cached on ctx (#757)."""
+        if getattr(ctx, 'bubble_polygons', None) is None:
+            from .bubble_detector import detect_bubbles
+            ctx.bubble_polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda')) or []
+        return ctx.bubble_polygons
+
+    def _textline_containers(self, config: Config, ctx):
+        """#757: the balloon/caption index of each textline, or None when the stage is off."""
+        if not (config.detector.det_bubble_seg and config.detector.det_bubble_merge) or not ctx.textlines:
+            return None
+        try:
+            from .bubble_association import associate_regions_to_bubbles
+            polygons = self._bubble_polygons(ctx)
+            if not polygons:
+                return None
+            boxes = [t.xyxy for t in ctx.textlines]
+            return associate_regions_to_bubbles(boxes, polygons)
+        except Exception:
+            logger.warning(f"[BubbleMerge] container assignment failed:\n{traceback.format_exc()}")
+            return None
+
     def _tag_regions_with_bubbles(self, ctx, regions: List[Any], synth_fallback: bool = False) -> None:
         """#170: detect speech balloons and tag each region with the balloon
         containing it (``region.bubble_idx`` + ``region.bubble_box``), so
@@ -1414,12 +1533,10 @@ class MangaTranslator:
         Best-effort: any failure (or no balloons) leaves regions untagged and
         the pipeline behaves exactly as if the stage were off.
         """
-        from .bubble_detector import detect_bubbles
         from .bubble_association import associate_regions_to_bubbles, acceptable_synth_bubble
-        from .bubble_association import associate_regions_to_bubbles
         from .detection_postproc import expand_balloons_with_white_boxes, white_box_candidates
 
-        polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
+        polygons = self._bubble_polygons(ctx)
         if not polygons:
             logger.info('[BubbleSeg] no balloons detected — proximity grouping')
             return
@@ -1513,7 +1630,7 @@ class MangaTranslator:
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
         await self._report_progress('translating')
         try:
@@ -1526,11 +1643,95 @@ class MangaTranslator:
 
         await self._report_progress('after-translating')
         if not ctx.text_regions or ctx.text_regions == 'cancel':
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
-        regions = self._filter_regions_by_source_lang(ctx.text_regions, config)
+
+        # #980 follow-up (opt-in MIT_SERIES_GLOSSARY=1): the single-page production path has no batch context, so
+        # remember character-name spellings per series (keyed by the Backend's series_context) and apply them
+        # before rendering. Off -> byte-identical pages.
+        try:
+            from .series_glossary_memory import remember_and_apply, series_memory_enabled
+            if series_memory_enabled():
+                _fixed = remember_and_apply(ctx.text_regions, getattr(config.translator, 'series_context', None),
+                                            getattr(config.translator, 'target_lang', '') or '')
+                if _fixed and os.environ.get('MIT_SERIES_GLOSSARY_LOG'):
+                    print(f'[series-glossary] applied {_fixed} name fix(es)', flush=True)
+        except Exception:
+            logger.warning(f'[series-glossary] skipped:\n{traceback.format_exc()}')
+
+        # Opt-in MIT_OMISSION_VERIFY=1: long lines the verifier agrees dropped a clause get one re-ask before render.
+        try:
+            from .omission_guard import enabled as omission_verify_enabled
+            if omission_verify_enabled():
+                await self._verify_omissions(config, ctx)
+        except Exception:
+            logger.warning(f'[omission-verify] skipped:\n{traceback.format_exc()}')
+
+        return await self._finish_patches(ctx, config, source_icc)
+
+    async def _verify_omissions(self, config, ctx):
+        """Opt-in: re-ask long lines whose Thai answer the verifier says dropped a clause."""
+        from .omission_guard import (apply_results, build_query, collect_candidates, passes as omission_passes,
+                                     verify_candidates)
+        candidates = collect_candidates(ctx.text_regions)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] entered candidates={len(candidates)}', flush=True)
+        if not candidates:
+            return
+        from .translators import keys
+        base = keys.CUSTOM_OPENAI_API_BASE.rstrip('/') + '/chat/completions'
+        agreed = await verify_candidates(candidates, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL,
+                                         passes=omission_passes())
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] agreed={sorted(agreed)}', flush=True)
+        if not agreed:
+            return
+        src_lang = str(getattr(config.translator, 'source_lang', '') or '').strip()
+        if not src_lang or src_lang.upper() == 'AUTO':
+            return
+        tgt_lang = str(getattr(config.translator, 'target_lang', '') or 'THA')
+        # Only the gateway translator is supported here (the pass uses its credentials and retry machinery).
+        from .config import Translator as _Translator
+        if getattr(config.translator, 'translator', None) != _Translator.custom_openai:
+            return
+        from .translators.custom_openai import CustomOpenAiTranslator
+        translator = CustomOpenAiTranslator()
+        translator.parse_args(config.translator)
+        flagged = [c for c in candidates if c['idx'] in agreed]
+        queries = [build_query(c['src'], agreed[c['idx']]) for c in flagged]
+        translated = await translator.translate(src_lang, tgt_lang, queries)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            print(f'[omission-verify] reasked={len(queries)} got={len(translated or [])} first={ (translated or [""])[0][:60]!r}', flush=True)
+        before = {c['idx']: ctx.text_regions[c['idx']].translation for c in flagged}
+        applied = apply_results(ctx.text_regions, [c['idx'] for c in flagged], translated)
+        if os.environ.get('MIT_LOG_OMISSION_VERIFY'):
+            for c in flagged:
+                after = ctx.text_regions[c['idx']].translation
+                if after != before.get(c['idx']):
+                    print(f"[omission-verify] {before.get(c['idx'])!r} -> {after!r} (missing={agreed[c['idx']]!r})", flush=True)
+            print(f'[omission-verify] candidates={len(candidates)} flagged={len(agreed)} applied={applied}', flush=True)
+
+    async def _finish_patches(self, ctx, config, source_icc):
+        """Post-translation half of `translate_patches` (#905 slice 2).
+
+        Extracted verbatim so the batch pipeline can run it as the page's *back* phase — mask, inpaint,
+        render and PNG encoding — after the ordered translation phase. Behaviour is identical to the
+        inlined body it replaces.
+        """
+        img_h, img_w = ctx.img_rgb.shape[:2]
+        _n_before_filter = len(ctx.text_regions or [])
+        if getattr(ctx, 'source_lang_filtered', False):
+            # #1051: the filter already ran on exactly the translated texts; re-running it here would re-run
+            # langdetect on a possibly different snapshot.
+            regions = list(ctx.text_regions or [])
+        else:
+            regions = self._apply_source_lang_filter(ctx, config)
+        if os.environ.get('MIT_LOG_REGION_FILTER'):
+            # #1050 probe: can a pre-translation mask be built safely? Needs the region list to be stable
+            # between the front stage and this point.
+            print(f'[region-filter] before={_n_before_filter} after={len(regions or [])}', flush=True)
         if not regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
         # Bubble segmentation (#170): tag each region with its speech balloon so
         # grouping stays within balloons (no cross-balloon clumps). Opt-in via
@@ -1552,6 +1753,9 @@ class MangaTranslator:
         # Group nearby regions so they share one crop and avoid overlap.
         # Use pad + render_extra as grouping threshold so any two regions whose
         # expanded render canvases would overlap are pre-merged into one group.
+        # #851: fix the page's dialogue font size on the whole page — each patch renders one group alone.
+        from .rendering import annotate_page_font
+        annotate_page_font(regions, config.render.font_src_scale)
         region_groups = self._group_nearby_regions(regions, pad + render_extra, img_w, img_h)
         logger.info(f'[PatchTranslate] {len(regions)} regions -> {len(region_groups)} groups after proximity merge')
 
@@ -1662,6 +1866,96 @@ class MangaTranslator:
         # rolling context (#159) and translation memory (#160).
         return {'img_width': img_w, 'img_height': img_h, 'patches': patches,
                 'regions': regions_payload(regions) + dropped_regions_payload(getattr(ctx, 'dropped_regions', None) or [])}
+
+
+    async def translate_batch_pipelined(self, images: List[Image.Image], config: Config, cancel_check=None) -> List[dict]:
+        """#905: translate a batch with the GPU phases overlapped against the gateway wait.
+'
+        Same stages, same order and same config as running :meth:`translate_patches` page by page. The only
+        change is scheduling: page i+1's FRONT phase (detect/ocr/merge) starts during page i's translation
+        wait, and page i's BACK phase (mask/inpaint/render) runs during page i+1's translation. Translations
+        stay strictly ordered, so the #159 rolling cross-page context keeps working when enabled.
+
+        Returns one patch-result dict per page, in page order.
+        """
+        import copy
+
+        from server.batch_pipeline import run_pipelined
+        from server.rolling_context import RollingContext
+
+        from .name_glossary import (apply_glossary, count_candidates, extract_glossary, format_glossary,
+                                    glossary_enabled as _name_glossary_enabled)
+
+        def _env_int(name: str, default: int) -> int:
+            try:
+                return max(0, int(os.environ.get(name, '') or default))
+            except ValueError:
+                return default
+
+        self.reset_page_context()
+        # #159: same rolling session the batch runner keeps; MIT_CONTEXT_PAGES=0 (default) disables it,
+        # which keeps the pipelined batch byte-identical in behaviour to independent pages.
+        rolling = RollingContext(max_pages=_env_int('MIT_CONTEXT_PAGES', 0),
+                                 max_chars=_env_int('MIT_CONTEXT_MAX_CHARS', 1500))
+        # #980: cross-page name glossary (off until measured — MIT_NAME_GLOSSARY=1 opts in). A name's Thai
+        # spelling is picked up from the page that produced it and enforced on every later page.
+        # #980: on by default — no extra model call, deterministic enforcement; MIT_NAME_GLOSSARY=0 disables.
+        glossary_enabled = _name_glossary_enabled()
+        glossary = {}
+        name_counts = {}
+        prev_regions = None
+
+        async def prepare_front(image):
+            cfg = copy.deepcopy(config)
+            icc = image.info.get('icc_profile')
+            ctx = await self._translate_until_translation(image, cfg)
+            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions)}
+
+        async def translate(front, prev_context):
+            ctx, cfg = front['ctx'], front['cfg']
+            nonlocal prev_regions, glossary
+            if not front['has_regions']:
+                return {'front': front, 'ok': False, 'block': rolling.render_block()}
+            if prev_context:
+                cfg.translator.prev_context = prev_context
+            if glossary_enabled and prev_regions:
+                glossary = extract_glossary(prev_regions, existing=glossary)
+                # Only names seen at least twice become constraints: a one-off ALL-CAPS word is probably not
+                # a character (SKY, GROUND) and pinning it would only constrain ordinary vocabulary.
+                enforced = {n: sp for n, sp in glossary.items() if name_counts.get(n, 0) >= 2}
+                cfg.translator.name_glossary = format_glossary(enforced) or None
+            else:
+                enforced = None
+            await self._report_progress('translating')
+            try:
+                ctx.text_regions = await self._run_text_translation(cfg, ctx)
+            except Exception:
+                logger.error(f"Error during translating (batch pipeline):\n{traceback.format_exc()}")
+                if not self.ignore_errors:
+                    raise
+                ctx.text_regions = []
+            await self._report_progress('after-translating')
+            ok = bool(ctx.text_regions) and ctx.text_regions != 'cancel'
+            if ok and glossary_enabled and enforced:
+                # Deterministic follow-up: prompt instructions are not reliable for exact spellings.
+                apply_glossary(ctx.text_regions, enforced)
+            if ok:
+                rolling.add_page(getattr(r, 'translation', '') or '' for r in ctx.text_regions)
+                prev_regions = ctx.text_regions
+                page_counts = count_candidates(ctx.text_regions)
+                for name, n in page_counts.items():
+                    name_counts[name] = name_counts.get(name, 0) + n
+            return {'front': front, 'ok': ok, 'block': rolling.render_block()}
+
+        async def finish_back(image, front, translated):
+            ctx, cfg, icc = front['ctx'], front['cfg'], front['icc']
+            if not translated['ok']:
+                img_h, img_w = ctx.img_rgb.shape[:2]
+                return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return await self._finish_patches(ctx, cfg, icc)
+
+        return await run_pipelined(list(images), prepare_front=prepare_front, translate=translate,
+                                   finish_back=finish_back, cancel_check=cancel_check)
 
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """

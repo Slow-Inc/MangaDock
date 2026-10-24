@@ -8,11 +8,20 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from manga_translator.ocr_vlm import build_sfx_prompt, restore_sfx_translations, sanitize_sfx, vlm_localize_sfx
+from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, crop_has_lettering,
+                                       restore_sfx_translations, sanitize_sfx, swallows_dialogue,
+                                       vlm_localize_sfx)
 
 
 def _crop():
-    return np.zeros((40, 80, 3), dtype=np.uint8)
+    """A white crop with two thick dark strokes - the ink profile of a real SFX crop (#887).
+
+    The rescue refuses crops without lettering before spending a vision call, so the contract tests
+    below must feed it the shape of a crop it was built for."""
+    crop = np.full((40, 80, 3), 250, dtype=np.uint8)
+    crop[6:34, 10:24] = 28
+    crop[6:34, 30:44] = 28
+    return crop
 
 
 class _Resp:
@@ -64,7 +73,33 @@ def test_localize_returns_sanitized_sfx():
     assert post.calls['url'] == 'https://gw/v1/chat/completions'
     assert post.calls['headers']['Authorization'] == 'Bearer k'
     parts = post.calls['json']['messages'][0]['content']
-    assert any(p.get('type') == 'image_url' and p['image_url']['url'].startswith('data:image/png;base64,') for p in parts)
+    assert any(p.get('type') == 'image_url' and (p['image_url']['url'].startswith('data:image/jpeg;base64,') or p['image_url']['url'].startswith('data:image/png;base64,')) for p in parts)
+
+# ── #881: a thinking model needs a budget above its reasoning need ────────────
+# The configured gateway default (qwen3.8-27b-fp8) answers only after ~154 reasoning
+# tokens: max_tokens=24 was spent entirely on reasoning, the reply came back '' with
+# finish_reason='length', and the caller read that as "no SFX here" (measured on the
+# Boku SFX crop, 2026-10-21).
+
+class _RespFinish:
+    def __init__(self, content, finish):
+        self._c, self._f = content, finish
+    def json(self):
+        return {"choices": [{"message": {"content": self._c}, "finish_reason": self._f}]}
+
+
+def test_localize_budget_lets_a_thinking_model_answer():
+    bodies = []
+    def post(url, headers=None, json=None, timeout=None):
+        bodies.append(json)
+        if json['max_tokens'] < 200:      # the gateway spends a small budget on reasoning
+            return _RespFinish('', 'length')
+        return _RespFinish('เฮ้อ', 'stop')
+    out = vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m',
+                           target_lang='THA', post_fn=post)
+    assert out == 'เฮ้อ'
+    assert bodies[0]['max_tokens'] >= 200
+
 
 def test_localize_blank_creds_short_circuits_without_calling():
     called = {'n': 0}
@@ -284,7 +319,7 @@ def test_truncated_none_reply_is_logged_with_reason_budget_and_region(caplog):
     [msg] = _warnings(caplog)
     assert 'finish_reason=length' in msg
     assert 'content=None' in msg
-    assert 'max_tokens=24' in msg
+    assert f'max_tokens={SFX_MAX_TOKENS}' in msg
     assert 'crop=80x40' in msg
 
 
@@ -304,3 +339,256 @@ def test_reply_that_sanitises_to_nothing_is_logged(caplog):
 def test_a_completed_reply_logs_nothing(caplog):
     assert _localize(_Completion('LOOM', 'stop'), caplog) == 'LOOM'
     assert _warnings(caplog) == []
+
+
+# ── 2026-10-20 quality loop: stop paying for a rescue the model cannot serve ─────────────────
+# Doctor timing on 17 real pages: every SFX rescue call ended finish_reason=length with no
+# content (the gateway model reasons past max_tokens and cannot see images, #693), ~2.5-3 s each,
+# sequential — up to 20 s of a page's 31 s. After a run of unusable replies the rescue stops
+# calling until a cooldown trial succeeds; a usable reply resets the streak.
+
+def test_rescue_stops_calling_after_consecutive_unusable_replies(caplog):
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return _Completion(None, 'length')
+
+    for _ in range(SFX_UNSERVED_LIMIT + 3):
+        assert vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert calls['n'] == SFX_UNSERVED_LIMIT
+
+
+def test_a_usable_reply_resets_the_unserved_streak():
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+    replies = [_Completion(None, 'length')] * (SFX_UNSERVED_LIMIT - 1) + [_Completion('BAM', 'stop')] \
+        + [_Completion(None, 'length')] * (SFX_UNSERVED_LIMIT - 1)
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return replies[calls['n'] - 1]
+
+    for _ in replies:
+        vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post)
+    assert calls['n'] == len(replies)  # never tripped
+
+
+def test_failed_calls_count_toward_the_unserved_streak():
+    """Doctor 2026-10-20 (Kage p1): the gateway answered an error body with no 'choices' four
+    times, ~6 s each — a failing call wastes the same page time as a truncated one."""
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+
+    class ErrorBody:
+        def json(self):
+            return {'error': {'message': 'upstream overloaded'}}
+
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return ErrorBody()
+
+    for _ in range(SFX_UNSERVED_LIMIT + 2):
+        assert vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert calls['n'] == SFX_UNSERVED_LIMIT
+
+
+def test_a_tripped_rescue_retries_once_after_the_cooldown(monkeypatch):
+    """A breaker that latched for the life of the process turned one gateway outage into silent,
+    permanent loss of SFX rescue on a long-running server. After the cooldown one trial call is
+    allowed: a usable reply closes the breaker, another failure re-opens it."""
+    from manga_translator import ocr_vlm
+    clock = {'t': 1000.0}
+    monkeypatch.setattr(ocr_vlm, '_now', lambda: clock['t'])
+    replies = [_Completion(None, 'length')] * ocr_vlm.SFX_UNSERVED_LIMIT
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return replies[calls['n'] - 1] if calls['n'] <= len(replies) else _Completion('BAM', 'stop')
+
+    def call():
+        return vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post)
+
+    for _ in range(ocr_vlm.SFX_UNSERVED_LIMIT + 2):
+        call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT              # tripped
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    replies.append(_Completion(None, 'length'))
+    call()
+    call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT + 1          # one trial, failed -> open again
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    assert call() != ''                                          # trial succeeds -> closed
+    call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT + 3
+
+
+def test_after_the_cooldown_only_one_trial_is_admitted(monkeypatch):
+    """Half-open means ONE trial: concurrent pages must not each spend a ~3 s call."""
+    from manga_translator import ocr_vlm
+    clock = {'t': 1000.0}
+    monkeypatch.setattr(ocr_vlm, '_now', lambda: clock['t'])
+    for _ in range(ocr_vlm.SFX_UNSERVED_LIMIT):
+        ocr_vlm._breaker.fail('m')
+    assert not ocr_vlm._breaker.allows()
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    assert ocr_vlm._breaker.allows()        # the trial
+    assert not ocr_vlm._breaker.allows()    # a concurrent page while the trial is in flight
+
+
+# #754 — ADR 026 Addendum DROP, narrowed by the 2026-10-20 corpus probe (16 EN pages): every det_sfx
+# false-positive read ONE ASCII char from art ('I', 'v', 'n', 'S', '1'), while multi-char ASCII
+# reads were real lettering worth keeping ('CHAINSAWMAN', 'Yamai', 'Omake', '491'). A real-text
+# read sitting on a dialogue line ('W'/'THE' over a bubble, Gal Yome 2026-06-30) is dropped too.
+
+def test_a_single_char_ascii_read_from_det_sfx_is_a_false_positive():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    for t in ('I', 'v', 'S', '1'):
+        assert sfx_false_positive(t, True, (0, 0, 200, 300), [])
+
+
+def test_real_multi_char_lettering_off_the_dialogue_is_kept():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    for t in ('CHAINSAWMAN', 'Yamai', '491'):
+        assert not sfx_false_positive(t, True, (0, 0, 200, 300), [(500, 500, 600, 540)])
+
+
+def test_a_real_text_read_that_is_a_fragment_of_a_dialogue_line_is_dropped():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert sfx_false_positive('THE', True, (160, 150, 240, 175), [(100, 140, 300, 190)])
+
+
+def test_a_big_real_sfx_around_a_small_dialogue_line_is_kept():
+    """Review 2026-10-20: 'contains a dialogue centre' dropped a panel-wide 'BOOM' that merely
+    surrounded a small line; a false positive is a fragment INSIDE the dialogue instead."""
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert not sfx_false_positive('BOOM', True, (0, 0, 400, 300), [(150, 150, 250, 180)])
+
+
+def test_only_det_sfx_provenance_and_ascii_reads_are_dropped():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert not sfx_false_positive('I', False, (0, 0, 200, 300), [])      # dialogue 'I' stays
+    assert not sfx_false_positive('ぬ', True, (0, 0, 200, 300), [])      # dropped glyph: rescue's job
+
+
+def test_speculative_box_reads_the_region_provenance():
+    from types import SimpleNamespace
+    from manga_translator.ocr_vlm import speculative_box
+    assert speculative_box(SimpleNamespace(speculative=True))
+    assert not speculative_box(SimpleNamespace(speculative=False))
+    assert not speculative_box(SimpleNamespace())
+
+
+# #797 follow-up (2026-10-21 probe, 16 pages): rescue placeholders whose OCR read was junk all had
+# confidence <= 0.657 ('TAF' .60, 'V' .61, 'LIt' .045); real reads were >= 0.959 ('STICK', 'IS SHE',
+# 'CALLED', '-AVALA'). Length cannot tell 'LIt' from 'WAS'; confidence can.
+
+def test_a_low_confidence_placeholder_read_is_junk():
+    from types import SimpleNamespace
+    from manga_translator.ocr_vlm import placeholder_junk
+    assert placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.6))
+    assert not placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.97))
+    assert not placeholder_junk(SimpleNamespace(rescue_placeholder=False, prob=0.1))  # DBNet text
+
+
+def _blank_crop(w=120, h=90, lines=0):
+    """A near-white crop with a few thin panel/armour lines - the det_sfx false-positive shape
+    the rescue was inventing SFX on (#887)."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    for i in range(lines):
+        y = int(h * (i + 1) / (lines + 1))
+        crop[max(0, y - 1):y + 1, :] = 60
+    return crop
+
+
+def _lettered_crop(w=120, h=90):
+    """White crop with two thick dark strokes: the ink profile of real lettering."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    crop[20:70, 20:32] = 30
+    crop[20:70, 45:57] = 30
+    crop[30:42, 70:110] = 30
+    return crop
+
+
+def test_a_blank_art_crop_has_no_lettering_887():
+    """Taida p0: a det_sfx box on plain armour (mean 248, 4.8% dark, std 30) became a rendered
+    phantom 'ฟู่'. Blank/line-only crops must not reach the vision call."""
+    assert crop_has_lettering(_blank_crop(lines=0)) is False
+    assert crop_has_lettering(_blank_crop(lines=3)) is False
+
+
+def test_a_lettered_crop_has_lettering_887():
+    assert crop_has_lettering(_lettered_crop()) is True
+
+
+def test_a_blank_crop_is_never_sent_to_the_vision_endpoint_887():
+    calls = []
+    import requests
+    orig = requests.post
+    try:
+        requests.post = lambda *a, **k: calls.append(1)
+        out = vlm_localize_sfx(_blank_crop(lines=2), api_base='http://x/v1', api_key='k', model='m')
+    finally:
+        requests.post = orig
+    assert out == ''
+    assert calls == []
+
+
+def _single_stroke_crop(w=120, h=90):
+    """One thick connected stroke (a panel arc / a thick oval) - high ink, no lettering. These
+    were the 4 phantoms that survived the contrast guard (#887)."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    crop[34:58, 8:112] = 30          # thicker than the contrast floor, still ONE stroke
+    return crop
+
+
+def test_one_thick_non_lettering_stroke_has_no_lettering_887():
+    """Contrast alone admits a thick arc or oval; lettering is SEVERAL separate strokes."""
+    assert crop_has_lettering(_single_stroke_crop()) is False
+
+
+def test_lettering_is_several_strokes_887():
+    """Two separate thick strokes (the shape of real katakana) are lettering; the ink amount is the
+    same as the single-stroke crop, so this pins the component rule rather than the contrast rule."""
+    assert crop_has_lettering(_lettered_crop()) is True
+
+
+def test_a_container_that_swallows_a_dialogue_line_is_not_rescued_887():
+    """Akuyaku p1: the merge produced a big container region whose own OCR read was junk while it
+    fully contained the balloon's `NYA` line. The rescue turned it into a second `เหมียว`, so the
+    bubble showed two meows. A region that fully contains real dialogue must not be rescued."""
+    container = (969, 580, 1158, 812)
+    nya = (997, 678, 1074, 717)
+    assert swallows_dialogue(container, [nya]) is True
+
+
+def test_a_normal_sfx_box_does_not_swallow_dialogue_887():
+    sfx = (1084, 440, 1160, 477)
+    other = (997, 678, 1074, 717)
+    assert swallows_dialogue(sfx, [other]) is False
+    assert swallows_dialogue(sfx, []) is False
+
+
+def test_localize_candidates_runs_concurrently_and_preserves_order():
+    import asyncio
+    import time
+
+    from manga_translator.ocr_vlm import localize_candidates
+
+    calls = []
+
+    def fake_worker(crop, *, api_base, api_key, model, target_lang):
+        calls.append(crop)
+        time.sleep(0.15)
+        return 'sfx-' + crop
+
+    started = time.time()
+    out = asyncio.run(localize_candidates(['a', 'b', 'c', 'd'], api_base='x', api_key='k', model='m',
+                                          target_lang='THA', worker=fake_worker))
+    elapsed = time.time() - started
+    assert out == ['sfx-a', 'sfx-b', 'sfx-c', 'sfx-d']
+    assert sorted(calls) == ['a', 'b', 'c', 'd']
+    assert elapsed < 0.45  # 4 sequential sleeps would be >= 0.6 s

@@ -38,11 +38,15 @@ def test_missing_or_empty_text_degrades_to_empty_strings():
 def test_translate_patches_returns_the_text_layer():
     """Wiring check via source inspection — running the pipeline needs
     GPU/models (same pattern as test_page_context.py). The patch result dict
-    must carry regions_payload(...) alongside img/patches."""
+    must carry regions_payload(...) alongside img/patches. #905 moved that
+    phase into _finish_patches; translate_patches must delegate to it."""
     src = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
     fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', src, re.S)
     assert fn, 'translate_patches not found'
-    assert "'regions': regions_payload(" in fn.group(0)
+    assert 'return await self._finish_patches(ctx, config, source_icc)' in fn.group(0)
+    finish = re.search(r'async def _finish_patches\(self.*?(?=\n    async def )', src, re.S)
+    assert finish, '_finish_patches not found'
+    assert "'regions': regions_payload(" in finish.group(0)
 
 
 # ---- #535 Phase-0c: telemetry enrichment (keys appear only when the attr exists) ----
@@ -96,3 +100,26 @@ def test_numpy_values_serialize_to_plain_python():
     json.dumps(out)                       # must not raise
     assert all(type(x) in (int, float) for x in out["xyxy"] + out["dst_box"])
     assert type(out["font_src_px"]) is int and type(out["font_final_px"]) is int
+
+
+# ---- 2026-10-20 quality loop: an early-returned page still accounts for its drops ----
+
+def test_empty_patch_result_still_lists_the_dropped_regions():
+    """A page whose every region was dropped (e.g. the LLM echoed English back and the identical-
+    translation filter removed them all) returned 'regions': [] — indistinguishable from a page
+    with no text, so Pipeline Doctor could only say 'no regions' (Chainsaw Man credits page)."""
+    from manga_translator.text_layer import empty_patch_result
+
+    class R:
+        text, translation, xyxy = 'NOTICE:', 'NOTICE:', (10, 10, 90, 30)
+
+    out = empty_patch_result(800, 1150, [(R(), 'Translation identical to original')])
+    assert out['img_width'] == 800 and out['img_height'] == 1150 and out['patches'] == []
+    assert out['regions'] == [{'src': 'NOTICE:', 'dst': 'NOTICE:', 'xyxy': [10, 10, 90, 30],
+                               'rendered': False, 'drop_reason': 'Translation identical to original'}]
+
+
+def test_translate_patches_early_returns_report_drops():
+    src = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
+    fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', src, re.S).group(0)
+    assert "'patches': [], 'regions': []}" not in fn

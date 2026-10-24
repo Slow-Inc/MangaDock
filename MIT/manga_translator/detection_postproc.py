@@ -66,6 +66,16 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     return out
 
 
+def _placeholder_quad(box):
+    """An empty textline over ``box`` that only exists for the VLM rescue — its OCR read is a
+    guess at a whole box, dropped when junk (#797)."""
+    from .utils.generic import Quadrilateral
+    x1, y1, x2, y2 = box
+    q = Quadrilateral(np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32), '', 1.0)
+    q.rescue_placeholder = True
+    return q
+
+
 def merge_empty_balloons(ctx, result, device):
     """#535: append an empty textline for every inked balloon DBNet left uncovered —
     it then flows OCR → vlm_rescue → translate → render exactly like a rescued SFX.
@@ -74,7 +84,12 @@ def merge_empty_balloons(ctx, result, device):
         from .bubble_detector import detect_bubbles
         from .utils.generic import Quadrilateral
         textlines, mask_raw, mask = result
-        polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda'))
+        # One balloon detection per page: container merge and tagging reuse ctx.bubble_polygons
+        # (the YOLO ran twice per page before — same image, same model, same answer).
+        polygons = getattr(ctx, 'bubble_polygons', None)
+        if polygons is None:
+            polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda')) or []
+            ctx.bubble_polygons = polygons
         if not polygons:
             return result
         img = ctx.img_rgb
@@ -107,9 +122,7 @@ def merge_empty_balloons(ctx, result, device):
         balloons += [_shrink(b) for b in white_box_candidates(gray_pre)]
         existing = [textline_aabb(t) for t in textlines]
         fresh = empty_balloon_boxes(balloons, existing, _ink)
-        for (x1, y1, x2, y2) in fresh:
-            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(Quadrilateral(pts, '', 1.0))
+        textlines.extend(_placeholder_quad(b) for b in fresh)
         if fresh:
             logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
 
@@ -119,9 +132,7 @@ def merge_empty_balloons(ctx, result, device):
         gray = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
         covered = [textline_aabb(t) for t in textlines] + list(balloons)
         clusters = uncovered_text_clusters(gray, covered)
-        for (x1, y1, x2, y2) in clusters:
-            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(Quadrilateral(pts, '', 1.0))
+        textlines.extend(_placeholder_quad(b) for b in clusters)
         if clusters:
             logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
         return (textlines, mask_raw, mask)
@@ -133,7 +144,8 @@ def merge_empty_balloons(ctx, result, device):
 def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
                             max_area_frac: float = 0.25,
                             ink_lo: float = 0.04, ink_hi: float = 0.45,
-                            bg_light: int = 190, dilate_px: int = 9):
+                            bg_light: int = 190, dilate_px: int = 9,
+                            max_width_frac: float = 0.7):
     """#535 completeness (Otome "STARTING WITH…" box + the "ME OFF!" line): find
     text-like INK CLUSTERS no detector covered — sparse dark strokes sitting on a
     LIGHT background (typeset captions / dialogue), the exact pattern both DBNet and
@@ -156,6 +168,8 @@ def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
         x, y, bw, bh, area = stats[i]
         if bw * bh < min_area or (bw * bh) / page_area > max_area_frac:
             continue
+        if bw > max_width_frac * w:
+            continue                      # panel-wide = light art (a UI screen), not a text block
         crop = g[y:y + bh, x:x + bw]
         crop_ink = (crop < 128)
         density = float(crop_ink.mean())

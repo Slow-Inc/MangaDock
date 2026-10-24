@@ -1,0 +1,292 @@
+{
+ "page": "result/corpus2/en_Mieruko_chan_c6_p0.png",
+ "regions": [
+  {
+   "index": 0,
+   "xyxy": [
+    709,
+    328,
+    745,
+    346
+   ],
+   "src": "Free",
+   "dst": "ฟรี",
+   "container": 0,
+   "container_box": [
+    681,
+    319,
+    784,
+    389
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 17,
+   "font_px": 20,
+   "dst_box": [
+    714.5,
+    325,
+    739.5,
+    349
+   ]
+  },
+  {
+   "index": 1,
+   "xyxy": [
+    71,
+    282,
+    184,
+    458
+   ],
+   "src": "EVER SINCE I PUT ON THIS BRACELET,",
+   "dst": "ตั้งแต่ใส่น้ำข้อมือเส้นนี้",
+   "container": 1,
+   "container_box": [
+    63,
+    330,
+    241,
+    783
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 30,
+   "font_px": 30,
+   "dst_box": [
+    89.5,
+    330.859375,
+    165.5,
+    474.859375
+   ]
+  },
+  {
+   "index": 2,
+   "xyxy": [
+    542,
+    319,
+    666,
+    458
+   ],
+   "src": "YOU WERE SPOT ON, GOD- MOTHER!",
+   "dst": "แม่นมคะ! แม่นบญชีแม่นจริงเปลาะเปลาะไปหมดเลย!",
+   "container": 2,
+   "container_box": [
+    528,
+    242,
+    668,
+    572
+   ],
+   "branch": "bubble_fit_tall",
+   "font_src_px": 29,
+   "font_px": 29,
+   "dst_box": [
+    546.316352786598,
+    291.83165991459543,
+    663.316352786598,
+    500.6316599145954
+   ]
+  },
+  {
+   "index": 3,
+   "xyxy": [
+    678,
+    393,
+    897,
+    533
+   ],
+   "src": "GODMOTHER OF ORTUNE TELLING AND EXORCISM luck with money, work and love all raised to the max!",
+   "dst": "แม่นมแห่งการดูดวงและขับไล่ผี โชคลาภเรื่องเงิน การงานและความรักพุ่งสูงสุด!",
+   "container": null,
+   "container_box": null,
+   "branch": "clean_layout",
+   "font_src_px": 19,
+   "font_px": 20,
+   "dst_box": [
+    712,
+    403,
+    863,
+    523
+   ]
+  },
+  {
+   "index": 4,
+   "xyxy": [
+    77,
+    522,
+    221,
+    733
+   ],
+   "src": "MEN HAVE BEEN FAWNING OVER ME LIKE THERES NO TOMORROW!",
+   "dst": "ผู้ชายต่างก็มาอ้อนวอนกันจนแทบจะหมดโลก!",
+   "container": 1,
+   "container_box": [
+    63,
+    330,
+    241,
+    783
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 27,
+   "font_px": 27,
+   "dst_box": [
+    95.5,
+    530.3,
+    202.5,
+    724.7
+   ]
+  },
+  {
+   "index": 5,
+   "xyxy": [
+    776,
+    810,
+    840,
+    830
+   ],
+   "src": "HEHE.",
+   "dst": "เขะๆ",
+   "container": 3,
+   "container_box": [
+    769,
+    751,
+    855,
+    884
+   ],
+   "branch": "bubble_fit_tall",
+   "font_src_px": 20,
+   "font_px": 20,
+   "dst_box": [
+    791.2051507367852,
+    808.000946329593,
+    828.2051507367852,
+    832.000946329593
+   ]
+  },
+  {
+   "index": 6,
+   "xyxy": [
+    146,
+    879,
+    265,
+    984
+   ],
+   "src": "ILL DEFINITELY BE BACK!",
+   "dst": "จะกลับมาอีกแน่นอน!",
+   "container": 4,
+   "container_box": [
+    90,
+    801,
+    312,
+    1084
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 29,
+   "font_px": 29,
+   "dst_box": [
+    149,
+    879.3,
+    262,
+    983.7
+   ]
+  },
+  {
+   "index": 7,
+   "xyxy": [
+    65,
+    1051,
+    200,
+    1211
+   ],
+   "src": "Fortune Telling ninutes 5,000 yen minutes 10,000 yen",
+   "dst": "ดูดวง นาทีละ 5,000 เยน นาทีละ 10,000 เยน",
+   "container": null,
+   "container_box": null,
+   "branch": "clean_layout",
+   "font_src_px": 21,
+   "font_px": 21,
+   "dst_box": [
+    84.5,
+    1070.48984375,
+    180.5,
+    1221.68984375
+   ]
+  },
+  {
+   "index": 8,
+   "xyxy": [
+    720,
+    1077,
+    884,
+    1270
+   ],
+   "src": "IF THE POWER WEARS OFF COME AGAIN AND ILL GIVE YOU A NEW ONE FOR JUST 30,000 YEN.",
+   "dst": "ถ้าพลังหมด ให้กลับมาใหม่ แล้วจะมอบเส้นใหม่ให้ในราคาเพียง 30,000 เยน",
+   "container": 5,
+   "container_box": [
+    697,
+    1003,
+    898,
+    1330
+   ],
+   "branch": "bubble_fit_tall",
+   "font_src_px": 17,
+   "font_px": 20,
+   "dst_box": [
+    754.2075933809515,
+    1078.7461926221479,
+    853.2075933809515,
+    1270.7461926221479
+   ]
+  },
+  {
+   "index": 9,
+   "xyxy": [
+    62,
+    1208,
+    223,
+    1281
+   ],
+   "src": "pecial course k 30,000 yen",
+   "dst": "คอร์สพิเศษ 30,000 เยน",
+   "container": null,
+   "container_box": null,
+   "branch": "clean_layout",
+   "font_src_px": 29,
+   "font_px": 29,
+   "dst_box": [
+    64,
+    1213,
+    221,
+    1282.6
+   ]
+  },
+  {
+   "index": 10,
+   "xyxy": [
+    65,
+    1288,
+    193,
+    1322
+   ],
+   "src": "ee your futcre",
+   "dst": "ดูอนาคต",
+   "container": null,
+   "container_box": null,
+   "branch": "clean_layout",
+   "font_src_px": 23,
+   "font_px": 23,
+   "dst_box": [
+    86.5,
+    1291.2,
+    171.5,
+    1318.8
+   ]
+  }
+ ],
+ "timing_ms": {
+  "wall": 6431,
+  "detection": 541,
+  "ocr": 1597,
+  "textline_merge": 234,
+  "translation": 2836,
+  "mask_refinement": 489,
+  "inpainting": 266,
+  "rendering": 283
+ }
+}

@@ -31,3 +31,55 @@ def test_short_ascii_name_kept():
 def test_thai_text_still_dropped_for_english_source():
     r = _region('ข้อความภาษาไทยล้วนยาวพอให้ตรวจจับได้')
     assert _filter([r]) == []
+
+
+def test_english_with_one_stray_glyph_is_kept_even_with_a_lazy_langid_guess():
+    """Iruma p0 (2026-10-21): 'I WONDER WHY...' and 'I ALREADY KNEW THAT, DUMMY.' stayed English on the
+    page. OCR misread the lone 'I' as '피' and caught a '○' — not pure ASCII, so the region went to
+    langid via TextBlock.source_lang (a lazy langid guess: KO, MT) and the mostly-ASCII Latin guard
+    in _detect_region_source_lang never ran. Both regions were dropped silently."""
+    regions = [SimpleNamespace(text=t, sfx_rescued=False, source_lang=guess)
+               for t, guess in (('피 WONDER WHY..', 'ko'), ('I AL- READY KNEW THAT, DUMMY. ○', 'mt'))]
+    assert _filter(regions) == regions
+
+
+def test_an_explicit_cjk_source_lang_still_drops_japanese():
+    r = SimpleNamespace(text='平ク ザワ ザワ', sfx_rescued=False, source_lang='ja')
+    assert _filter([r]) == []
+
+
+def _strip(regions, source='ENG'):
+    self = object.__new__(MangaTranslator)
+    config = SimpleNamespace(translator=SimpleNamespace(source_lang=source))
+    MangaTranslator._strip_source_noise(self, regions, config)
+    return [r.text for r in regions]
+
+
+def test_ocr_noise_glyphs_are_stripped_before_translation_857():
+    """The source-language filter runs AFTER translation, so the LLM had already seen '피 WONDER WHY..'
+    ('เพราะ WONDER'). The noise is stripped from a Latin-source region before it is translated."""
+    regions = [SimpleNamespace(text='피 WONDER WHY..'), SimpleNamespace(text='平ク ザワ')]
+    assert _strip(regions) == ['WONDER WHY..', '平ク ザワ']
+    assert _strip([SimpleNamespace(text='피 WONDER WHY..')], source='JPN') == ['피 WONDER WHY..']
+
+
+def test_regions_the_filter_drops_are_recorded_for_the_payload_857():
+    """#857: the filter dropped two English balloons and the doctor's `dropped` list stayed empty —
+    the bug was invisible. Its drops now go to ctx.dropped_regions with the detected language."""
+    self = object.__new__(MangaTranslator)
+    config = SimpleNamespace(translator=SimpleNamespace(source_lang_only=True, source_lang='ENG'))
+    keep = SimpleNamespace(text='HELLO THERE', sfx_rescued=False)
+    drop = SimpleNamespace(text='ข้อความภาษาไทยล้วนยาวพอให้ตรวจจับได้', sfx_rescued=False)
+    ctx = SimpleNamespace(text_regions=[keep, drop])
+    assert MangaTranslator._apply_source_lang_filter(self, ctx, config) == [keep]
+    assert [(r, why[:16]) for r, why in ctx.dropped_regions] == [(drop, 'source language ')]
+
+
+def test_punctuation_does_not_count_against_english_857():
+    """Third corpus, Horimiya p0 (2026-10-21): 'STRANGELY…' read as 'STRANGEレY…' (one katakana
+    misread) was dropped as 'not English' — with the '…' only 9/11 characters were ASCII (< 0.85).
+    The share is taken over letters only: 8 of 9 letters are Latin."""
+    r = SimpleNamespace(text='STRANGEレY…', sfx_rescued=False, source_lang='ja')
+    assert _filter([r]) == [r]
+    jp = SimpleNamespace(text='ザワ…!? ザワ…', sfx_rescued=False, source_lang='ja')
+    assert _filter([jp]) == []

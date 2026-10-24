@@ -357,6 +357,9 @@ class Quadrilateral(object):
     """
     Helper for storing textlines that contains various helper functions.
     """
+    #: True for an empty-balloon / ink-cluster placeholder queued for the VLM rescue (#797).
+    rescue_placeholder = False
+
     def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0, is_sfx: bool = False):
         self.pts, is_vertical = sort_pnts(pts)
         # #278: provenance — True when appended by the det_sfx second pass (merge_sfx_detections),

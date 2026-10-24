@@ -180,6 +180,21 @@ class RenderConfig(BaseModel):
     scaled up by the length-ratio heuristic into an oversized block that overflows its
     panel (matches MangaTranslator's small absolute fonts). SFX is exempt. 0 → no cap
     (byte-identical)."""
+    font_src_scale: float = 0.0
+    """#851: one dialogue font size per page, scaled from the source lettering — the page's size is
+    this x the median source font size of its non-SFX regions (a region far off the median keeps
+    this x its own). Clean layout starts from it instead of the absolute font_size_max, and a
+    sole-balloon fit never exceeds it; each still shrinks to fit. 0 → off (byte-identical)."""
+    fit_below_floor: bool = False
+    widen_vertical_columns: bool = False
+    """#1006 opt-in: a vertical Japanese source rendered to a horizontal-only target (Thai/Latin) may
+    grow its wrap width toward 1.5x the source column instead of squeezing to the original height —
+    fewer, longer lines allow a larger font on regions that currently land at the font floor (measured:
+    20 px from a 40 px source on the real JP pages). Off -> byte-identical renders."""
+    """#883: when a block cannot fit between its neighbours even at ``font_size_minimum``, shrink
+    below the floor to the size that fits instead of overlapping them. Off → current behavior
+    (a block taller than its gap is centred in it, overlapping). Opt-in: small text is a quality
+    call, so the default stays byte-identical."""
     anti_overlap: bool = False
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated
@@ -306,6 +321,23 @@ class TranslatorConfig(BaseModel):
     seam as series_context so every GPT-family translator carries it. The worker
     resets its own per-request memory, so this is the batch path's only carrier.
     Absent → prompts identical to today."""
+    name_glossary: Optional[str] = None
+    """#980: cross-page character-name glossary rendered by name_glossary.format_glossary
+(source name -> Thai spelling). Rides the same chatgpt_config seam as series_context/prev_context so
+every GPT-family translator appends it to its system prompt. Absent -> prompts byte-identical."""
+    api_key: Optional[str] = None
+    """#893: per-request credential the Backend sends when LLM_PROVIDER is not gemini
+    (Backend/.env LLM_API_KEY). Dropped silently before; the OpenAI-compatible client rebuilds
+    from it when present. Absent -> the translator keeps its .env client."""
+    api_url: Optional[str] = None
+    """#893: per-request endpoint (LLM_BASE_URL) for the same path. Absent -> .env base."""
+    concise_bubbles: bool = False
+    temperature: Optional[float] = None
+    """#762 follow-up: per-request sampling temperature. Absent -> the translator keeps its default (0.5)."""
+    """#892 (P7/#526): ask the translator for the shortest faithful phrasing — the #1 render defect
+    on tight bubbles is a translation physically too long for the balloon. The Backend has sent this
+    flag since #526 but Pydantic dropped it because the field was missing; it rides the same
+    chatgpt_config seam as the context fields now. False → prompts byte-identical."""
 
     # 译后检查配置项
     enable_post_translation_check: bool = True
@@ -348,6 +380,13 @@ class TranslatorConfig(BaseModel):
             overrides['series_context'] = self.series_context
         if self.prev_context:
             overrides['prev_context'] = self.prev_context
+        if self.name_glossary:
+            overrides['name_glossary'] = self.name_glossary
+        if self.concise_bubbles:
+            # #892: the Backend flag used to die here; carry it to the OmegaConf ConfigGPT reads.
+            overrides['concise_bubbles'] = True
+        if self.temperature is not None:
+            overrides['temperature'] = float(self.temperature)
         if overrides:
             ctx = OmegaConf.create(overrides)
             return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx
@@ -379,6 +418,11 @@ class DetectorConfig(BaseModel):
     bubbles → dialogue treated as narration + under-filled), synthesize one with a classical
     flood-fill, accepted only through acceptable_synth_bubble (encloses text, not a page leak).
     Requires det_bubble_seg. Off → byte-identical."""
+    det_bubble_merge: bool = True
+    """#757: detect balloons/captions BEFORE textline merge and coalesce line components that share
+    one container when one of them is a single line, so a caption whose lines are spaced 1.0-1.7x
+    the font size is translated as one block, not per-line fragments. Requires det_bubble_seg.
+    Default on since 2026-10-21 (corpus: 0 wrong merges); off → byte-identical to before."""
     det_sfx: bool = False
     """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
     and merge its boxes (IoA dedup) into the textline flow, so stylized katakana

@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # from .ballon_extractor import extract_ballon_region
 from . import text_render
-from ..font_fit import fit_font_size, font_high_cap
+from ..font_fit import area_font_cap, fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
 from ..render_overlap import box_containment, fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, squeeze_width
 from ..safe_area import safe_area_box
@@ -98,6 +98,13 @@ def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BO
         return block_w, block_h
 
     high = font_high_cap(h_box, max_box_ratio, floor=8)
+    # The fit scans DOWN from `high` (the wrapper is not monotonic in size), so cap `high`
+    # by area first: a one-line width of k px per font px cannot wrap into w x h above
+    # sqrt(w*h / (line_height * k)).
+    probe = 100
+    one_line = text_render.get_string_width(probe, text.replace('\n', ' '))
+    high = max(8, min(high, area_font_cap((w_box, h_box), one_line / probe, _LINE_HEIGHT,
+                                          margin=_FIT_MARGIN)))
     return fit_font_size((w_box, h_box), measure, low=8, high=high, margin=_FIT_MARGIN)
 
 
@@ -149,17 +156,150 @@ def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_a
         return None
 
 
+def _box(v):
+    return tuple(float(x) for x in v) if v is not None else None
+
+
+def _render_wrap_width(font_size, text, lang, box_w, ss):
+    """Wrap width for the ss-scaled render. #item9: never narrower than the widest whole word
+    (ss rounding would otherwise force-split it). #816: but when that word is wider than the box,
+    the layout already broke it at its dictionary parts — re-wrap at the layout's own width so the
+    render keeps those breaks instead of re-widening the block and squeezing it into the box."""
+    floor = text_render.longest_token_width(font_size * ss, text, lang)
+    if floor > box_w * ss:
+        _, widths = text_render.calc_horizontal(font_size, text, max(1, int(round(box_w))), 10 ** 6,
+                                                language=lang)
+        if widths:
+            floor = min(floor, (max(widths) + 1) * ss)
+    return max(round(box_w * ss), floor)
+
+
+def _clamp_center(c, size, lo, hi):
+    """Centre ``c`` moved so a span of ``size`` stays within [lo, hi] — unchanged if it can't fit."""
+    if size > hi - lo:
+        return c
+    return min(max(c, lo + size / 2.0), hi - size / 2.0)
+
+
+def _dodge_center(c, size, lo, hi):
+    """Centre ``c`` moved the least so a span of ``size`` clears the edges a dodge pushed in to
+    [lo, hi]: inside it when it fits, else flush with the pushed edge (centred if both were)."""
+    if size <= hi - lo:
+        return _clamp_center(c, size, lo, hi)
+    lo_pushed, hi_pushed = lo > c - size / 2.0 + 1e-6, hi < c + size / 2.0 - 1e-6
+    if lo_pushed != hi_pushed:
+        return lo + size / 2.0 if lo_pushed else hi - size / 2.0
+    return (lo + hi) / 2.0 if lo_pushed else c
+
+
+def _dodged_space(cx, cy, bw, bh, territories, own):
+    """``(dodged, free)`` for a ``bw`` x ``bh`` block centred at (cx, cy): the block's box with every
+    neighbour's territory pushed out of it, and that box clipped to the region's own balloon when
+    the block sits in one (the clip is no push — Tsuki p1). None/None when it collapses."""
+    box = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+    dodged = clamp_box_to_neighbors(box, territories, margin=2)
+    free = list(dodged)
+    if own is not None and own[0] <= cx <= own[2] and own[1] <= cy <= own[3]:
+        free = [max(free[0], own[0]), max(free[1], own[1]), min(free[2], own[2]), min(free[3], own[3])]
+    if (free[2] - free[0]) < 6 or (free[3] - free[1]) < 6:
+        return None, None
+    return dodged, free
+
+
+def _place_off_neighbours(cx, cy, bw, bh, territories, own):
+    """Centre for a ``bw`` x ``bh`` block that must stay off its neighbours (#795). Per axis: inside
+    the free space when it fits, else flush with the edge a neighbour pushed in. If that move runs
+    into another neighbour, the block is centred in the gap between the two — or, when the far side
+    was never a neighbour, sits flush against the one it hit (Mieruko p0: flush alone pushed a sign
+    onto the line below). The dodge is taken at this block's own size (a re-laid block is taller)."""
+    dodged, free = _dodged_space(cx, cy, bw, bh, territories, own)
+    if dodged is None:
+        return cx, cy
+    start = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+
+    def axis(c, size, k):
+        if size <= free[k + 2] - free[k]:
+            return _clamp_center(c, size, free[k], free[k + 2])
+        return _dodge_center(c, size, dodged[k], dodged[k + 2])
+
+    cx, cy = axis(cx, bw, 0), axis(cy, bh, 1)
+    moved = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+    again = clamp_box_to_neighbors(moved, territories, margin=2)
+
+    def gap(c, size, k):
+        lo_hit, hi_hit = again[k] > moved[k] + 1e-6, again[k + 2] < moved[k + 2] - 1e-6
+        if not (lo_hit or hi_hit):
+            return c
+        lo = again[k] if lo_hit else (dodged[k] if dodged[k] > start[k] + 1e-6 else None)
+        hi = again[k + 2] if hi_hit else (dodged[k + 2] if dodged[k + 2] < start[k + 2] - 1e-6 else None)
+        if lo is None:
+            return hi - size / 2.0
+        if hi is None:
+            return lo + size / 2.0
+        return _clamp_center(c, size, lo, hi) if size <= hi - lo else (lo + hi) / 2.0
+
+    return gap(cx, bw, 0), gap(cy, bh, 1)
+
+
+def _is_sfx_region(r) -> bool:
+    return bool(getattr(r, 'from_sfx_detection', False) or getattr(r, 'sfx_rescued', False))
+
+
+def annotate_page_font(regions, scale: float) -> None:
+    """#851: one dialogue font size per page. Sets ``region.page_font`` = ``scale`` x the median
+    source font size (``region.font_size``, the detected line height) of the page's non-SFX
+    regions. A region under half that median (credits) gets ``scale`` x its own size; one over
+    double it (a title, an SFX the detector did not tag — Iruma 'PRK') gets no page size and keeps
+    the absolute font. Run on the WHOLE page before patch grouping — a patch renders one group
+    alone and would otherwise take the median of that group. No-op at scale 0."""
+    if not scale or scale <= 0:
+        return
+    srcs = sorted(float(r.font_size) for r in regions
+                  if (getattr(r, 'font_size', 0) or 0) > 0 and not _is_sfx_region(r))
+    if not srcs:
+        return
+    n = len(srcs)
+    median = srcs[n // 2] if n % 2 else (srcs[n // 2 - 1] + srcs[n // 2]) / 2.0
+    for r in regions:
+        own = float(getattr(r, 'font_size', 0) or 0)
+        if own > 2.0 * median or _is_sfx_region(r):
+            r.page_font = None
+            continue
+        base = own if 0 < own < 0.5 * median else median
+        r.page_font = max(1, round(scale * base))
+
+
 def _region_territory(region):
     """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
     detection box. Returns None when neither is available."""
     bb = getattr(region, 'bubble_box', None)
-    if bb is not None:
-        return (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
-    xy = getattr(region, 'xyxy', None)
-    return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
+    return _box(bb) if bb is not None else _box(getattr(region, 'xyxy', None))
 
 
-def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
+def _neighbor_territories(text_regions, i, text_only=False):
+    """Territories region ``i`` must stay out of. A sibling in the SAME balloon owns only its
+    detection box: its territory would otherwise be that whole balloon, and clamping against it
+    shoved region ``i`` out of its own balloon onto the next one (Tsuki p1, 2026-10-20)."""
+    own = _box(getattr(text_regions[i], 'bubble_box', None))
+    out = []
+    for j, r in enumerate(text_regions):
+        if j == i:
+            continue
+        sibling = own is not None and _box(getattr(r, 'bubble_box', None)) == own
+        t = _box(getattr(r, 'xyxy', None)) if (sibling or text_only) else _region_territory(r)
+        if t is not None:
+            out.append(t)
+    return out
+
+
+# The Thai column in a tall balloon starts at this share of the source column's width: the source is
+# measured at its widest line, and an elliptical balloon narrows where the Thai's first line sits
+# (Mieruko p1: 'เด็กพวกนี้' touched the outline at the full source width).
+_LETTER_W_FILL = 0.9
+
+
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None,
+                      shrink_to_fit: bool = False, grow: bool = True, widen_vertical: bool | None = None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -169,6 +309,8 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
 
     ``font_size_max`` (MIT_FONT_SIZE_MAX) sets the absolute font when >0, else a small
     page-scaled default (≈ MangaTranslator's 12–16px on a typical page)."""
+    if widen_vertical is None:
+        widen_vertical = bool(getattr(region, 'widen_vertical_columns', False))
     xy = getattr(region, 'xyxy', None)
     if xy is None:
         return None
@@ -183,6 +325,9 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # small crop, whose 45% cap would strangle a wide caption (and the 11% floor
     # under-floor). Use the page width when the caller threads it.
     _ps = page_shape if page_shape is not None else img_shape
+    # #1006: a vertical source rendered to a horizontal-only target may use a wider block (fewer lines ->
+    # larger font) instead of squeezing to the source column's height.
+    _widen = bool(widen_vertical) and getattr(region, 'source_direction', '') == 'v'
     wrap_w = clean_wrap_width(x2f - x1f, _ps[1])
     lang = getattr(region, 'target_lang', 'en_US')
     # #535/#183 (user vs target): a tall original footprint (vertical-JP narration /
@@ -193,6 +338,18 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # own 2×font so no degenerate sliver.
     box_h = max(1.0, y2f - y1f)
     bbox_w = max(1.0, x2f - x1f)
+    # A balloon interior: keep the letterer's column — squeeze only toward the height the source
+    # lettering used, not the whole balloon (Kaoru p0: two 152 px lines in a tall octagon became a
+    # 60 px column of one word per line; Otome's 'THIS SCUMBAG' filled its tall box, so its column
+    # stays tall), and start from its width, not the interior's (Kage p0: the full interior width
+    # put the Thai on the narration box's border). The fit below still widens/shrinks as needed.
+    _letter_w = float(getattr(region, 'letter_w', 0) or 0)
+    _letter_h = float(getattr(region, 'letter_h', 0) or 0)
+    _squeeze_h = min(box_h, _letter_h) if _letter_h > 0 else box_h
+    _squeeze_h_base = _squeeze_h
+    if _letter_w > 0:
+        wrap_w = min(wrap_w, _LETTER_W_FILL * _letter_w)
+    _wrap_w_base = wrap_w
 
     # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
     # SYLLABLE + hyphen when the language hyphenator can split it — long words then
@@ -233,7 +390,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
                                                 int(img_shape[0]), language=lang)
             return max(1, len(ls)) * fs * _LINE_HEIGHT
         floor = _floor_w(fs)
-        used = squeeze_width(_mh, max(wrap_w, floor), floor, box_h)
+        used = squeeze_width(_mh, max(wrap_w, floor), floor, _squeeze_h)
         lines, widths = text_render.calc_horizontal(
             fs, region.translation, int(used), int(img_shape[0]), language=lang)
         bw = float(max(widths)) if widths else float(used)
@@ -245,22 +402,60 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # lettering whose squeezed column still fits the original footprint (width AND
     # height). Falls back to the flat size (current behavior) when nothing larger
     # fits — a short/wide caption keeps the flat look unchanged.
-    orig_fs = int(getattr(region, 'font_size', 0) or 0)
-    hi = min(max(orig_fs, clean_fs), 120)
-    fs = hi
-    while fs > clean_fs:
-        bw, bh = _layout_at(fs)
-        if bh <= box_h and bw <= bbox_w * 1.05:
-            block_w, block_h, clean_fs = bw, bh, fs
-            return int(clean_fs), float(block_w), float(block_h)
-        fs -= 2
+    _orig_fs = int(getattr(region, 'font_size', 0) or 0)
+    # grow=False (#851 page size): the page's size is the ceiling, not a floor to grow from
+    hi = min(max(_orig_fs, clean_fs), 120) if grow else clean_fs
 
-    # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
-    block_w, block_h = _layout_at(clean_fs)
+    def _search(cap_w, squeeze_h, start_wrap):
+        def _layout(fs):
+            floor = _floor_w(fs)
+            def _mh(w):
+                ls, _ = text_render.calc_horizontal(fs, region.translation, int(w),
+                                                    int(img_shape[0]), language=lang)
+                return max(1, len(ls)) * fs * _LINE_HEIGHT
+            used = squeeze_width(_mh, max(start_wrap, floor), floor, squeeze_h)
+            lines, widths = text_render.calc_horizontal(fs, region.translation, int(used),
+                                                        int(img_shape[0]), language=lang)
+            bw = float(max(widths)) if widths else float(used)
+            bh = max(1, len(lines)) * fs * _LINE_HEIGHT
+            return bw, bh
+
+        fs = hi
+        while fs > clean_fs:
+            bw, bh = _layout(fs)
+            if bh <= box_h and bw <= cap_w:
+                return fs, bw, bh
+            fs -= 2
+        bw, bh = _layout(clean_fs)
+        return clean_fs, bw, bh
+
+    # #535 (user vs target): pick the LARGEST font <= the original lettering that fits the source
+    # footprint. #1006 (opt-in): a tall narrow source may also try a WIDER block (fewer lines, larger
+    # font); the wider layout is used only when it yields a bigger font, so no region gets smaller.
+    clean_fs, block_w, block_h = _search(bbox_w * 1.05, _squeeze_h_base, _wrap_w_base)
+    if _widen:
+        _wide_fs, _wide_w, _wide_h = _search(bbox_w * 1.5, 10 ** 7, _wrap_w_base * 1.5)
+        if _wide_fs > clean_fs:
+            clean_fs, block_w, block_h = _wide_fs, _wide_w, _wide_h
+    # #816: when the box is a balloon interior (bubble_fit_tall), a block that still overflows at
+    # the flat size spills past the balloon edge. Wrap straight to the interior width — the
+    # wrapper then breaks a too-long word at its dictionary parts, giving a taller column at the
+    # same size — and shrink only while that still does not fit, down to a readable floor.
+    if shrink_to_fit and (block_w > bbox_w * 1.05 or block_h > box_h):
+        floor_fs = max(10, font_size_minimum)
+        for fs in range(clean_fs, floor_fs - 1, -1):
+            ls, ws = text_render.calc_horizontal(fs, region.translation, int(bbox_w),
+                                                 int(img_shape[0]), language=lang)
+            block_w = float(max(ws)) if ws else float(bbox_w)
+            block_h = max(1, len(ls)) * fs * _LINE_HEIGHT
+            clean_fs = fs
+            if block_w <= bbox_w * 1.05 and block_h <= box_h:
+                break
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0, fit_below_floor: bool = False,
+                          widen_vertical_columns: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -339,7 +534,21 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             _seen_sfx[_t] = (k, _area)
 
     dst_points_list = []
+    # #851: one dialogue size per page. The /patches path annotates the whole page before grouping;
+    # a full-page render (every region present) annotates here.
+    if font_src_scale and font_src_scale > 0 and not all(hasattr(r, 'page_font') for r in text_regions):
+        annotate_page_font(text_regions, font_src_scale)
+
+    if widen_vertical_columns:
+        for _r in text_regions:
+            _r.widen_vertical_columns = True
     for i, region in enumerate(text_regions):
+        # the absolute font clean layout starts from: the page's dialogue size (#851) for text in a
+        # balloon, else font_size_max — balloon-less text (contents lists, signs) sits tight against
+        # its neighbours and overlapped them when grown (A/B at 1.4: 10 new pairs)
+        _page_sized = bool(font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None)
+                           and getattr(region, 'bubble_box', None) is not None)
+        fmax_i = max(font_size_minimum, region.page_font) if _page_sized else font_size_max
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
         # (the legacy path would choke on it); keep a degenerate dst so lists align.
         if not (region.translation and region.translation.strip()):
@@ -376,8 +585,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # region's territory; the font is then fit to the clamped box, so the text
             # stays in its own space instead of colliding with the next bubble.
             if anti_overlap:
-                territories = [t for j, r in enumerate(text_regions) if j != i
-                               for t in (_region_territory(r),) if t is not None]
+                # the fit box is this balloon polygon's interior: it cannot enter another balloon, only its text —
+                # a neighbour balloon's bbox can overlap it (Horimiya p0: 87 px interior clamped to 14 px)
+                territories = _neighbor_territories(text_regions, i, text_only=bool(getattr(region, 'bubble_polygon', None)))
                 cb = clamp_box_to_neighbors(
                     (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
                     territories, margin=2)
@@ -394,10 +604,12 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     translation=region.translation,
                     target_lang=getattr(region, 'target_lang', 'en_US'),
                     font_size=getattr(region, 'font_size', 0),
+                    letter_w=float(region.xyxy[2]) - float(region.xyxy[0]),
+                    letter_h=float(region.xyxy[3]) - float(region.xyxy[1]),
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
                 _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                          font_size_max, page_shape)
+                                          fmax_i, page_shape, shrink_to_fit=True, grow=not _page_sized)
                 if _laid is not None:
                     _fs, _bw, _bh = _laid
                     region.font_size = int(_fs)
@@ -410,6 +622,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         np.array([centered_box(acx, acy, _bw, _bh)], dtype=np.int64))
                     continue
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
+            if _page_sized:
+                region.font_size = min(region.font_size, region.page_font)   # #851: not past the page size
             hw, hh = fit_w / 2.0, fit_h / 2.0
             # #535 Phase-0c telemetry: stamp the routing decision so the /patches
             # payload can explain this region (additive attrs, no behavior change).
@@ -464,20 +678,112 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             continue
 
         if clean_layout and not _sfx_display and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
+            _bb = getattr(region, 'bubble_box', None)
+
+            def _clean_laid(fmax, page_sized):
+                laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax, page_shape,
+                                         grow=not page_sized)
+                # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
+                # lands here, and its column floored at the widest Thai word can be wider than the
+                # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
+                if laid is not None and _bb is not None and region.horizontal:
+                    _fw, _fh, (_acx, _acy) = _bubble_interior_box(region, _bb, img.shape)
+                    # with the page size (#851) a block can also outgrow the interior's height
+                    if laid[1] > _fw * 1.05 or (page_sized and laid[2] > _fh * 1.05):
+                        from types import SimpleNamespace
+                        _proxy = SimpleNamespace(
+                            translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
+                            font_size=getattr(region, 'font_size', 0),
+                            xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
+                        laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, fmax,
+                                                 page_shape, shrink_to_fit=True, grow=not page_sized) or laid
+                return laid
+
+            laid = _clean_laid(fmax_i, _page_sized)
+            # #851: a page-sized block must fit its space — the balloon interior, or its own footprint
+            # when it shares the balloon (two siblings grew into each other: Akuyaku p1). If not, the
+            # largest size <= the page size that fits; below the absolute font, the absolute font
+            # (Kage p1 outgrew its box; dropping straight to 20 px beside 39 px made pages LESS even).
+            if _page_sized and laid is not None:
+                if occupancy[i] == 1:
+                    _iw, _ih, (_ix, _iy) = _bubble_interior_box(region, _bb, img.shape)
+                    _fit_box = (_ix - _iw / 2.0, _iy - _ih / 2.0, _ix + _iw / 2.0, _iy + _ih / 2.0)
+                else:
+                    _fit_box = tuple(float(v) for v in region.xyxy)
+                _fbw, _fbh = _fit_box[2] - _fit_box[0], _fit_box[3] - _fit_box[1]
+                if laid[1] > _fbw or laid[2] > _fbh:   # no slack: 303 px in a 292 px box spilled (Kage p1)
+                    from types import SimpleNamespace
+                    _fit = _clean_layout_dst(
+                        SimpleNamespace(translation=region.translation,
+                                        target_lang=getattr(region, 'target_lang', 'en_US'),
+                                        font_size=getattr(region, 'font_size', 0), xyxy=_fit_box),
+                        img.shape, font_size_minimum, fmax_i, page_shape, shrink_to_fit=True, grow=False)
+                    if (_fit is not None and _fit[0] >= font_size_max
+                            and _fit[1] <= _fbw and _fit[2] <= _fbh):
+                        laid = _fit
+                    else:
+                        _page_sized, fmax_i = False, font_size_max
+                        laid = _clean_laid(fmax_i, False)
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
                 cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
-                # anti-overlap: shift the upright block off any neighbour's territory.
+                # anti-overlap: the block must stay off every neighbour's territory (#795) and inside
+                # its own balloon when the region sits in one (Tsuki p1). The free space is the
+                # dodged box clipped to that balloon; if it is narrower than the block, the text is
+                # laid out again to fit it (Iruma p0: re-centring alone still overlapped).
                 if anti_overlap:
-                    territories = [t for j, r in enumerate(text_regions) if j != i
-                                   for t in (_region_territory(r),) if t is not None]
-                    cb = clamp_box_to_neighbors(
-                        (cx - block_w / 2.0, cy - block_h / 2.0,
-                         cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
-                    if (cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6:
-                        cx, cy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+                    territories = _neighbor_territories(text_regions, i)
+                    own = _box(getattr(region, 'bubble_box', None))
+                    _, free = _dodged_space(cx, cy, block_w, block_h, territories, own)
+                    if free is not None:
+                        _free_w = free[2] - free[0]
+                        if _free_w < block_w - 1 and _free_w >= 2 * font_size_minimum:
+                            from types import SimpleNamespace
+                            _h = max(block_h, y2f - y1f)
+                            _proxy = SimpleNamespace(
+                                translation=region.translation,
+                                target_lang=getattr(region, 'target_lang', 'en_US'),
+                                font_size=getattr(region, 'font_size', 0),
+                                xyxy=(free[0], cy - _h / 2.0, free[2], cy + _h / 2.0))
+                            _relaid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
+                                                        fmax_i, page_shape, shrink_to_fit=True, grow=not _page_sized)
+                            if _relaid is not None and _relaid[1] <= _free_w * 1.05:
+                                clean_fs, block_w, block_h = _relaid
+                        cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, territories, own)
+                    # #883 (opt-in): the block still does not fit the space the neighbours leave
+                    # (a block taller than its gap is centred in it and overlaps). Shrink below the
+                    # readable floor to the size that does fit; small text beats overlapping text.
+                    if fit_below_floor and not _page_sized and (free is None or block_w > (free[2] - free[0]) + 1
+                                                                or block_h > (free[3] - free[1]) + 1):
+                        _sub_min = max(6, font_size_minimum // 2)
+                        _bx = tuple(float(v) for v in region.xyxy)
+                        for _fs_try in range(int(clean_fs) - 2, _sub_min - 1, -2):
+                            from types import SimpleNamespace as _NS
+                            _proxy = _NS(translation=region.translation,
+                                         target_lang=getattr(region, 'target_lang', 'en_US'),
+                                         font_size=getattr(region, 'font_size', 0), xyxy=_bx)
+                            _re = _clean_layout_dst(_proxy, img.shape, _sub_min, _fs_try, page_shape,
+                                                    shrink_to_fit=True, grow=False)
+                            if _re is None:
+                                break
+                            _bw, _bh = float(_re[1]), float(_re[2])
+                            _d2, _f2 = _dodged_space(cx, cy, _bw, _bh, territories, own)
+                            if _f2 is not None and _bw <= (_f2[2] - _f2[0]) + 1 and _bh <= (_f2[3] - _f2[1]) + 1:
+                                clean_fs, block_w, block_h, free = int(_re[0]), _bw, _bh, _f2
+                                break
+                    if own is not None:            # a dodge never takes the text out of its balloon
+                        cx = _clamp_center(cx, block_w, own[0], own[2])
+                        cy = _clamp_center(cy, block_h, own[1], own[3])
+                # keep the block on the page (Otome p0: gutter narration laid out wider than its source
+                # started at x = -7 and lost its first letters). A patch knows the page edges in its own
+                # coordinates (page_bounds); a full-page render is the page.
+                _pb = getattr(region, 'page_bounds', None)
+                if _pb is None and page_shape is None:
+                    _pb = (0.0, 0.0, float(img.shape[1]), float(img.shape[0]))
+                if _pb is not None:
+                    cx = _clamp_center(cx, block_w, _pb[0], _pb[2])
+                    cy = _clamp_center(cy, block_h, _pb[1], _pb[3])
                 region.font_size = clean_fs
                 region._direction = 'h'
                 # #535 Phase-0c telemetry (additive, no behavior change).
@@ -609,8 +915,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             pts = dst_points.reshape(-1, 2)
             ax1, ay1 = float(pts[:, 0].min()), float(pts[:, 1].min())
             ax2, ay2 = float(pts[:, 0].max()), float(pts[:, 1].max())
-            territories = [t for j, r in enumerate(text_regions) if j != i
-                           for t in (_region_territory(r),) if t is not None]
+            territories = _neighbor_territories(text_regions, i)
             cb = clamp_box_to_neighbors((ax1, ay1, ax2, ay2), territories, margin=2)
             if ((cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6 and
                     (cb[0] > ax1 + 0.5 or cb[1] > ay1 + 0.5
@@ -649,7 +954,10 @@ async def dispatch(
     font_size_max: int = 0,
     clean_layout: bool = False,
     knuth_plass: bool = False,
-    page_shape=None
+    page_shape=None,
+    font_src_scale: float = 0.0,
+    fit_below_floor: bool = False,
+    widen_vertical_columns: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -665,7 +973,7 @@ async def dispatch(
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale, fit_below_floor, widen_vertical_columns)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections
@@ -753,8 +1061,7 @@ def render(
         # narrower than the widest atomic word at font*ss — integer rounding at ss=4
         # otherwise force-splits Thai/CJK words the layout kept whole ("ขอโทษ"→"ขอโ/ทบ").
         _render_text = region.get_translation_for_rendering()
-        _wrap_w_ss = max(round(norm_h[0] * ss),
-                         text_render.longest_token_width(region.font_size * ss, _render_text, region.target_lang))
+        _wrap_w_ss = _render_wrap_width(region.font_size, _render_text, region.target_lang, norm_h[0], ss)
         temp_box = text_render.put_text_horizontal(
             region.font_size * ss,
             _render_text,

@@ -225,7 +225,7 @@ class CommonGPTTranslator(ConfigGPT, CommonTranslator):
                 yield prompt.lstrip(), len(this_batch)
     
     def _assemble_request(self, to_lang: str, prompt: str) -> Dict:
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
         if to_lang in self.chat_sample:
             messages.append({'role': 'user', 'content': self.chat_sample[to_lang][0]})
@@ -355,7 +355,7 @@ class _CommonGPTTranslator_JSON:
                 yield this_batch.model_dump_json(), len(this_batch.TextList)
 
     def _assemble_request(self, to_lang: str, prompt: str, response_format=True) -> Dict:
-        messages = [{'role': 'system', 'content': self.translator.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.translator.system_prompt(to_lang)}]
         
         jSample=self.translator.get_json_sample(to_lang)
         if jSample:

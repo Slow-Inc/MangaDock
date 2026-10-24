@@ -290,7 +290,7 @@ class GeminiTranslator(CommonGPTTranslator):
     
     def _createContext(self, to_lang: str): 
         chatSamples=None
-        sysTemplate=self.chat_system_template.format(to_lang=to_lang)
+        sysTemplate=self.system_prompt(to_lang)
         
         # Store cached values for printing to logger:
         self.cachedVals={'System Prompt (Cached)': sysTemplate}
@@ -459,7 +459,7 @@ class GeminiTranslator(CommonGPTTranslator):
             
             loggerVals = self.cachedVals.copy()
         else:
-            config_kwargs['system_instruction'] = self.chat_system_template.format(to_lang=to_lang)
+            config_kwargs['system_instruction'] = self.system_prompt(to_lang)
             loggerVals = {'System Prompt': config_kwargs['system_instruction']}
 
             # 如果需要先给出示例对话
@@ -523,7 +523,7 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
 
     def _createContext(self, to_lang: str):
         JSON_Samples=[]
-        sysTemplate=self.translator.chat_system_template.format(to_lang=to_lang)
+        sysTemplate=self.translator.system_prompt(to_lang)
 
         # Store cached values for printing to logger:
         self.cachedVals={'System Prompt (Cached)': sysTemplate}
@@ -566,7 +566,7 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
             config_kwargs['cached_content'] = self.templateCache.name
             loggerVals = self.cachedVals
         else:
-            config_kwargs['system_instruction'] = self.translator.chat_system_template.format(to_lang=to_lang)
+            config_kwargs['system_instruction'] = self.translator.system_prompt(to_lang)
             loggerVals={'System Prompt': config_kwargs['system_instruction']}
 
             lang_JSON_samples = self.translator.get_json_sample(to_lang)

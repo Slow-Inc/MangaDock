@@ -18,13 +18,20 @@ class Segment:
 		return f"({self.a}, {self.b})"
 
 	def __eq__(self, other):
-		return any([
-			self.a == other.a and self.b == other.b,
-			self.a == other.b and self.b == other.a,
-		])
+		return (self.a == other.a and self.b == other.b) or (self.a == other.b and self.b == other.a)
+
+	def key(self):
+		"""Order-free endpoints: two segments are __eq__ exactly when their keys are equal."""
+		return (self.a, self.b) if self.a <= self.b else (self.b, self.a)
 
 	def dist(self):
-		return math.sqrt(self.dist_x()**2 + self.dist_y()**2)
+		# cached: union_all compares every pair of segments (~51k intersect calls on 4 pages), and the
+		# endpoints never change after __init__
+		try:
+			return self._dist
+		except AttributeError:
+			self._dist = math.sqrt(self.dist_x()**2 + self.dist_y()**2)
+			return self._dist
 
 	def dist_x(self, keep_sign = False):
 		dist = self.b[0] - self.a[0]
@@ -123,7 +130,11 @@ class Segment:
 		return angle < 10 or abs(angle - 180) < 10
 
 	def angle(self):
-		return math.atan(self.dist_y() / self.dist_x()) if self.dist_x() != 0 else math.pi / 2
+		try:
+			return self._angle
+		except AttributeError:
+			self._angle = math.atan(self.dist_y() / self.dist_x()) if self.dist_x() != 0 else math.pi / 2
+			return self._angle
 
 	def intersect_all(self, segments):
 		segments_match = []
@@ -164,21 +175,21 @@ class Segment:
 		while unioned_segments:
 			unioned_segments = False
 			dedup_segments = []
-			used = []
+			used = set()  # #822: order-free endpoint keys — same meaning as `in` on a list, O(1)
 			for i, s1 in enumerate(segments):
 				for s2 in segments[i + 1:]:
-					if s2 in used:
+					if s2.key() in used:
 						continue
 
 					s3 = s1.union(s2)
 					if s3 is not None:
 						unioned_segments = True
 						dedup_segments += [s3]
-						used.append(s1)
-						used.append(s2)
+						used.add(s1.key())
+						used.add(s2.key())
 						break
 
-				if s1 not in used:
+				if s1.key() not in used:
 					dedup_segments += [s1]
 
 			segments = dedup_segments
@@ -186,12 +197,13 @@ class Segment:
 		return dedup_segments
 
 	def projected_point(self, p):
-		a = np.array(self.a)
-		b = np.array(self.b)
-		p = np.array(p)
-		ap = p - a
-		ab = b - a
-		if ab[0] == 0 and ab[1] == 0:
-			return a
-		result = a + np.dot(ap, ab) / np.dot(ab, ab) * ab
-		return (round(result[0]), round(result[1]))
+		# plain floats, same arithmetic as the former 2-element numpy version (exact integer dot
+		# products, one true division) — it ran for every pair union_all and split compare. Integer
+		# coordinates only (Segment endpoints and contour dots are ints), as int() below assumes.
+		ax, ay = self.a
+		abx, aby = self.b[0] - ax, self.b[1] - ay
+		if abx == 0 and aby == 0:
+			return np.array(self.a)
+		px, py = (p[0], p[1]) if len(p) == 2 else np.ravel(p)[:2]   # a polygon dot arrives as [[x, y]]
+		t = (int(px - ax) * abx + int(py - ay) * aby) / (abx * abx + aby * aby)
+		return (round(ax + t * abx), round(ay + t * aby))

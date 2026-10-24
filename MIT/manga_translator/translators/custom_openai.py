@@ -87,7 +87,8 @@ def parse_numbered_translations(response: str, query_size: int):
     index shifted every later bubble) and strict (a malformed ``<|10|`` with no closing ``>``
     leaked into the text). Delegates to ``numbered_contract`` (index-based + malformed-marker
     tolerant); falls back to a whole-body / newline split only when there is no marker at all."""
-    from .numbered_contract import normalize_numbered_output, _BLOCK_RE
+    from .numbered_contract import contract_gap, normalize_numbered_output, _BLOCK_RE
+
     if _BLOCK_RE.search(response or ''):
         return [('' if t.startswith('[Missing item') else t)
                 for t in normalize_numbered_output(response, query_size)]
@@ -189,7 +190,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         if to_lang in self.chat_sample:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 self.chat_sample[to_lang][0],
                 'Assistant:',
@@ -200,7 +201,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         else:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 prompt,
             ])
@@ -215,6 +216,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             ratelimit_attempt = 0
             server_error_attempt = 0
             timeout_attempt = 0
+            contract_attempt = 0
             while True:
                 request_task = asyncio.create_task(self._request_translation(to_lang, prompt))
                 started = time.time()
@@ -242,6 +244,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         started = time.time()
                 try:
                     response = await request_task
+                    # #1026: index-based normalization cannot detect a MERGED/SPLIT line. Count the blocks
+                    # against the batch size and re-ask once; a mismatch here shifts every later balloon.
+                    from .numbered_contract import contract_gap
+                    if contract_gap(response, query_size) and contract_attempt < 2:
+                        contract_attempt += 1
+                        self.logger.warning(
+                            f'Numbered contract mismatch for {query_size} lines - retrying the batch '
+                            f'(attempt {contract_attempt})')
+                        await asyncio.sleep(0.5)
+                        continue
                     break
                 except openai.RateLimitError:  # Server returned ratelimit response
                     ratelimit_attempt += 1
@@ -290,7 +302,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         return translations
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
         # Add chat samples if available
         lang_chat_samples = self.get_chat_sample(to_lang)

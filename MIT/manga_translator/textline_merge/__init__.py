@@ -107,7 +107,7 @@ def split_text_region(
 #     box = np.array(box)
 #     return box
 
-def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
+def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height, containers=None):
     # step 0: merge quadrilaterals that belong to the same textline
     # u = 0
     # removed_counter = 0
@@ -139,6 +139,15 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
     region_indices: List[Set[int]] = []
     for node_set in nx.algorithms.components.connected_components(G):
          region_indices.extend(split_text_region(bboxes, node_set, width, height))
+
+    # step 2b (#757): lines inside one balloon/caption container belong together even when their
+    # spacing exceeds the merge gap above (captions run 1.0-1.7x the font size).
+    if containers is not None:
+        from ..container_merge import coalesce_container_fragments
+        region_indices = coalesce_container_fragments(
+            region_indices, containers, [box.direction for box in bboxes],
+            [b.xyxy for b in bboxes],
+            [b.font_size for b in bboxes], [getattr(b, 'is_sfx', False) for b in bboxes])
 
     # step 3: return regions
     for node_set in region_indices:
@@ -181,7 +190,18 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
         # yield overall bbox and sorted indices
         yield txtlns, (fg_r, fg_g, fg_b), (bg_r, bg_g, bg_b)
 
-async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False) -> List[TextBlock]:
+def stamp_text_raw(regions) -> None:
+    """#885: keep the raw OCR text on each merged region BEFORE the pre-translation dictionary
+    rewrites ``text``. Renderers scale a longer translation against it (rendering:792) and the
+    page-translation record keys on it; the old stamp landed on a dispatch whose regions were
+    thrown away, so every consumer silently saw the rewritten text instead."""
+    for region in regions or []:
+        if not hasattr(region, "text_raw"):
+            region.text_raw = region.text
+
+
+async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False,
+                   containers=None) -> List[TextBlock]:
     # print(width, height)
     # import re
     # for l in textlines:
@@ -190,7 +210,7 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
     #     print(s)
 
     text_regions: List[TextBlock] = []
-    for (txtlns, fg_color, bg_color) in merge_bboxes_text_region(textlines, width, height):
+    for (txtlns, fg_color, bg_color) in merge_bboxes_text_region(textlines, width, height, containers):
         total_logprobs = 0
         for txtln in txtlns:
             total_logprobs += np.log(txtln.prob) * txtln.area
@@ -213,6 +233,15 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         # VLM rescue), NOT `is_sfx`. So `is_sfx` is
         # inert for the render/rescue path here — kept only as provenance. Unify to one
         # is_display_sfx_region helper: tracked in #629.
+        # #1006: the merged region's SOURCE line direction ('v' for a Japanese column); the
+        # renderer uses it to tell vertical sources from captions (target presets hide it).
+        _dirs = [getattr(t, 'direction', None) for t in txtlns]
+        region.source_direction = Counter(d for d in _dirs if d).most_common(1)[0][0] if any(_dirs) else ''
         region.is_sfx = from_sfx
+        # Speculative only when EVERY line is a detector guess (a det_sfx box or an empty-balloon /
+        # ink-cluster placeholder): a real line merged with a det_sfx fragment is dialogue, and
+        # must never meet the junk-read drop (ocr_vlm.sfx_false_positive, #754/#797).
+        region.speculative = all(t.is_sfx or t.rescue_placeholder for t in txtlns)
+        region.rescue_placeholder = all(t.rescue_placeholder for t in txtlns)
         text_regions.append(region)
     return text_regions

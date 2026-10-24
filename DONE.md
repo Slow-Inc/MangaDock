@@ -2280,6 +2280,2311 @@ that need a running server, same as before. Browser: signed out on the dev serve
 - TDD reproduced lost author details and invalid follow profiles for array-shaped joins through the real Supabase SDK with a controlled HTTP boundary. Added 12 regression tests; `npm.cmd run build` passed; full Backend suite: **90 suites / 960 tests passed**.
 - Scope: three Backend services and their new specs, plus this history and the [impact report](docs/reports/system-impact-report.md). No dependency, schema, Frontend, or MIT changes. Uncommitted local fix for the reported Backend startup blocker, separate from native Mobile feature work.
 - Resume here: rerun `npm.cmd run start:dev` in `Backend` if the existing watch process has not rebuilt; database/runtime connectivity remains to be checked in the user's environment.
+## MIT quality loop, round 288 — closing evidence battery + loop-close record (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the final battery at head 3fce711f: suite **997 passed**, all checks pass (logic 1m48s, heavy ML 5m9s, backend 51s, Vercel completed), #642 is the only blocker (open draft CONFLICTING), merge-tree conflicts limited to the three docs, worktree clean.
+- Wrote `2026-10-23-loop-close.md`: verified state, end-state numbers, remaining external steps and the evidence index. No code change.
+
+---
+
+## MIT quality loop, round 287 — team vault synced to the v6-v11 final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vault `project-translation-eval-set.md` gained the v6-v11 section: sweep results, judge band, the SFX batching latency win, OCR garble fix, new precision licences, series-memory fix, unseen 31-page validation, 997 tests, CI/merge status and the do-not-repeat list. No code change.
+
+---
+
+## MIT quality loop, round 286 — loop-by-numbers summary added to the hand-off index (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off gained a by-the-numbers block: 450 commits, 318 files (+19,212/-295; 131 MIT, 174 docs), 997 tests, 6 unseen series / 31 pages, sweeps v1-v11 and the judge band. No code change.
+
+---
+
+## MIT quality loop, round 285 — opt-in MIT_RETRY_SUBSET_LAST added; dense A/B shows different wording (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `use_segment_retry` (pure, tested) and the opt-in `MIT_RETRY_SUBSET_LAST`: retries 3+ send only the flagged segments while the first retry keeps page context. `MIT_SEGMENT_RETRY` keeps its old all-retries behaviour.
+- Dense-page forced A/B: hybrid wall 18.5/17.6 s vs whole-page 32.7/14.6 s (mixed), and the final translations differ in **4/9 regions**, so equal quality is not proven -> knob stays opt-in, no default change. Documented; env example updated. Suite local run pending green.
+
+---
+
+## MIT quality loop, round 284 — dense-page retry hybrid queued with natural evidence (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Death Note's dense page (41 s translation for two whole-page retries) is the natural case where the previously-rejected attempt-3-subset hybrid would save about a third of the stage; recorded that the test must be repeated on a dense page (the small-page A/B does not transfer) before it could become a default above a segment-count threshold. No code change.
+
+---
+
+## MIT quality loop, round 283 — seventh unseen series (Death Note): gate 0 on dense dialogue pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four dialogue-dense Death Note pages: gate 0 everywhere, render telemetry clean; two triggers caught (a Korean-syllable leak and a content-loss retry). The glitched page's translation stage cost 41 s - a concrete natural example of the retry-bound latency (quality held).
+- Unseen aggregate now 6 series / 31 pages, 30/31 gated clean (the exception is legitimate Latin names on Bocchi). No code change.
+
+---
+
+## MIT quality loop, round 282 — production path re-verified after all licences: gate 0, names consistent (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two series x two pages via `translate_patches` with `series_context`: gate 0 on every page's translated regions; the series memory applied 2 name fixes on Tsuki p1 and both pages ship the same spelling.
+- Tooling note recorded: gate the translated regions only, because raw payloads carry untouched regions (credits/art/SFX) whose empty translation is expected. No code change.
+
+---
+
+## MIT quality loop, round 281 — SFX upload A/B: 768 JPEG is quality-neutral (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Same unseen page, two runs per arm, `_to_data_url` swapped between full-res PNG and the new 768 px JPEG (9 candidates both arms): both arms produced plausible short onomatopoeia (`เหมียว`/`ปัง`/`ฟึ่บ` vs `ฟึ่บ`/`เฮ้อ`) with no garbage; variation is sampling/candidate nondeterminism. The upload change is quality-neutral and stays default. No code change.
+
+---
+
+## MIT quality loop, round 280 — v11 sweep: one more emphasis carrier; gate {} again (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v11 (39 pages, all licences live): 6 guard triggers (degraded window), dashboard gate `{dropped_!: 1}` from `DAMN THAT SHITTY GODDESS!` -> `ไอ้เทพธิดาใจร้ายนั่น` (the Thai `นั่น` carries the shout). Added `นั่น` to the emphasis licence; `ไอ้` alone was rejected because it broke the existing negative control. Re-scan: **gate {}, leftover {}**. v11 row recorded. Suite **996 passed**.
+
+---
+
+## MIT quality loop, round 279 — hand-off index refreshed to the final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off now covers v7-v10 (gate/lleftover {}, guard 1-14 by window, wall 6.1-10.3 s), judge raw 1.38-1.44, tests 995, Vercel green heads, the new licences and the SFX prefetch change, plus the missing evidence files. No code change.
+
+---
+
+## MIT quality loop, round 278 — temperature 0.2 does not reduce guard triggers; licence side-effect audit clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Paired 8-page A/B (alternating order) of `translator.temperature=0.2` vs the 0.5 default: guard triggers **2 vs 2**, stage time 3239 vs 4136 ms (sampling luck). No evidence for a default change; `MIT_TEMPERATURE` stays the opt-in knob.
+- Audited the round-274 licences on v10: only two source-`!` lines lack emphasis punctuation/particle; one is the licensed strong negation, the other uses `หรือ?`. Nothing hidden. Recorded in the backlog. No code change.
+
+---
+
+## MIT quality loop, round 277 — new Kaguya chapter: gate 0, second render-spill data point logged on #642 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four pages from a different unseen Kaguya chapter: gate 0 everywhere, no guard triggers; one render spill (a free-standing text box whose right edge sits 6.5 px outside its container).
+- Posted the box deltas as a second instance on #642 (render reconciliation) and updated the unseen-data aggregate: 27 pages, 26 gated clean, two render spills. No code change.
+
+---
+
+## MIT quality loop, round 276 — v10 judge in a bad window: raw 1.38, adjusted 1.53 (2.4% broken) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v10 outputs: 371 segments, raw **1.38**, 77 noise flags, strict-adjusted **1.53**, distribution 9/155/207 (broken 2.4%). The raw mean is window-dependent (**1.38-1.44** across runs); the adjusted band stays 1.53-1.60 and the structural results (gate {}, leftover {}) did not move.
+- Baseline and final report updated to quote the raw range plus the fixed structural numbers. No code change.
+
+---
+
+## MIT quality loop, round 275 — merge-day runbook issue list and suite figure refreshed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Runbook now lists the two newest licence issues to close on merge (#1098, #1099) and quotes the current post-licence suite figure (995). No code change.
+
+---
+
+## MIT quality loop, round 274 — digit-name + strong-negation gate licences; v10 re-scan gate {} (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v10 (39 pages) hit a bad model window again (14 guard triggers, wall 10.1 s) but every trigger was caught; the two gate findings were false positives: `ZER0` for the source credit `ZERO` (digit-suffixed kept name) and a strong Thai negation (`ไม่ใช่อย่างนั้น`) carrying a source `!`.
+- Fixed `added_latin` to normalise lookalike digits across whole alphanumeric tokens (genuine added Latin still flagged) and extended the emphasis licence with `ไม่ใช่`. Re-scan of v10: **gate {} and leftover {}**. Tests added; dashboard fixture updated; suite **995 passed**. Issue #1099; v10 row recorded.
+
+---
+
+## MIT quality loop, round 273 — merge re-verified against main 1a7ed2e6: 3 docs conflicts, merged suite 993 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- main advanced (#1091 image-proxy allowlist); `merge-tree` still conflicts only on the three append-only docs, and the extracted merged tree passes **993/4** - identical to the branch. Runbook unchanged; #642 still an old open draft. No code change.
+
+---
+
+## MIT quality loop, round 272 — Kaiju pages 8-11: gate 0, licence holds; unseen aggregate 23 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Three more unseen Kaiju pages: gate 0, render telemetry clean, no guard triggers; wall 1.8-26.6 s (dialogue/SFX/near-blank). The round-271 credit licence holds (no untranslated-word retries).
+- Unseen aggregate updated to 5 series / 23 pages, 22/23 gated clean (the exception remains legitimate Latin names on Bocchi). No code change.
+
+---
+
+## MIT quality loop, round 271 — reader-site credits + rhetorical exclamations licensed; retries and gate FPs gone (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Unseen Kaiju pages 5-8 exposed two FPs: reader-site credits (`...KDTSCANS.COM` kept legitimately) flagged by untranslated_word in both guard and gate, and a rhetorical `!` carried by the Thai particle `งั้นเหรอ` flagged as dropped_!.
+- Fixed: untranslated_source_word ignores words inside URLs/domains (real leaks like MATERIALS still caught); the gate emphasis licence accepts `งั้นเหรอ/เหรอ/หรอ/ไม่ใช่เหรอ`. Re-run of the three pages: **no guard triggers, gate 0**, translation 2.7-4.7 s vs 6.6-11.1 s. Tests added; suite **993 passed**. Issue #1098.
+
+---
+
+## MIT quality loop, round 270 — fifth unseen series (Kaiju No. 8): gate 0, no guard triggers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Kaiju No. 8 (4 unseen pages, optimized pipeline): gate 0 everywhere, render telemetry clean, **no guard triggers**; merge 0.2-0.5 s on plain pages and 5.3-7.9 s on the two SFX-heavy ones (batching keeps the worst case at ~8 s instead of 25-37 s).
+- Unseen-data aggregate: 5 series / 20 pages, 19/20 gated clean (the exceptions are legitimate Latin names on Bocchi). No code change.
+
+---
+
+## MIT quality loop, round 269 — remaining merge outliers profiled: panel/bubble layout + SFX vision wait (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- v9 merge outliers (5.7-9.2 s) were profiled on the Mushoku page: Kumiko panel detection 2.13 s (`_cached_split` 1.46 s over 16 panels), bubble detection 0.78 s, and the (already concurrent) SFX vision wait on candidate pages.
+- Neither can shrink without a quality tradeoff (dropping SFX candidates or changing the panel contract that rendering relies on; the panel-downscale campaign was already rejected). Recorded and closed for this loop. No code change.
+
+---
+
+## MIT quality loop, round 268 — final report includes the SFX batching fix and the v9 latency note (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Final report now records the round-264 optimization (textline_merge 32-37 s -> 8.4-8.8 s via concurrent SFX vision calls + 768 px JPEG uploads), the v9 wall-time note (retries dominate in a bad model window), and the current test count (991). No code change.
+
+---
+
+## MIT quality loop, round 267 — v9 sweep after SFX batching: gate/lleftover empty, 11 glitches cost retries (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 39-page sweep on the optimized pipeline: dashboard page gate **{}** and leftover **{}** again, but the window's model variance produced **11** guard triggers (foreign-script Chinese leaks, spurious `ทน`, content-loss), and the wall rose to 10.3 s avg with translation 165.7 s total.
+- Every trigger was caught (nothing shipped), so quality held; the extra time is the whole-page retry cost measured in rounds 265-266 - natural-data confirmation that retries, not the SFX change, dominate latency in a bad model window. v9 row recorded.
+
+---
+
+## MIT quality loop, round 266 — attempt-3 subset retry measured: identical quality, no latency win -> rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Forced persistent-glitch A/B (corrupt first two attempts; whole-page vs subset retries; 3 reps/arm): **final translations identical 3/3** (dst_diffs 0), but whole median 11.1 s vs subset 12.1 s (one 48 s outlier) - no measurable win because a retry is one gateway call either way on these page sizes.
+- Rejected the attempt-3 subset default; keep MIT_SEGMENT_RETRY opt-in. Recorded in the backlog. No code change.
+
+---
+
+## MIT quality loop, round 265 — remaining latency cost is whole-page glitch retries; candidate queued (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Post-optimization timing on corpus pages: textline_merge now 0.4-0.9 s (SFX batching holds), and the translation stage dominates (7-17 s) because the default retry policy re-sends the whole page for every invalid segment (MIT_SEGMENT_RETRY stays opt-in for context quality).
+- Measured Tsuki: one foreign_script glitch -> 11.0 s translation vs 3-4 s clean (attempts 2 and 3 each 3x traffic). Queued a proposal needing a forced-glitch A/B: whole-page for attempt 2, flagged subset for attempt 3. No code change.
+
+---
+
+## MIT quality loop, round 264 — SFX vision calls batched: textline_merge 32 s -> 8.4 s, page wall 54-68 -> 26 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Unseen-page QA showed 25-37 s textline_merge outliers; profiling traced them to one blocking 4-5 s vision request per SFX candidate, sequential, plus full-resolution PNG uploads.
+- Fix: candidates are localised concurrently (`ocr_vlm.localize_candidates`, order preserved, empty answers cached so the loop cannot re-ask them) and crops upload as 768 px JPEG instead of full-res PNG.
+- Same page: prefetch wait 14.2 -> 7.5 s, textline_merge 32.4-37.4 -> 8.4-8.8 s, wall 54-68 -> 25.8-26.0 s, gate 0. Tests added (concurrency/order + data URL); suite **991 passed**. Benchmark `2026-10-23-sfx-vlm-prefetch.md`.
+
+---
+
+## MIT quality loop, round 263 — fourth unseen series: gate 0; A/B shows the dropped-question hit was a real catch (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Oshi no Ko (4 pages): gate 0 everywhere, render telemetry clean. One dropped_question trigger on `ARENT THEY TOTALLY VISIBLE!?` looked like a licence candidate, but a direct A/B shows the model normally keeps the agreement marker (`ไม่ใช่หรือ!?`/`ใช่ไหม!?`) — the guard caught a rare bad sample, so no licence change. Content-loss hit was an OCR-truncated line, retried clean.
+- Unseen-data aggregate now 4 series / 16 pages. No code change.
+
+---
+
+## MIT quality loop, round 262 — third unseen series: gate 0 on all pages; unseen-data aggregate recorded (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Yotsuba pages: gate 0 everywhere, render telemetry clean, warm pages under 4 s; one content-loss retry on a credits strip. Aggregate over three unseen series (12 pages): translation generalises, remaining costs are the rare free-standing-text spill and retry churn on legitimate Latin names. No code change.
+
+---
+
+## MIT quality loop, round 261 — second unseen series: clean renders, but Latin proper names cost two retries (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Bocchi pages: render telemetry clean on all, gate 3 findings that are all legitimate Latin names (`KLIMTS NIGHT`, `TIKTOK`) kept intentionally; the untranslated-word guard still retried twice (10.9 s translation) and shipped the same names. A Chinese fragment in a translator note was retried to clean.
+- Queued a measured candidate: stop retrying `untranslated_word` when the identical Latin token survives the first retry (both observed cases never improved on retry), which needs per-class retry memory in custom_openai and its own tests. Recorded in the generalization report. No code change.
+
+---
+
+## MIT quality loop, round 260 — opinion-tag licence (SEE?/UNDERSTAND?) removes 2 retries on an unseen page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Kaguya pages: gate 0, render telemetry all zeros, but `THATS WHY EVERYONES READING, SEE?` retried twice (19 s translation) for an opinion tag the licence list lacked. Extended `is_tag_question` to standalone/comma-attached SEE / UNDERSTAND / GOT IT / CAPEESH / DIG; real questions (`CAN YOU SEE?`) remain guarded.
+- Re-run: **no guard trigger**, gate 0, translation 5.4 s (was 19.2 s). Test added; suite **990 passed**.
+
+---
+
+## MIT quality loop, round 259 — generalization test on a brand-new real manga page (Kaguya ch.11) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Pulled page 1 of Kaguya-sama ch.11 (English) from the MangaDex public API (kept in tmp, not committed) and ran the full pipeline: **gate 0**, natural Thai on all 7 regions, wall 16.4 s including cold model load.
+- Found one minor render-side defect: a free-standing text region spills ~7 px out of its container (`spill=1`), and confirmed the outlined-art-lettering detection gap extends to overlaid chapter subtitles. Both are outside the translation loop; recorded in `2026-10-23-new-manga-generalization.md`. No code change.
+
+---
+
+## MIT quality loop, round 258 — stylised heading: ruled out resolution, documented as a detector gap (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the Tsuki page at detection_size 3200 and 3840 (default 2560): **no region** for the `2ND NIGHT` heading in any run, so resolution is not the cause. It needs a detector/preprocessing class for outlined display text (separate campaign, own FP risk), not a translation-loop fix. Recorded in the backlog. No code change.
+
+---
+
+## MIT quality loop, round 257 — visual acceptance of rendered pages; stylised-heading limitation identified (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Inspected both rendered PNGs by eye: bubble text fitted and legible everywhere, no overflow/clipping/overlap; sizes track balloon size.
+- The stylised `2ND NIGHT: ...` heading stays English because it is **not detected as a text region** (absent from both regions and the dropped-by-filter list); Japanese credits + the decorative 月 title are correctly dropped by the source-language filter. This is a detection limitation for outlined display lettering, recorded for future work (title/logo class), not a translation or render defect. No code change.
+
+---
+
+## MIT quality loop, round 256 — batched notes: v8 in hand-off, intra-page name unify measured as unnecessary (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off end-state row now covers v7/v8 (gate {} both runs, 1-3 guard triggers, 6.07-7.83 s).
+- Negative result recorded: intra-page name spelling variance is 0/39 pages, so no page-level normaliser is warranted; cross-page variance is the production series-memory case (#1065). No code change.
+
+---
+
+## MIT quality loop, round 255 — v8 reproducibility sweep: gate {} again, 1 guard trigger, 6.07 s avg (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Second full sweep on the current head reproduces the clean state: dashboard page gate **{}**, leftover **{}**, only the expected chapter name variance, and just **1** guard trigger (a HEHE Chinese leak, retried to clean).
+- Wall avg 6.07 s (vs 7.83 s in v7) - run-to-run gateway/model variance, so the honest quote is the 6-8 s range. v8 row recorded. No code change.
+
+---
+
+## MIT quality loop, round 254 — hand-off index and vault synced to the final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off index now lists 989 tests, the rendered-PNG acceptance and the stability-report refactor; vault test count synced (989). No code change.
+
+---
+
+## MIT quality loop, round 253 — rendered-PNG acceptance: real outputs, zero layout telemetry, gate 0 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Final pass with PNG rendering (late sweeps were text-only): two pages produced 1.81/1.13 MB annotated images and 1.51/0.92 MB rendered images; render telemetry all zeros (`spill/overlap/small_font/suppressed`) and gate 0. Confirms the shipped pipeline renders real pages end-to-end after every late change.
+
+---
+
+## MIT quality loop, round 252 — stability-audit logic extracted and unit-tested (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `stability_audit.py` imports the ML stack, so its bucketing logic was untestable. Extracted the pure part into `tools/stability_report.compare_runs` (worst pairwise similarity per common segment, stable >=0.85 / moderate >=0.5) and made the audit call it.
+- Added `test/test_stability_report.py` (4 tests: bucket boundaries, segments missing from a run not scored, thresholds as parameters, empty input). Suite **989 passed**. No behaviour change to the audit.
+
+---
+
+## MIT quality loop, round 251 — stability audit finds term/register variance, queued as a future-loop candidate (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `stability_audit.py --runs 3` on current defaults: meaning is stable, but recurring terms vary (`จอมมาร` vs `เจ้าชายปีศาจ` for DEMON LORD) and pronouns vary (`ฉัน` vs `ข้า`). Names are covered by the series memory; common terms are not (it only learns name-focused lines).
+- Recorded as a future-loop candidate with the required design/FP guards, not a tail-end patch. No code change.
+
+---
+
+## MIT quality loop, round 249 — English negation-lost guard evaluated and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned v7: 40 regions carry an English negation, 4 lacked a Thai marker; inspection plus a direct A/B (3 baselines + retry-note sample per candidate) showed idiomatic renderings (`without holding back`), a prohibition marker the scan lacked (`ห้าม`), tag-question variance, and one rare glitch whose source kept the negation 3/3 on re-sampling.
+- A marker-based guard would retry on false positives and almost never hit a real defect; rejected and recorded in the do-not-repeat backlog (revisit only with a semantic verifier). No code change.
+
+---
+
+## MIT quality loop, round 248 — number-preservation guard evaluated and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned every v7 region with a source digit (`20`): only 3 looked like missing numbers and all were OCR garbles of words (`60NNA`=GONNA, `HUH2`=`?`, `7BYTHE`=BY THE) with correct translations.
+- A number guard would fire on OCR noise, not translation defects; recorded in the do-not-repeat backlog with the revisit condition (standalone numbers only). No code change.
+
+---
+
+## MIT quality loop, round 247 — env example now documents the two new debug logs (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited `MIT/.env.example` against the knobs the code reads: the two debug logs added in this loop (`MIT_LOG_OCR_REREAD`, `MIT_LOG_OMISSION_VERIFY`) were missing; both are now listed next to the other log switches. No behaviour change.
+
+---
+
+## MIT quality loop, round 246 — one-page branch hand-off index written (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `2026-10-23-quality-loop-handoff.md`: current state (v7 numbers, judge band, tests, CI), defaults turned on, opt-ins, evidence index, open items and pointers to the do-not-repeat list, so a successor does not need to replay the loop.
+- No code change.
+
+---
+
+## MIT quality loop, round 245 — pre-merge re-verified against main cb30e950: 3 docs conflicts, merged suite 985 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `git merge-tree` against current main: conflicts remain exactly the three append-only files (`DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md`).
+- Extracted the merged tree and ran the fast suite there: **985 passed, 4 skipped**, identical to the branch. The merge-day runbook is still accurate after main advanced (#1077). No code change.
+
+---
+
+## MIT quality loop, round 244 — v7 judge: raw 1.42, adjusted 1.56, broken share 2.2 % (lowest) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v7 outputs: 369 segments, raw **1.42**, 66 noise flags, strict-adjusted **1.56**, distribution 8/145/216 -> **broken 2.2 % (lowest of any sweep)**, partial 39.3 %, perfect 58.5 %.
+- Raw reads 1.42-1.44 across the loop's judge runs; adjusted stays in the 1.53-1.60 band. Baseline doc, final report and vault updated together. No code change.
+
+---
+
+## MIT quality loop, round 243 — v7 sweep: page gate `{}`, leftover `{}`, 3 guard triggers (lowest) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Post-fix sweep: dashboard gate **`{}`** and leftover **`{}`** (the rare `ATERIAL` did not recur), only the expected chapter name variance remains; guard triggers **3**, the lowest of any sweep; wall 7.83 s.
+- OCR suspicious singles dropped 7 -> 6 and the survivors are legitimate stammers/truncations (`W-`, `T THATS`, `R..`, `U-UM`, a cut `S`) — the `N`->`NOT` line is fixed. Final baseline gained the v7 row. No further code change.
+
+---
+
+## MIT quality loop, round 242 — suspicious OCR lines re-read with a wider crop (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Suspicious (single-letter garble) lines now use a 1.7x wider padded crop: the missing letter is usually just outside the detector box, and acceptance already requires the garble to be gone.
+- Measured on Iruma: same corrections at much better confidence (`YOU N` -> `YOU NOT` 0.95 vs 0.68). The Osoraku `DOWN HERE S` line remains unrecoverable (accepted 0); both pages keep gate 0. Crop-width test added; suite 985 passed. Benchmark updated.
+
+---
+
+## MIT quality loop, round 241 — garble-to-garble churn blocked in the OCR re-read (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the five pages that had suspicious singles: the Iruma `N`->`NOT` fix reproduced and all five pages passed the gate, but one line churned `TREASURE DOWN HERE S` -> `... F` through the confidence-margin path (garbled to garbled).
+- `better_read` now refuses any replacement while the new read still carries a suspicious single letter; only a clean read may replace a suspicious one. Test added; suite 984 passed. Benchmark updated.
+
+---
+
+## MIT quality loop, round 240 — OCR single-letter garbles (N=NOT) re-read: negation loss fixed 3/3 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A v6 zero-score segment shipped a positive question because OCR mangled `NOT` to a lone `N`; the line's confidence (0.78) was above the re-read threshold, so the pass skipped it.
+- The OCR second pass now treats a standalone capital letter (not I/A) between words as a re-read candidate regardless of confidence, and accepts a correction that removes the garbled token even without a confidence jump. Measured on the Iruma page **3/3 runs**: OCR `AH- DO YOU NOT LIKE THESE SNACKS?`, Thai `อ๋อ- เธอไม่ชอบขนมพวกนี้หรอ?` (negation preserved; previously a positive question).
+- Tests added; benchmark `2026-10-23-ocr-single-letter-garble.md`. This also removes the `AGAI-`? no — that fragment is unchanged; only the function-word garble class.
+
+---
+
+## MIT quality loop, round 239 — v6 judge: raw 1.44 stable, adjusted band widens to 1.53-1.60 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v6 outputs: 370 segments, raw **1.44**, noise flags **49**, strict-adjusted **1.53**, distribution 10/155/205 (2.7 % broken / 41.9 % partial / 55.4 % perfect).
+- Raw is stable across v1-v6; the adjusted value tracks the run's noise-flag count (49-138), so the honest band is now **1.53-1.60**. Baseline doc, final report and vault updated to quote the band plus the stable raw value. No code change.
+
+---
+
+## MIT quality loop, round 238 — final-state PR comment; GitHub CI green on e73c98ee (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Posted a final-state comment (v6 numbers, leftovers definition, retort licence, JP sanity, series-memory verification, deploy status, 982 tests, 0 secret-like hits) so a reviewer can read the current state without scrolling the history.
+- CI on head `e73c98ee`: **logic gate / heavy ML / backend all pass**; Vercel remains its external build-rate limit. No code change.
+
+---
+
+## MIT quality loop, round 237 — JP-path sanity: one real JP page, gate 0, no regressions (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the single distinct JP page through the current defaults (`--source JPN --target THA --gate`): **gate 0**, no guard triggers, wall 13.9 s (cold model load included). The late translation-side changes do not regress the JP path.
+- Recorded in the final baseline doc. No code change.
+
+---
+
+## MIT quality loop, round 236 — branch hygiene/security scan clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned all 312 changed files in the branch diff for secret-like patterns (API keys, AWS ids, private keys): **0 hits**. Binary additions are only benchmark evidence images under docs/reports; no models/archives.
+- Change mix: docs/reports 170, MIT/test 53, MIT/manga_translator 46, MIT/tools 22, MIT/server 5, Backend/src 3, vault 2 — consistent with a tested quality/ops change set. No code change.
+
+---
+
+## MIT quality loop, round 235 — leftover definition documented; dashboard named as source of truth (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Confirmed from the dashboard code that "leftover" covers `foreign_script`, `content_loss`, `untranslated_word`, `dropped_question`; older table rows used a narrower custom scan (which is why only the v6 row reports an `untranslated_word` leftover).
+- Added the definition footnote to the final baseline doc and restated the classes in the final report. No code change.
+
+---
+
+## MIT quality loop, round 234 — CORRECTION: v6 leftovers are `{untranslated_word: 1}` (the rare leak), not {} (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Validated the final-report reproduce command (`quality_dashboard.py --doctor-dir result/doctor/final166`): it reports gate `{untranslated_word: 1, added_latin: 1}` and leftover **`{untranslated_word: 1}`** — the same rare `ATERIAL` leak. The earlier v6 "leftover 0" came from a custom scan that did not include the untranslated-word predicate.
+- Corrected the v6 table and the final report dict wording; the leak is the already-analysed guard-failure case, not a new defect. No code change.
+
+---
+
+## MIT quality loop, round 233 — merge-day runbook written; status re-checked (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a concrete merge-day runbook to `2026-10-23-premerge-verification.md`: retarget to main, merge main, resolve the three docs conflicts by union, confirmation steps, and the list of loop issues to close with evidence once merged.
+- Status: branch in sync with origin, CI running on the latest head, Vercel rate-limited externally (it passed on `16ff6e43`), #642 still an open draft (mergeable UNKNOWN). No code change.
+
+---
+
+## MIT quality loop, round 232 — retry budget re-evaluated (keep 2) and final report bumped to v6/982 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Evaluated raising `_INVALID_REPEAT_COUNT` to 3 for the rare `ATERIAL` case: the leak is 1/370, guard hits are rare, and direct sampling shows the first retry normally fixes leaks (0/9) — the third attempt would mostly add latency on bad batches. **Kept at 2**, with the revisit condition recorded (name the leaked token in the note only if leaks survive two retries).
+- Final report updated with the v6 gate wording and the current suite count (982). No code change.
+
+---
+
+## MIT quality loop, round 231 — v6 sweep: v5 gate findings stay fixed; one rare guard-failure leak analysed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full default sweep with every licence live: leftover **0** across all five scans, 4 guard triggers, wall 7.80/6.62 s; retort retries stayed gone.
+- Page gate: 2 findings on ONE line (`untranslated_word` + `added_latin`: `...เอามATERIALมา...`) plus the expected name variance. The `untranslated_word` guard fired but both retries leaked an English variant, exhausting the budget.
+- Direct A/B of three retry notes (none/current/stronger) on that exact line: **0 Latin leaks in 9/9 samples** -> model variance, not a weak note; no change. Final baseline doc gained the v6 row.
+
+---
+
+## MIT quality loop, round 230 — licences validated live: retort retries gone, gate 0 on the two pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh runs of the two motivating pages: no `dropped_question` trigger on the retort page (previously two re-asks per run), no emphasis gate finding, **gate pages=2 violations=0**. The only glitches were two foreign-script Chinese leaks (model variance) that the existing guard handled. No code change; benchmark updated.
+
+---
+
+## MIT quality loop, round 229 — retort + Thai-emphasis licences: v5 page gate now completely clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Both remaining page-gate findings were false positives: a rhetorical retort ending in `?` (Thai carries it with `!`) kept the dropped_question guard retrying every run, and a source `!` conveyed by the Thai particle `จริงๆ` was called dropped_!.
+- Added `is_retort_question` (long >= 8-word statement, no question form; shared by guard and gate) and a gate emphasis-particle licence. The measured 6-word #1056 case stays guarded.
+- v5 dashboard after the licences: **gate_violations {}, leftover {}**; all 44 corpus lines with a source `!` verified to carry the mark or an emphasis particle. Tests added; files 67 passed. Issue #1071, benchmark `2026-10-23-guard-precision-licences.md`.
+
+---
+
+## MIT quality loop, round 228 — team memory updated with v5 and the late fixes (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vault `project-translation-eval-set.md` now records the v5 sweep numbers, the #1065 series-memory bug/fix with its production verification, the #1064 deploy fix, the opt-in omission pass evidence and the current suite count.
+- CI watcher started on the latest head. No code change.
+
+---
+
+## MIT quality loop, round 227 — PR body/comment carry the round-7 state (v5, #1064, #1065) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-7 section (v5 numbers, deploy fix/revert of image downscaling, series-memory bug + production re-verification, suite 979) with a Thai mirror; a matching comment was posted. No code change.
+- CI was running on the latest head; Vercel shows its external build-rate limit again (it deployed successfully on `16ff6e43`).
+
+---
+
+## MIT quality loop, round 226 — production series-memory re-verified end-to-end: 2 name fixes, consistent spelling (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two-page production-style run with a stable `series_context`: page 2 logged `[series-glossary] applied 2 name fix(es)` and shipped the same `สึกุโยมิ` spelling as page 1 — the default production path is consistent again after the #1065 token-level fix.
+- Root cause of the earlier `APIConnectionError` in the recheck script was **import order** (keys caches the gateway URL at import; `.env` must load first) plus `TUNED` having no translator key — both tooling, not pipeline. Recorded in the prod-path acceptance benchmark.
+
+---
+
+## MIT quality loop, round 225 — series-memory bug fixed: token-level glossary presence (#1065) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checking the production series memory via its public API exposed a real bug: `apply_glossary` used a **substring** test for "spelling already present", so a variant that contains the remembered spelling (`ทสึคุโยมิ` contains `สึคุโยมิ`) was never fixed — exactly the shape that survives across pages in production.
+- Fixed to token-level presence check (#1065); measured before/after via the public API: page2 `ทสึคุโยมิ?` -> `สึคุโยมิ?` (fixed=1). Regression test added; suite **979 passed**.
+- The full gateway pipeline recheck still fails in this window with an SDK `APIConnectionError` while `GET /models` returns 200; module-level verification is the evidence and the pipeline re-run stays on the list.
+
+---
+
+## MIT quality loop, round 224 — production series-memory recheck attempt hit a transient SDK connection error (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tried to re-run the two-page production-path series-memory check with the current code; the OpenAI SDK raised `APIConnectionError` twice while `GET /models` on the same gateway returned 200 (connectivity fine, transient SDK call failure).
+- No series-memory code changed this round beyond the unit-tested interjection filter in `candidate_names`, so the earlier production-path acceptance plus the 7 series-memory tests stand. Re-run deferred to the next healthy window.
+
+---
+
+## MIT quality loop, round 223 — v5 acceptance sweep: 4 guard triggers, 0 leftovers, 3 explainable gate findings (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full default sweep with all late fixes: 39 pages/369 regions, **leftover 0/0/0/0/0**, **4 guard triggers** (lowest), wall 7.80/6.62 s median, OCR 1.63 s.
+- Gate: 3 findings, all understood — one real lost `!`, one rhetorical `?`->`!` (the retort licence was evaluated and deliberately kept), one name inconsistency that `series_context` fixes in production. The HEHE laughter inconsistency is gone (interjection filter).
+- Final baseline doc gained the v5 row. Vercel is rate-limited again on the newest docs-only commit (the prior head deployed successfully); heavy ML confirmation pending.
+
+---
+
+## MIT quality loop, round 222 — Vercel deployment passes after the tracing fix; all PR checks green (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The rate-limit window cleared and Vercel deployed head `16ff6e43`: **deployment completed** — the `outputFileTracingExcludes` fix (#1064) resolved the 253 MB docs-function failure. The image-downscaling workaround was already reverted, so evidence images are original resolution.
+- GitHub checks on the same head: logic gate pass, backend pass (heavy ML was still running); PR is now fully green including Vercel.
+- Commented on #1064 and the PR with the evidence; issue closes when #794 merges. Local `next build` verification was not possible in this worktree (Turbopack rejects a symlinked node_modules from another root), so Vercel is the verification.
+
+---
+
+## MIT quality loop, round 221 — root fix for the Vercel docs-function size: exclude binaries from tracing; images restored (#1064) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Root cause of the 253.42 MB `docs` function: `Frontend/app/docs/page.tsx` scans the repo `docs/` tree, so Next traced every benchmark **image** into the function, though it only reads UTF-8 text and never serves binaries.
+- Added `outputFileTracingExcludes` for `/docs` (png/jpg/jpeg/webp/gif) in `Frontend/next.config.ts` (issue #1064). With images out of the bundle, the earlier downscaling workaround is unnecessary: **restored all 34 evidence images to their original size** (16.6 MB) so the docs evidence stays crisp.
+- Local `next build` could not run in this worktree (no node_modules); the config field is standard Next 12.3+ and Vercel/CI will validate it.
+
+---
+
+## MIT quality loop, round 220 — evidence images downscaled to 900px for a ~244 MB docs function (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 34 evidence images are downscaled again (max side 900px): total 17.4 -> **8.4 MB (-9 MB)**, putting the docs function around **~244 MB** with ~6 MB of headroom under the 250 MB limit, so the next Vercel retry should pass even if the earlier estimate was optimistic.
+- Vercel CLI is authenticated but the Frontend has no local project link, so no manual prebuilt deploy was attempted; the fix waits for the external rate-limit window.
+
+---
+
+## MIT quality loop, round 219 — Vercel re-rate-limited; size shrank ahead of its next retry (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- After the real 253 MB `docs` function failure was diagnosed and the 34 evidence images shrank 17.4 → 10.5 MB (round 218), Vercel went back to its **external rate limit** (retry in 24 h), so the size fix cannot be verified until that window clears.
+- All GitHub CI jobs pass on the new head (logic gate 1m48s, backend 1m19s; heavy ML was still running when checked). No code change.
+
+---
+
+## MIT quality loop, round 218 — Vercel docs-function size fixed by downscaling the branch's benchmark images (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Vercel stopped rate-limiting and revealed a real failure: the `docs` function is **253.42 MB uncompressed**, over the 250 MB limit. The branch adds 34 benchmark evidence images (17.4 MB) under `docs/reports/benchmarks/`, which is what tipped it over.
+- Downscaled all 34 added images to max side 1100 px with PNG optimization (still readable as evidence): **17.4 MB -> 10.5 MB (-6.9 MB)**, which brings the function to roughly 246.5 MB. Commit pushed; Vercel redeploys on the new head.
+
+---
+
+## MIT quality loop, round 217 — final report now includes the omission pass; suite count refreshed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `2026-10-23-quality-loop-final-report.md` gained the opt-in omission-verification entry (replay TP proof, 0/19 clean-page flags, cost) and the current test count (978). No code change.
+
+---
+
+## MIT quality loop, round 216 — omission pass added to PR body/comment with TP+FP evidence (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-6 section (flow, the three fixed bugs, replay TP proof, 10-page/19-candidate FP sample, cost, opt-in status) with a Thai mirror; a PR comment carries the same summary.
+- No code change.
+
+---
+
+## MIT quality loop, round 215 — omission pass clean-page sample: 19 candidates, 0 false flags (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four more pages with the schema fast path (1/6/2/1 candidates, all agreed=[]); cumulative clean-page sample is now **10 pages / 19 candidates / 0 flags**, while every flag seen (1) was the replay true positive.
+- Consistent with the class being safe as opt-in; a small sample for any default. No code change; benchmark updated.
+
+---
+
+## MIT quality loop, round 214 — omission pass: schema-enforced batch verification cuts cost to 24.8 s on the replay page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The gateway supports `response_format: json_schema`; the verifier now requests one `{items:[{i,omitted,missing}]}` object per pass (one request), taking the fast path only when the item count matches and falling back to the proven per-line path otherwise.
+- Akuyaku replay: **24.8 s vs 29.6 s**, clause still restored (`...ฉันก็เกิดสงสัยขึ้นมาด้วย`); direct six-candidate probe flags only the omitted line. 11 omission tests (fast path, count fallback, object/array parser); full suite green.
+
+---
+
+## MIT quality loop, round 213 — omission pass: 0 false positives across 6 clean pages (9 candidates) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wider clean-page sweep (Boku/Horimiya/Mieruko/Iruma/Mushoku/Dungeon): 9 long-line candidates, **agreed=[] on every page** — no false flags on complete translations.
+- Together with the replay true-positive this gives deterministic TP evidence + a 0/9 clean-page FP sample; wall 14-23 s/page with ~4-8 s verifier cost when candidates exist. Still opt-in; full-corpus sweep + judge comparison remain the gate for any default.
+
+---
+
+## MIT quality loop, round 212 — omission pass live probe: no false flags on two clean pages; cost still high (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Live probe of the fixed pass on Akuyaku p0/p1: `agreed=[]` on both (their live translations were complete) — no false flags; wall 29.5 s / 14.8 s with ~8-12 s of verifier cost per page with long lines.
+- Precision on true omissions remains the replay proof from round 211; a wider sweep is still needed before discussing a default. No code change; benchmark updated.
+
+---
+
+## MIT quality loop, round 211 — omission pass: three real bugs fixed; deterministic replay proof (CORRECTION) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Correction:** the round-208/209 "natural proof" was not attributable — those runs showed translation sampling variance and the pipeline verification returned nothing (no log line). Chasing it exposed three real defects: (1) JSON mode returns a single **object** for one pair while the parser only accepted arrays; (2) a batched page prompt made the model return one wrongly-indexed item; (3) 12 parallel verifier calls were throttled by the gateway so agreement was empty at page scale.
+- Fixes: parser accepts array/object/wrapped list (module + `tools/omission_verify.py`); verification sends **one candidate per request** fanned out; `Semaphore(3)` + one retry per call; the retry now builds `CustomOpenAiTranslator` (the pass only supports the gateway translator); diagnostics under `MIT_LOG_OMISSION_VERIFY`.
+- **Deterministic replay proof** (`--replay` pins the omitted baseline): `agreed=[5]`, `reasked=1`, shipped `แล้ว... เรื่องนี้ทำให้ฉันทึ่งมากตอนที่อยู่ในห้องอาหาร` (was `แล้ว... เมื่อตอนกลางวันในโรงอาหาร`). Independent probe flags the pair 4/4 runs. Cost ~29.6 s on the replay page (~2 verifier round-trips + one re-ask). Still opt-in. Suite 977 passed.
+
+---
+
+## MIT quality loop, round 210 — omission pass count configurable; default stays 2 because single-pass misses the case (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `MIT_OMISSION_VERIFY_PASSES` (1-3, default 2, documented in `MIT/.env.example`) + parse/clamp test.
+- Measured single-pass on the Akuyaku page: 21.1 s vs 25.2 s, but the curiosity clause was **not restored** — one sample did not flag it. The two-pass agreement is therefore load-bearing; default stays 2, single-pass is an explicit cost trade.
+
+---
+
+## MIT quality loop, round 209 — omission pass: concurrent verifier passes save 7.3 s/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The two verifier passes are independent requests; they now run with `asyncio.gather` (same agreement rule). Re-measured on Akuyaku p0: **25.2 s vs 32.5 s**, clause still restored (`แล้ว... เมื่อครู่ในโรงอาหารนี้ ก็ทำให้ฉันสงสัย`).
+- Still ~10 s over default (one verifier round-trip + the re-ask call), so opt-in stays; single-pass mode recorded as the next cost lever. Test updated for concurrent replies; suite green.
+
+---
+
+## MIT quality loop, round 208 — omission pass natural proof: clause restored; cost ~3 gateway calls/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran Akuyaku p0 with `MIT_OMISSION_VERIFY=1`: the default's `แล้ว... เมื่อตอนกลางวันในโรงอาหาร` (curiosity clause gone) came back as **`แล้วอีกอย่าง... เมื่อสักครู่ในโรงอาหารนี้ ก็จุดประกายความสงสัยของฉัน`** — the measured omission is repaired end-to-end.
+- Cost is real: that page took **32.5 s wall** (vs ~15 s default) because the pass adds ~3 gateway round-trips (two verifier passes + one re-ask batch). Stays opt-in; tuning ideas recorded (single pass / content-loss-suspect lines only).
+- Benchmark updated; no default change.
+
+---
+
+## MIT quality loop, round 207 — omission-verification pass: module + wiring behind MIT_OMISSION_VERIFY=1 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built `manga_translator/omission_guard.py`: long-line candidates, batched JSON-mode verifier (two passes must agree), retry note naming the missing words, accept only when the new answer is longer, every failure caught. 7 tests.
+- Wired after the translation stage behind **`MIT_OMISSION_VERIFY=1`** (documented in `MIT/.env.example`); unset = byte-identical. Retry intentionally uses a fresh translator (no page context) — the tradeoff that keeps it opt-in.
+- Suite 974 passed. Pending: natural proof on the Akuyaku page + corpus FP/latency sweep before any default decision.
+
+---
+
+## MIT quality loop, round 206 — final report written (index of shipped defaults, opt-ins, rejects, remaining) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-quality-loop-final-report.md`: v4 end-state numbers (gate 0, leftover 0, adjusted 1.58, wall 7.80/6.62 s), everything shipped as default with its evidence link, the opt-in list, the rejected-with-evidence list, remaining work and the exact reproduce commands. It is the one-page entry point for the reviewer/user.
+- No code change.
+
+---
+
+## MIT quality loop, round 205 — CI green on the consider-guard head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- CI on head `f131cc1a` (run 39952900369): logic gate, heavy ML and backend all **pass**; Vercel remains the external 24 h rate limit. Branch mergeable, still draft, base #642 still open/conflicting.
+
+---
+
+## MIT quality loop, round 204 — consider guard FP scan: 2 hits / 19,327 regions, inventory updated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned all stored doctor dirs with the new predicate: **19,327 regions, exactly 2 hits**, both the known bad `CONSIDER BUYING` renderings — **zero false positives**.
+- Updated the vault guard inventory (11 default-ON classes) and posted a PR comment with the FP scan and the natural retry proof. No code change.
+
+---
+
+## MIT quality loop, round 203 — new guard `consider_as_please`: natural retry turned กรุณาซื้อ into ลองพิจารณาซื้อ (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the v4 real judge findings; one was a measured semantic swap: `CONSIDER BUYING THE OFFICIAL VOLUMES` -> `กรุณาซื้อ...` (suggestion -> request). Mined 6 unique CONSIDER renderings: **2 please-style**, 4 correct.
+- Added `consider_as_please` (exact licence: source CONSIDER and not PLEASE; Thai กรุณา and not พิจารณา), wired into the retry trigger with its own note, plus a trigger test.
+- Natural validation on the Chainsaw credits page: the guard fired (`กรุณาสนับสนุน...`) and the re-ask shipped **`ลองพิจารณาซื้อฉบับพิมพ์`** (correct suggestion). Suite 967 passed. Benchmark `2026-10-23-consider-as-please-guard.md`.
+
+---
+
+## MIT quality loop, round 202 — v4 official judge: raw 1.44, strict-adjusted 1.58, 62 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the v4 outputs (363 scored segments; 6 lines unscorable on 2 pages): raw **1.44**, noise flags 65, stale-adjusted **1.58**, distribution 0/1/2 = **13/125/225** (3.6 % broken / 34.4 % partial / 62.0 % perfect).
+- Raw is stable across v1/v2/v4 and 1.58 sits inside the 1.55-1.60 band; the final baseline doc now records the official v4 block. No code change.
+
+---
+
+## MIT quality loop, round 201 — v4 end state propagated to PR body and team memory (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body gained the round-5 section (v4 numbers: 39/365, gate 0, leftover 0, 5 guard triggers, wall 7.80 s median 6.62 s) with the Thai mirror and the two late fixes (interjection filter, Mai name guard).
+- Vault `project-translation-eval-set.md` records the same v4 state, noting the judge range is unchanged and CI/PR state.
+
+---
+
+## MIT quality loop, round 200 — interjection filter: v4 end state has ZERO gate violations and ZERO leftovers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The v4 sweep's only gate finding (`inconsistent_name: HEHE`) exposed a real risk: laughter tokens matched the Latin name pattern, so `extract_glossary` would learn `HEHE -> เข่า` and the default series memory would enforce that nonsense rendering on later pages.
+- Added an interjection denylist (`is_interjection_source`) to `candidate_names`: HEHE/NYA/UGH/HEY/OK... are no longer name candidates; real names still learn.
+- Re-ran the dashboard on the v4 outputs: **gate 0 violations, leftover {}, 365 regions, wall 7.80 s / median 6.62 s, 5 guard triggers**. Suite 967 passed (new test).
+- First end state with a completely clean gate; final baseline doc gained the v4 row.
+
+---
+
+## MIT quality loop, round 199 — typo normalizer name-safety guard for `ไม` (Mai) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Self-review risk: `ไม -> ไม่` could rewrite a character named Mai. The replacement is now gated on the next significant token continuing a negation (whitelist mined from all 100 corpus occurrences: ทำ/ไป/ใช่/ได้/ถ้วน/.../-); `ให`/`ไมใช` stay unconditional.
+- `ไม นี่คือเพื่อนของฉัน` is untouched; the genuine negations still fix. Validation on the final outputs: 0 further changes; suite 966 passed; benchmark updated.
+
+---
+
+## MIT quality loop, round 198 — OCR pass made fail-open (dispatch errors cannot fail the page) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Self-review of the now-default OCR second pass found a production risk: an exception from the extra dispatch (model/OOM/crop) would propagate and fail the whole OCR stage. It now catches any dispatch exception, logs a warning, keeps the first reads and returns 0 — the pass is an enhancement, never a failure source.
+- Test: exploding fake dispatch leaves lines untouched, returns 0; suite 965 passed. Benchmark note added.
+
+---
+
+## MIT quality loop, round 197 — OCR pass hardening: confidence normalized to float (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The OCR second pass now converts old/new line confidence to `float` where read, so comparisons and the debug log cannot fail when a model path returns a numpy scalar or torch tensor (the flag is default ON, so this is a production path).
+- Suite 964 passed; benchmark note added.
+
+---
+
+## MIT quality loop, round 196 — latency outlier re-triage on v3 defaults (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Per-page stage breakdown (median wall 6.63 s): the 19.2 s page is the **cold-start page of the sweep** (detection 6.1 s + OCR 3.9 s of lazy model loads); merge spikes (4.7-8.8 s) move between runs and do not correlate with page/Kumiko cost — the earlier transient-contention conclusion stands; translation spikes are gateway-side.
+- Nothing actionable beyond the opt-in `MIT_PRELOAD`; benchmark updated.
+
+---
+
+## MIT quality loop, round 195 — Kumiko profile: 509 ms/page concentrated in the recursive split; no safe micro-opt (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Profiled the slowest page: `panel._cached_split` is 0.57 s **self** time (pure-Python recursive split over ~32k segment intersections); `cv2.LSD` only 0.12 s, `get_segments` 0.29 s. Any pruning changes which splits exist -> panel/reading order changes (the reason the 0.5x downscale was rejected).
+- **No code change**: a faster split search can only be accepted with panel-for-panel identical output on all 39 pages, i.e. a vendored-code campaign beyond this loop's scope for ~4-6 % wall. Benchmark `2026-10-23-panel-detection-profile.md` records the acceptance gate.
+
+---
+
+## MIT quality loop, round 194 — panel-detection downscale rejected: it reorders 12/33 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured Kumiko across all 39 pages: **509 ms/page (19.9 s total)**, ~35 % of the `textline_merge` stage. Downscaling its input to 0.5x halves the cost (257 ms/page) but **12 of 33 compared pages end up with a different region order** — reading order is part of quality, so no downscale.
+- Recorded in the do-not-repeat list; no code change. Full-resolution panel detection stays.
+
+---
+
+## MIT quality loop, round 193 — laughter normalisation measured and rejected (1 real case of 4) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined strict laughter lines across the v3 corpus: 4 lines, 3 without a Thai laugh marker, but only **one real defect** (`HEHE.` -> `เข่าเข่า.`; `NYA` -> `เนีย` is a legitimate sound transliteration). Not worth a normaliser/guard; recorded in the do-not-repeat list.
+- No code change.
+
+---
+
+## MIT quality loop, round 192 — PR body round-4 section; CI green on the tuned head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Appended the round-4 section to the PR body (OCR threshold tune 0.75/cap 8 with the A/B, tag-question licence and gate alignment, stronger spurious-filler note with the 3/3 result, mapping robustness test, v3 row) plus a Thai mirror.
+- CI on head `aeff9208` (run 39947222701): **logic gate, heavy ML and backend all pass**; Vercel remains the external 24 h rate limit.
+
+---
+
+## MIT quality loop, round 191 — spurious_filler note strengthened: natural `ทน` misses fixed 3/3 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the 10 zero-score judge segments from the latest sweep; two were `ทน` insertions the `spurious_filler` guard flagged every time but the model kept re-producing, so the retry note was not strong enough.
+- Added one sentence to the retry note ("Translate the source verb literally and never use the word ทน in this answer."). Three independent runs on the Dungeon page's `IVE BEEN KILLED BY IT...` line now render `ตาย/ถูกฆ่า` without `ทน` (3/3), where every earlier run shipped a `ทน` variant.
+- Note only applies after the guard fires (rare), so no ordinary translation is affected. Benchmark `2026-10-23-spurious-filler-note.md`; suite re-run.
+
+---
+
+## MIT quality loop, round 190 — OCR pass mapping robustness test (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a test that runs two candidates through the batched canvas and makes the fake model return the reads in **reverse order**: the pass maps them back to the right textlines by slot y-span and accepts both (`TO DEEEND` -> `TO DEFEND`, `SLAND` -> `ISLAND`). This pins the production mapping logic that the single-candidate test never exercised.
+- Suite 964 passed.
+
+---
+
+## MIT quality loop, round 189 — team memory updated with round-3 (OCR pass, rejects, v3 numbers) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Updated `Obsidian-MangaDock/project-translation-eval-set.md`: OCR second-pass root cause/fix/evidence/tuning, the three rejected OCR experiments (global box pad, unclip 2.6, same-crop re-read), guard/gate tag-question alignment, typo normalizer/leak coverage, and the v3 numbers (raw 1.44, adjusted range 1.55-1.60, gate 1 dropped_!, leftover {}).
+- Corrected the older line that still quoted gate 2 so the note has one current state. No code change.
+
+---
+
+## MIT quality loop, round 188 — gate aligned with the tag licence; v3 end state gate/leftover clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The deterministic gate had its own question-marker check and still flagged the YKNOW tag line; exported `is_tag_question` and made both `dropped_question` and the gate use it. Dashboard on the same outputs: gate `{dropped_! : 1}` (real lost exclamation), **leftover {}**.
+- Gate test added; suite 963 passed. Final baseline doc gained the v3 row (369 regions, wall 8.03 s single run, judge range unchanged).
+
+---
+
+## MIT quality loop, round 187 — dropped_question tag-question licence clears the only leftover (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The tuned-default sweep left one `dropped_question` leftover that two re-asks could not fix: `ITS JUST AINT FAIR, YKNOW?` -> `มันไม่แฟร์เลยนะเนี่ย!`. The `?` is a discourse tag, and `นะเนี่ย` is the idiomatic rendering — a guard false positive.
+- Added a tag-question licence (`YKNOW | YOU KNOW | RIGHT | EH | HUH | OK | OKAY | HMM` at the source end); real questions still fire. Dashboard on the same outputs: **leftover `{}`** (was 1). Tests added; suite 962 passed.
+- Benchmark `2026-10-23-tag-question-licence.md`.
+
+---
+
+## MIT quality loop, round 186 — OCR pass threshold tuned to 0.75: +8 net better lines for +69 ms/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Raised the OCR second-pass threshold 0.65 -> 0.75 and the cap 6 -> 8 (one batched canvas either way). Sweep: 20/369 sources change, 1 layout change, OCR **+69 ms/page**. Text A/B of those 20 lines: **11 better / 3 worse / 6 tie** (a second run: 10/4/6) — both runs agree on the direction.
+- Adopted as the new default; constants documented with the numbers. Benchmark updated.
+
+---
+
+## MIT quality loop, round 185 — PR body numbers refreshed to the v2 range (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR body's quality lines now quote the post-OCR-pass range: raw 1.44, strict-adjusted **1.55-1.60** (v2 dashboard 1.60), EN and Thai mirrors both updated. No code change.
+
+---
+
+## MIT quality loop, round 184 — official dashboard on v2: adjusted 1.60, leftover {}, wall 7.64 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran `tools/quality_dashboard.py` on the v2 outputs: 39 pages/370 regions, gate **dropped_? x1**, **leftover {}**, wall total 297.9 s (avg 7.64 s), OCR 1.56 s/page with the second pass (baseline 1.26 s), judge raw 1.44 / noise flags 77 / **adjusted 1.60**.
+- Honest reading: raw is stable at 1.44 and the adjusted 1.55 -> 1.60 movement tracks the noise-flag count (77 vs 138), i.e. classifier variance rather than a proven OCR gain; the end-state doc and hand-off now quote the **1.55-1.60 range**.
+
+---
+
+## MIT quality loop, round 183 — v2 end-state sweep with the OCR pass default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 39-page default sweep with the new OCR pass: **370 regions, leftovers 0/0/0, 9 guard triggers, gate 3** (all `inconsistent_name`, expected without `series_context`), judge raw **1.435**, wall avg **7.64 s / median 6.63 s**.
+- Versus v1 (1.44 / 7.65 s): the pass is invisible in aggregates (repairs ~10 % of source strings) and costs no measurable wall time after batching; its value is deterministic (OCR A/B 30/34 = 88 % better on changed lines, `DEEEND`/destroy fixed by default).
+- `2026-10-23-final-quality-baseline.md` now carries the v2 table; remaining defects are the known model-ceiling class plus production-fixable name variance.
+
+---
+
+## MIT quality loop, round 182 — global OCR box padding rejected and experiment removed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested padding every detected textline box 15 % before the first OCR pass (the re-read pass's mechanism, at zero extra calls). Sweep: **159/348 (45.7 %) source strings changed, 24/39 page layouts changed**, text-level A/B 25 padded-better vs **13 baseline-better** — chapter-wide churn with a coin-flip on aligned lines.
+- **Rejected**: keep padding only on the low-confidence line via the re-read pass. Removed the experimental knob/helpers/tests so nothing unproven ships; documented in `2026-10-23-ocr-box-pad-rejected.md`. Suite 961 passed.
+
+---
+
+## MIT quality loop, round 181 — production acceptance with the OCR pass default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Two production-style pages with the default (no env): **gate 0 violations**, one spacing repair accepted (`towardsme that` -> `towards me that`), no errors/layout change. With `MIT_OCR_REREAD=0` the same pages reproduce baseline timings/text.
+- Cost on these pages: +0.5 s wall/page average (range +0.2 to +0.8), consistent with the 39-page +0.33 s/page average. Benchmark `2026-10-23-ocr-reread-prod-acceptance.md`.
+- Default is production-safe.
+
+---
+
+## MIT quality loop, round 180 — PR #794 body/comment updated with round-3; CI green on the new head (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Appended the round-3 section to the PR body (OCR second pass default ON + escape, OCR A/B tool, typo normalizer, extended leak-script salvage, edge strip, debugger-hook removal, unclip A/B) with a full Thai mirror, and posted a round-3 change-set comment.
+- CI on head `029e2325`: **logic gate pass (1m58s), heavy ML pass (5m0s), backend pass (53s)**; Vercel still the external 24 h rate limit. PR remains mergeable and draft.
+
+---
+
+## MIT quality loop, round 179 — OCR second pass flipped to DEFAULT ON (+4 % wall, escape env) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Decision: default ON. The pass is a deterministic source repair (text-level A/B 30/34 = 88 % better), never moves a box, and with the batched dispatch costs only **+0.33 s/page (~+4 % wall)** — a small fixed cost, not a UX/behaviour tradeoff.
+- `MIT_OCR_REREAD=0` restores the old byte-identical behaviour; verified live on Otome p1 (default reads `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.`, escape reads `DEEEND`/`/SLAND`). Tests and `MIT/.env.example` updated; suite 961 passed.
+
+---
+
+## MIT quality loop, round 178 — OCR re-read wins the text-level A/B: 30/34 lines better (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/ocr_text_ab.py` (+3 tests): judges two doctor dirs' changed source lines directly ("which is the correct OCR of the artwork?"). On baseline vs re-read: **B (re-read) better 30/34 (88 %)**, 2 baseline wins that did not reproduce in a per-pair recheck (judge variance), 2 ties.
+- This gives the OCR second pass an objective quality signal independent of the noisy translation judge; benchmark updated. Still opt-in (`MIT_OCR_REREAD=1`) per the tradeoff rule (+0.33 s/page), with much stronger evidence behind it now.
+
+---
+
+## MIT quality loop, round 177 — OCR second pass batched: same repairs at +0.33 s/page (4 % wall) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The v1 pass paid one model dispatch per candidate line (~0.27 s overhead each, +1.45 s/page). Rewrote it to paste all candidate crops of a page into one white canvas and dispatch **once**, mapping results back by quad y-position; tuned threshold 0.65 and cap 6.
+- Batched sweep (39 pages): **41 accepted re-reads** (10.0 % of source strings), **2/39 layout changes**, OCR stage **+0.33 s/page (+4 % wall)**. Otome p1 now reads `THEY HAVE TO DEFEND THIS DESERTED ISLAND AND FACILITY.` (both `DEFEND` and `ISLAND` repaired; the cap-4 candidate list had dropped the latter).
+- Suite green; flag remains **opt-in** per the loop's tradeoff rule; benchmark updated. Next: re-judge the tuned corpus before any default decision.
+
+---
+
+## MIT quality loop, round 176 — opt-in OCR second pass shipped: 67 misreads repaired, +1.4 s/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built `manga_translator/ocr_reread.py`: after OCR, Latin lines under confidence 0.78 are re-read with the textline box padded 30 % (same pixels); a new read replaces the old only when its confidence beats the old by >= 0.12. Flag-gated `MIT_OCR_REREAD=1`, 5 pure/integration tests, unset = byte-identical.
+- Full 39-page sweep with the flag: **67 re-reads**, 55/369 source strings changed (14.9 %), **only 2/39 layout changes** (the pass never moves a box), OCR stage 1,259 -> 2,705 ms (+1.45 s/page). Repairs real garbage (`DONOT RFHOST THIS CHAPT` -> `DO NOT REHOST THIS CHAPTER.`, `TO DEEEND` -> `TO DEFEND`, `TOKYQ` -> `TOKYO`). Judge 1.446 vs 1.436 (+0.01, noise; pages 17/13).
+- **Ships opt-in** (`MIT_OCR_REREAD=1`, documented in `MIT/.env.example`): real deterministic wins but a real +1.45 s/page tradeoff; planned tuning (threshold ~0.65, cap 4) before any default. Benchmark `2026-10-23-ocr-reread-pass.md`.
+
+---
+
+## MIT quality loop, round 175 — unclip threshold search: the fix needs only +0.15, but any global bump churns the chapter (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fine-grained threshold search: `unclip_ratio` 2.4 still reads `DEEEND`; **2.45** already reads `DEFEND` (Otome page).
+- Full sweep at 2.4 (below the Otome fix threshold): the DEFEND case is still broken, yet **21.6 % of source strings and 7/39 page layouts already changed** — the detector merges/resizes boxes globally, so any bump that changes anything carries chapter-wide churn.
+- This rules out a global knob as a targeted fix and confirms the design: **localized re-detection around suspicious lines at higher resolution**. Default stays 2.3; no code change.
+
+---
+
+## MIT quality loop, round 174 — unclip_ratio 2.6 A/B: fixes DEFEND locally, overall parity, default unchanged (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested the knob that grows the detector box without moving layout (`unclip_ratio` 2.3 -> 2.6) on the full 39-page corpus with the judge.
+- It **fixes the DEFEND case** (Otome 0.80 -> 1.40; Taida 1.25 -> 2.00; Kumo 1.00 -> 2.00) but changes **119/365 source strings (32.6 %)**, **8/39 page layouts**, and lands at **judge 1.39 vs 1.44** (inside the noise band; page wins 19 / losses 16) with losses as real as the wins (Tsuki 1.79 -> 1.14).
+- **Default stays 2.3**; documented as an investigation knob (`2026-10-23-unclip-ratio-ab.md`). Root fix remains localized re-detection around suspicious lines. No code change.
+
+---
+
+## MIT quality loop, round 173 — same-crop OCR re-read tested and disproven; the fix is detector box geometry (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tried to reproduce the DEFEND read by re-running the OCR model on hand-cropped line images (tight / padded / 2x-interpolated): the crops read as junk (`TODe`, `BEA`), so the detection_size-3200 win is **not extra crop pixels** — it is the detector's textline-box geometry (the 2560 boxes clip the F edge).
+- A same-box second-pass OCR is therefore disproven; the viable targeted design is **localized re-detection at higher resolution around suspicious lines**. Backlog updated so a future session does not rebuild the crop approach. No code change.
+
+---
+
+## MIT quality loop, round 172 — OCR misreads are resolution-bound: DEFEND/DEEEND reproduced and fixed at higher detection size (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Reproduced the stress-run error on Otome p1 and compared detection sizes: at **2560** OCR reads `DEEEND` (translated as destroy), at **3200** and **4096** it reads `DEFEND` (translated as protect). The misread is a pixel-resolution effect, not a translator fault.
+- Global detection_size remains the wrong fix (region sets change; rejected earlier). Recorded a **targeted second-pass OCR** lever for the next session: re-OCR only suspicious low-confidence textlines at a higher zoom and accept when `Quadrilateral.prob` improves (payload does not store prob yet). Gated behind a flag with forced-fixture + sweep evidence, same as the other levers. No code change this round.
+
+---
+
+## MIT quality loop, round 171 — deterministic OCR-noise repair measured and rejected (7 tokens total) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined the corpus for digit-in-word OCR noise (`60NNA`/`Y0U` shape) before building a repair guard: **7 occurrences in 368 regions**, half legitimate (`3RD`, `Part1`, `ZER0` as a name). The stress-run error (`DEEEND` for DEFEND) is a letter/letter misread, which no digit map would catch.
+- **No deterministic source-repair guard**; the OCR-garble class needs an OCR-confidence signal or a detection/OCR campaign. Documented in the stress-run benchmark.
+
+---
+
+## MIT quality loop, round 170 — stress-run quality judged: -0.06 inside the noise band; one OCR-garble error explained (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the seven stress-affected pages: weighted **1.453 vs 1.509** in the earlier sweep — a **-0.057 delta inside the judge-noise band**, so the bad batch did not degrade final quality after the guards.
+- One zero-score segment: source OCR read `DEEEND` (DEFEND) and the Thai shipped `ทำลาย` (destroy) — an opposite-meaning error caused by the OCR garble; fluent output, so no translation predicate can see it. Judge typo notes on it are the known noise class (code-point check shows correct marks).
+- Recorded OCR-garble→plausible-wrong as a future detection/OCR item (not a translation-guard one). Benchmark updated.
+
+---
+
+## MIT quality loop, round 169 — retry depth analysed in the stress run: no segment exhausted the budget (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Parsed the stress-run trigger log per source line: **15 unique triggered lines**, only `NYA` tripped twice, none three times — so `_INVALID_REPEAT_COUNT = 2` was sufficient even with whole-line Chinese answers. `NYA` shipped as `เมี้ยว`, `AH` as `อ๊ะ/อ้อ`, `EH?` as `เอ๊ะ?`.
+- Recorded the signal to watch (three triggers on one line = budget exhausted -> raise budget or blank-instead-of-garbage) in the stress-run benchmark. No code change.
+
+---
+
+## MIT quality loop, round 168 — stress run: bad model batch (whole Chinese lines) left zero defects (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A full-corpus sweep hit a visibly worse model batch: **16 guard triggers** over 39 pages (vs 9 before), including **eleven whole-line Chinese answers** plus content-loss/question/filler hits.
+- Leftover scan of the final payloads: **0 foreign script, 0 content loss, 0 typo tokens**; gate 1 violation (expected `inconsistent_name` without `series_context`). The retry loop + extended-script salvage absorbed the bad batch entirely.
+- External model variance, not a code regression; strongest natural-traffic evidence for the guard set. Benchmark `2026-10-23-stress-run-guards.md`.
+
+---
+
+## MIT quality loop, round 167 — master-plan critical item re-checked: readable-floor does not reproduce at HEAD (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the plan's critical readable-floor defect (#1/#2, was 5/10 pages with 3-4 px unreadable fallbacks) from the final sweep telemetry: **368 regions, minimum final font 15 px, zero below 14 px**, `small_font` telemetry 0 on all 39 pages — the defect does not reproduce at HEAD (resolved by the current clean-layout/floor logic; same class as #899).
+- Also tabulated the other carried-over translation plan items: rolling context partially addressed by series name memory (full context still opt-in by design), gate delivered, remaining accuracy classes are model-ceiling sense/nuance. Benchmark `2026-10-23-master-plan-critical-verification.md`.
+
+---
+
+## MIT quality loop, round 166 — mark-only typo mining: no new safe mappings (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined recurring OOV tokens (count >= 3) whose base letters match a dictionary word: 11 candidates, **all SFX (`ฟึ่ก/ปึ่ก/ฟึ่บ/ซึ๊ง/เบ`) or names/loanwords (`เฮย์/ยิ/การ์/นี/บะ/นัม`)**. No new unambiguous typo beyond the already-normalised `แล่ว/ไม/ให/ไมใช`.
+- Recorded in the typo-normalizer benchmark so the search is not repeated; no code change.
+
+---
+
+## MIT quality loop, round 165 — extended-script detection keeps the guard cost at 0.40 ms/page (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 22-script table added in round 164 would run per-script passes on every segment; added a combined-character fast path (`_ANY_LEAK_CHAR`) that short-circuits both `foreign_script` and `strip_leaked_script` when the text has no extended-script character (the common case).
+- Re-measured over **15,668 stored segments**: all nine guards **0.023 ms/segment = 0.40 ms per 17-region page** — unchanged from before the extension. Translation-quality suite 45 passed.
+- Benchmark guard-cost note updated.
+
+---
+
+## MIT quality loop, round 164 — leak-script coverage closed: Arabic salvaged, target scripts protected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Found two gaps: the last-resort salvage table had only cjk/kana/hangul/cyrillic (the live sweep's Arabic leak would ship if retries exhausted), and salvage could strip the **target's own script** (kana deleted from a Japanese translation whose English source lacked kana).
+- One extended 22-script table now serves detector + salvage (Arabic, Greek, Hebrew, Devanagari/Bengali/Tamil/Telugu/Kannada/Malayalam/Sinhala, Lao, Khmer, Myanmar, Tibetan, Ethiopic, Armenian, Georgian); `_TARGET_OWN_SCRIPTS` makes the salvage skip legitimate target scripts; neutral kana punctuation excluded.
+- Tests: Greek/Devanagari detection + licensing, Arabic salvage (`มี قوية ด้วย` -> `มี ด้วย`), JPN target kana preserved, THA still strips; suite **953 passed**. Benchmark `2026-10-23-leak-script-coverage.md`.
+
+---
+
+## MIT quality loop, round 163 — formatting probes: 3+ repetitions zero, edge whitespace now stripped (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Probes: **0** occurrences of 3+ consecutive identical Thai tokens outside known laughter/SFX; **0** double spaces, space-before-punctuation, unbalanced brackets or odd quotes in stored outputs.
+- Only **42 regions had trailing edge whitespace** (`'ฮ่า ฮ่า ฮ่า '`); the final cleanup now returns `trans.strip()` (never meaningful in a bubble) with a mocked-translator test. Heavy glitch suite 20 passed.
+
+---
+
+## MIT quality loop, round 162 — live validation: typo normalizer active, 0 typo tokens, gate clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Six fresh real pages with the normalizer active: **0** occurrences of the previously frequent typos (`แล่ว/แลว/ไมใช่/ทำให/ขอให`) in the outputs, **gate 0 violations**, one unrelated `dropped_question` guard trigger.
+- Confirms the typo normalizer runs in the live cleanup path (not only in unit tests). Benchmark updated.
+
+---
+
+## MIT quality loop, round 161 — duplicate-token cleaning measured and rejected (96% intentional) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined adjacent identical Thai tokens: 18 types / 412 occurrences, of which **96 % are intentional** — laughter (`ฮ่า` 274, `ฮิ/ฮึ/คิก/ก๊าก` ~50), legitimate grammar (`เธอ เธอจึง` 44), deliberate stutter (`ไม่ ไม่ใช่` 2), and tokenizer artefacts inside names (`ลิลิธ`, `ซีไอไอ`).
+- A de-dup pass would corrupt those for about a 1 % gain -> **no duplicate-token guard**; documented in the typo-normalizer benchmark. Only the unambiguous missing-mark tokens stay normalised.
+
+---
+
+## MIT quality loop, round 160 — missing-mark tokens fixed too: 219 stored regions corrected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Dictionary-based OOV mining over 15.6k stored regions found three recurring invalid tokens: **ไม x100, ให x75, ไมใช x36** (missing tone/ending marks). Added token-level fixes (`ไม->ไม่`, `ให->ให้`, `ไมใช->ไม่ใช่`) inside `normalize_common_typos`; because it tokenizes with `keep_whitespace=True`, real words (ไหน, ไม้, ให้) are untouched.
+- Corpus validation: **219 of 15,590 regions (1.4 %)** are corrected (แล่ว 44 + these 175); sampled diffs are all clear fixes; cost **0.04 ms/segment**.
+- Tests extended (new mappings + preserved words); gate `common_typo` uses the same normalizer. Suite green.
+
+---
+
+## MIT quality loop, round 159 — แล่ว -> แล้ว normalizer (44 stored regions fixed) + fragment guard rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mining short all-caps fragments (145 unique pairs) showed they are mostly correct elaborations; a shape guard would fire on good lines (rare bad cases like `HEHE.` -> `เข่าเข่า.`). **No fragment guard.**
+- The same mining found a **frequent unambiguous typo: `แล่ว` x45** (should be `แล้ว`). Added `normalize_common_typos()` to the final cleanup (deterministic, default on, no flag) and a `common_typo` gate rule for regressions. Validation: **44 stored output regions fixed**, no other word touched; suites 60 passed in the two files.
+- Benchmark `2026-10-23-common-thai-typo-normalizer.md`; full suite re-run green.
+
+---
+
+## MIT quality loop, round 158 — documentation numbers made consistent everywhere (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Grepped all 2026-10-23 benchmarks for stale quality numbers; fixed the two remaining misleading spots: the judge-noise profile title (`1.70/2` -> `1.55 strict, 1.68-1.70 lenient`) and its summary line (`72 % perfect / 2.1 % broken` -> `58.9-72 % / 2.1-3.5 %` classifier-dependent), plus the pre-merge verification line (`1.68/2, 70.6 %` -> `1.55 strict, relative range`).
+- Every doc, the PR body and the vault now quote the same strict-adjusted number with the 1.55-1.68 range.
+
+---
+
+## MIT quality loop, round 157 — omission verifier JSON mode: parse-fail 0/11, agreement more honest (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Gateway accepts `response_format json_object` (verified); `verify_page` now uses JSON mode with a plain-mode retry on unparseable output.
+- Same 12-page/3-pass sample: **PARSE-FAIL 0/11** (was 2/11) — the reliability blocker is gone. Agreed flags dropped to 1 with **4 disagreements** (was 3 agreed/0): JSON mode is stricter and surfaces the real model variance instead of masking it.
+- Conclusion unchanged: report-only tool (now robust); auto-retry stays closed until flags are page-to-page reproducible.
+
+---
+
+## MIT quality loop, round 156 — omission verifier 3-pass majority: 18% parse-fail, auto-retry closed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--min-votes N` majority support (+test) and ran a 3-pass sample: 11 pages/26 long pairs, **3 agreed** (Akuyaku curiosity clause, a new Akuyaku `my guts` candidate, the borderline Horimiya `won't` nuance), 0 disagreements, but **2/11 pages had a PARSE-FAIL** (JSON-only reply not parseable, ~18 %).
+- **Closes auto-retry integration**: parse-fail reliability + need for a context-preserving whole-page re-ask + only 2-3 true positives per corpus make it not worth production complexity. The tool stays report-only; revisit only with strict JSON mode and a larger sample.
+
+---
+
+## MIT quality loop, round 155 — omission-verifier pipeline integration deferred with a concrete design note (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Decided **not** to wire the verifier into the pipeline yet: it would need a whole-page re-ask that preserves page context (the same constraint that keeps segment retry opt-in), a forced-injection proof, and acceptance of ~2 verifier calls on the ~5 % of pages with long lines and an agreed flag.
+- Updated the next-loop backlog: P1 entry now records the working report-only tool, the two-pass precision evidence (2 agreed TPs, 0 agreed FPs, 2 borderline disagreements) and the three requirements for integration behind `MIT_OMISSION_VERIFY=1`; added a separate P1 item for a wider precision sample / 3-pass majority.
+- No code change.
+
+---
+
+## MIT quality loop, round 154 — omission verifier two-pass agreement keeps 2 clear TPs, drops 2 borderline (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--passes N` + `combine_passes` to `tools/omission_verify.py`: a pair is flagged only when every pass agrees; disagreements are reported separately. Unit test added (4 tests in the file).
+- Ran the full corpus with 2 passes (33 pages/85 long pairs/66 calls): **2 agreed** (Akuyaku curiosity clause, Komi `100 (IOO)`) and **2 disagreed** borderline cases (Horimiya tense nuance, Osoraku dropped `three`). Two-pass keeps the high-confidence omissions, at 2x calls; still report-only pending a forced-injection proof.
+
+---
+
+## MIT quality loop, round 153 — omission verifier full-corpus sweep: 33 pages, 85 long pairs, 2 true-positive flags; run-to-run instability documented (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full 39-page sweep: 33 pages had long lines (**85 long pairs**), 33 verifier calls, **2 flags both true positives** — the Akuyaku curiosity clause and a Komi `100 (IOO)` loss.
+- **Stability caveat:** the earlier 10-page probe also flagged Chainsaw `PAIZ` (paid); the full sweep did not re-flag it. Akuyaku flagged in both runs, the other two once each — fine for a report-only QA lead generator, not yet for an automatic retry trigger. Integration would need two-pass agreement + forced proof + wider precision sweep; documented in the probe note.
+
+---
+
+## MIT quality loop, round 152 — semantic omission verifier prototyped: 2/2 true positives on long lines (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The ratio guard cannot see dropped clauses, so prototyped `tools/omission_verify.py`: one gateway verification call per page on **long source lines only** (>= 8 English words), JSON verdicts, report-only.
+- Probe over 10 final-sweep pages: 23 long pairs, **2 flagged and both true positives** — the known `this piqued my curiosity` omission and a second `PAIZ` (paid) modifier loss that the gate never saw. 21 unflagged lines spot-check clean.
+- Ships with pure-helper tests. Next step (backlog P1): wider sweep, then a forced-injection proof before wiring as opt-in `MIT_OMISSION_VERIFY=1`.
+
+---
+
+## MIT quality loop, round 151 — next-loop backlog written for the hand-off (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-next-loop-backlog.md`: P0 (JP corpus expansion, temperature re-test clearing the noise bar, batch-default decision once progress UX allows), P1 (clause omission via a semantic verifier, fragment completion with a cut detector + shape-preserving retry, interjection/lexical senses as model ceiling), P2 (validated merge/retarget sequence, standard measurement path, external Vercel check), plus the explicit **do-not-repeat list** of already-rejected experiments.
+- #642 is still an open draft and now shows CONFLICTING against main, so the retarget step stays pending; the backlog records the exact sequence to follow when it lands.
+
+---
+
+## MIT quality loop, round 150 — merge simulated into main: code auto-merges, merged fast suite 944 passed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran a real merge of this branch head into `origin/main` in a temporary worktree: the only conflicts were the three forecasted docs files; all code auto-merged.
+- After resolving the docs (main's side, simulation only) the merged tree's **fast suite passed 944 tests** — so no code work will be needed once #642 lands and the PR is retargeted.
+- Recorded the real-resolution note (union the docs, do not keep one side) in `2026-10-23-premerge-verification.md`; temp worktree removed.
+
+---
+
+## MIT quality loop, round 149 — merge-conflict forecast vs main: code clean, only 3 docs files (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `git merge-tree --write-tree origin/main HEAD` dry-run: **no code conflicts** (MIT/Backend/Frontend all auto-merge); conflicts only in `DONE.md`, `docs/adr/README.md`, `docs/reports/system-impact-report.md` (append-heavy docs, take-both fixes).
+- Recorded in `2026-10-23-premerge-verification.md` with the delivery sequence: retarget #794 to `main` after #642 merges; only the three docs conflicts remain to resolve.
+- Base #642 is still an open draft and the base branch exists, so nothing needs retargeting yet.
+
+---
+
+## MIT quality loop, round 148 — quality-loop env knobs documented in the env examples (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a consolidated **quality-loop knobs** section to `MIT/.env.example`: default-on guards with their disable flags (`MIT_FILTER_AFTER_STRIP`, `MIT_NAME_GLOSSARY`, `MIT_SERIES_GLOSSARY`, `MIT_LEAK_LATIN_GUARD`, `MIT_CONTENT_LOSS_GUARD`), opt-in levers (`MIT_SEGMENT_RETRY`, `MIT_PRELOAD`, `MIT_BATCH_PIPELINE`) and the debug loggers.
+- Added the two documented-but-missing Backend knobs to `Backend/.env.example` (`MIT_DETECTION_SIZE`, `MIT_WIDEN_VERTICAL_COLUMNS`) next to `MIT_TEMPERATURE`.
+- Docs-only; operators can now discover every knob from the env example instead of grepping the code.
+
+---
+
+## MIT quality loop, round 147 — clause-omission guard measured and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined 7,080 real segments with a Thai/English word-count ratio (pythainlp): median 1.14, p10 0.80. The low tail is **titles/credits** (correct but compact); a dropped clause inside a long sentence stays around 0.7-0.9, inside the normal band.
+- **No guard added** — a word-ratio predicate would fire on titles and miss real omissions; recorded in `2026-10-23-clause-omission-rejected.md` so it is not rebuilt without a different signal.
+
+---
+
+## MIT quality loop, round 146 — debugger-hook audit completed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Grepped the whole MIT package for `breakpoint()` / `pdb` / `sys.exit(`: only three hooks exist. The XPOS one (#1059) was the sole production landmine and is fixed; the DBNet and LaMa hits sit inside `__main__`-guarded dev smoke tests, and the `sys.exit` paths are CLI-only (PDF/`--save-panels`/license-sidecar) that the worker's array path never reaches.
+- Documented in `2026-10-23-debugger-hooks-audit.md`; no further code change needed.
+
+---
+
+## MIT quality loop, round 145 — removed a pre-existing breakpoint() landmine from OCR code (#1059) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scan of the branch diff for debug leftovers found `breakpoint()` inside `apply_rotary_pos_emb2d` in `ocr/xpos_relative_position.py` (pre-existing since 2026-03-08, **never called** — grep finds only the definition). If it ever got called, a production worker would freeze in pdb.
+- Opened #1059 and removed the one-line hook (dead helper kept for upstream parity); import check passes and the fast suite stays green (944 passed).
+
+---
+
+## MIT quality loop, round 144 — MIT_TEMPERATURE documented in Backend env example (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the new opt-in to `Backend/.env.example` with the one-line evidence (A/B inside the noise bar, guard hits 10 -> 6, default stays 0.5) so operators can discover it without reading the benchmark.
+- Docs-only change.
+
+---
+
+## MIT quality loop, round 143 — textline_merge #872 hypothesis closed with measurements (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Traced panel detection: `sort_regions` (production) calls Kumiko once per page; the other call site is debug-only; the recursive call passes `img=None`, so no duplicate detection.
+- Timed Kumiko directly: 163 / 568 / 119 ms on three real pages (2 panels each) — content-dependent but far below the 8.8 s merge spike.
+- Combined with the earlier triage (spike moves between runs, size uncorrelated, `models_ttl=0`), the remaining merge time is transient host/GPU contention. No lossless fix without changing reading order; documented and #872 annotated.
+
+---
+
+## MIT quality loop, round 142 — PR hand-off guide posted; no review feedback yet (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Verified: **no reviews and no inline review comments** on the PR yet; CI on the head is green (logic gate 1m24s, heavy ML 4m22s, backend jest 47s), only the external Vercel rate-limit fails.
+- Posted a **reviewer guide** comment: file map by area (guards, gate/dashboard, #1051 filter move, series memory, temperature opt-in, harnesses, evidence), reproduce commands (fast gate / heavy subset / dashboard), hand-off state (raw 1.44, strict-adjusted 1.55, 9 saves/0 leftovers, wall 7.65 s) and a risk-ordered review focus list.
+- No code change.
+
+---
+
+## MIT quality loop, round 141 — temperature result propagated to PR + vault (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR #794 body now carries the temperature experiment (EN + Thai mirror): full paired numbers, why the default stays 0.5, and the `MIT_TEMPERATURE` opt-in path.
+- Vault note (`project-translation-eval-set.md`) records the same decision in the quality-loop consolidation section, so a future session will not re-run the experiment blindly.
+- No code change.
+
+---
+
+## MIT quality loop, round 140 — Backend spec for MIT_TEMPERATURE (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the missing Backend coverage for the new opt-in: `buildMitConfig` omits `temperature` by default, passes a valid `MIT_TEMPERATURE=0.2` through, and drops invalid/out-of-range values (`abc`, `-1`, `5`). mit-config spec **28 passed**.
+- No behaviour change.
+
+---
+
+## MIT quality loop, round 139 — temperature A/B completed: 0.2 within noise, kept opt-in as MIT_TEMPERATURE (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Full-corpus paired A/B:** 0.5 -> 38 pages/376 segs raw 1.41, strict-adjusted 1.51, 13 zeros, 10 guard hits; 0.2 -> 37/364 raw 1.45, adjusted 1.58, 14 zeros, 6 guard hits. Paired per-page: 0.2 wins 17 / 0.5 wins 12 / ties 8 — exactly the loop's noise boundary (≤5-page margin).
+- **Default stays 0.5** (no evidence clearing the noise bar); the lever is now an **opt-in config**: `MIT_TEMPERATURE` (Backend) -> `translator.temperature` -> `ConfigGPT.temperature`; absent -> translator default 0.5 and byte-identical config. MIT passthrough test added; Backend mit-config spec 27 passed.
+- Benchmark `2026-10-23-temperature-ab.md` updated with the full table and decision.
+
+---
+
+## MIT quality loop, round 138 — temperature 0.5 vs 0.2 A/B launched; pilot favours 0.2 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran paired translations of **all 39 corpus pages** at temp 0.5 (current default) and 0.2 (patched `ConfigGPT.temperature` in a separate process per arm).
+- **Guard hits:** 0.5 -> **10** triggers (pilot 4 + rest 6); 0.2 -> **6** (pilot 1 + rest 5) — ~40 % fewer, but the pilot's strong 4:1 shrank to 6:5 on the rest.
+- **Judge (pilot 11 pages, 118 segments each):** 0.5 **1.52** raw with 6 zeros vs 0.2 **1.62** with 4 zeros; the remaining 28-page judge is running. The default decision waits for the paired full-corpus numbers (the loop's own rule: <40 pages = noise). Benchmark `2026-10-23-temperature-ab.md` (status: judge pending).
+
+---
+
+## MIT quality loop, round 137 — dashboard positive-control fixture (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a **positive control**: a trimmed legacy payload whose region has the measured `content_loss` defect (114→46 chars). The dashboard test asserts it reports `content_loss` in **both** the gate violations and the leftover scan — proving the clean-page fixtures are not passing by blind luck.
+- 2 dashboard fixture tests now (clean pages → 0 leftovers; legacy defect → detected).
+
+---
+
+## MIT quality loop, round 136 — dashboard pinned on real payload fixtures (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Committed two **trimmed real doctor payloads** (Iruma p1 with the known `dropped_!` nuance, Mieruko p0 clean) as dashboard fixtures and added an aggregation test: 2 pages, 19 rendered regions, exactly one `dropped_!` gate finding, **leftover {}**, non-zero timing sum. Synthetic-dict tests remain, but the real payload shape (regions/dropped/timing keys) is now pinned.
+- No behaviour change.
+
+---
+
+## MIT quality loop, round 135 — one-command quality dashboard added (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/quality_dashboard.py`: gate violations per class + leftover guard-class scan + stage-timing sums + raw/noise-adjusted judge mean in one reproducible command; pure aggregation with 2 unit tests.
+- End-state run on the 39-page final sweep: 368 rendered regions, gate only `dropped_!` ×1, **leftover {}**, judge 367 segments raw **1.44** / strict-adjusted **1.55**. Documented in `2026-10-23-quality-dashboard-tool.md`.
+
+---
+
+## MIT quality loop, round 134 — quality classifier tightened + numbers corrected everywhere (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added tests for `tools/audit_summary` and they exposed a **too-lenient noise classifier**: a note containing a real typo pair (`บ่าน→บ้าน`) was still counted as noise because it also contained an identical pair. The classifier now treats **any real pair (left != right) or complaint keyword as a real finding**; only all-identical pairs / typo-only claims are noise.
+- Recomputed honestly: end-state 367 segments **raw 1.44, strict-adjusted 1.55** (13/138/216 = 3.5 % broken / 37.6 % partial / **58.9 % perfect**), lenient-adjusted 1.68; 480-subset also 1.55 strict. The earlier 1.68 was the lenient cut.
+- Corrected `2026-10-23-final-quality-baseline.md`, `2026-10-23-judge-noise-adjusted-profile.md`, the vault note, and the PR body + a PR comment explaining the correction. 4 new tool tests.
+
+---
+
+## MIT quality loop, round 133 — series-memory edge cases covered (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the two missing tests for the new series name memory: the 32-series **LRU bound** (oldest evicted, newest kept) and **dict-shaped regions** (`{"src", "dst"}` as the batch/gate paths pass them) being learned and enforced exactly like TextBlock objects. 7 tests in the module, all pure Python.
+- No behaviour change.
+
+---
+
+## MIT quality loop, round 132 — final pre-merge verification battery (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **MIT fast gate 932 passed** (4 skipped), **MIT heavy subset 86 passed**, **Backend mit-config 27 passed**; CI on the branch head: logic gate pass, heavy ML pass (3m49s), backend jest pass. Vercel fails on the frontend preview deployment (external; no Frontend files touched).
+- PR remains **MERGEABLE**. Recorded in `2026-10-23-premerge-verification.md` together with the end-state quality/perf numbers so the merge decision has one summary.
+
+---
+
+## MIT quality loop, round 131 — batch/single payload parity verified (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the same page through `translate_patches` and `translate_batch_pipelined([page])` with one config on two real pages: **payload keys, image size, patch count, region count, rendered/dropped split and the full source-text set are identical**. Translation strings differ only by sampling, as expected.
+- With the earlier 1.46x latency measurement and the context/glossary quality wins, this closes the "can batch mode be enabled safely?" question from the payload consumer's side: it cannot break a consumer that relies on payload structure. Benchmark `2026-10-23-batch-single-payload-parity.md`.
+
+---
+
+## MIT quality loop, round 130 — gate CLI verified with the new rules; module docs updated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the standalone `tools/quality_gate.py` CLI on an old payload that contains a known defect: it reports `content_loss: index=5 detail=114->46` — the new rule works outside the pytest path too.
+- Updated the module docstring to list the newer classes (untranslated English word #1057, content loss #1058, question particle anywhere in the answer) and the `rendered: False` dropped-region rule (#535). Gate tests 16 passed.
+
+---
+
+## MIT quality loop, round 129 — gate no longer flags dropped (never-rendered) regions as empty translations (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Payloads carry **dropped regions** for attribution (`rendered: False`, `drop_reason`) alongside rendered ones (#535); the gate treated their empty translations as `empty_translation` violations (hit on the batch sanity run: JP credits/`月` kept as original artwork).
+- `check_page` now skips `rendered is False` regions; a rendered region with an empty translation is still flagged. Test added; gate suite 16 passed; full suite green.
+
+---
+
+## MIT quality loop, round 128 — production log hygiene: debug prints are env-gated (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Found two unconditional `print`s this loop added: `[filter-after-strip]` fired on **every production page** (the filter is default ON) and `[series-glossary]` on every applied fix. Both are now gated behind existing/added debug envs (`MIT_LOG_REGION_FILTER`, `MIT_SERIES_GLOSSARY_LOG`).
+- Verified: a default doctor run on a real page now logs **zero** debug lines and the gate stays clean; the fast suite is green. No behaviour change — only log noise removed.
+
+---
+
+## MIT quality loop, round 127 — pre-merge hygiene + PR body refreshed with round 2 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Hygiene scan** of everything the branch adds vs the base: 196 added files, **17.1 MB total — 16.9 MB docs** (34 benchmark evidence images), MIT code +0.2 MB, **zero** files under `tmp/`, `result/` or `Backend/uploads/`. No corpus renders or model files committed.
+- **PR body** was still the round-1 description; appended a bilingual round-2 section (guards/gate/filter/series memory with defaults + evidence, the noise-adjusted **1.68/2 / 70.6 % perfect** baseline, opt-ins with tradeoffs, render telemetry clean, and the CI status: logic gate + heavy ML + backend jest green, Vercel external rate-limit only).
+- PR remains **MERGEABLE**; no code change.
+
+---
+
+## MIT quality loop, round 126 — fixed the heavy-CI regression our branch introduced in test_stages (#1006 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR #794 is **mergeable**; CI: logic gate (torch-free) pass, backend jest pass, frontend/mobile skip, Vercel rate-limited (external), heavy ML report-only **failed** on `test_stages.py::test_run_rendering_default_dispatch_forwards_all_kwargs`.
+- Root cause is ours: commit `54ba1fb4` (#1006) started forwarding `fit_below_floor` and `widen_vertical_columns` through the rendering stage, but the test's `_render_config` SimpleNamespace and expected-kwargs assertion were not updated — the local fast gate skips heavy tests, so only CI caught it.
+- Updated the helper + expected kwargs; `test/test_stages.py` **9 passed** locally. After the push, CI is **green**: logic gate pass, heavy ML pass (4m39s), backend jest pass; only Vercel fails on an external deployment rate-limit (retry in 24 h) — the PR is mergeable and otherwise ready.
+
+## MIT quality loop, round 125 — render/layout telemetry is clean on all 39 pages (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Parsed the per-page render + composite telemetry of the final sweep: **root/inherited/spill/overlap/small_font/suppressed/composite-invisible all 0 across all 39 pages** — no page has a layout defect (block leaving the patch, overlapping text, below-floor font, invisible composite).
+- Combined with the end-state numbers (adjusted **1.68/2**, 71 % perfect; gate covering every class; 9 guard saves with 0 leftovers), the render side is deterministic-clean. Benchmark updated (`2026-10-23-final-quality-baseline.md`).
+
+## MIT quality loop, round 124 — definitive end-state quality baseline: adjusted 1.68/2, 71 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged the **final 39-page sweep outputs** (the exact end-state defaults): 38 pages scorable, **367 segments**, raw mean 1.44/2, **98 noise flags (27 %)**, **noise-adjusted 1.68/2** with distribution **11/97/259 = broken 3.0 % / partial 26.4 % / perfect 70.6 %**.
+- Real remaining classes: clause omission the ratio guard cannot see (model ceiling), transliteration/word-taste; no corruption-class defects remain — consistent with the earlier 480-segment profile. One page had no scorable segment (all filtered), not a failure.
+- Benchmark `2026-10-23-final-quality-baseline.md`; vault note carries the end-state number for future sessions.
+
+## MIT quality loop, round 123 — deterministic gate now covers content-loss and untranslated-word (#1057/#1058) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Extended `quality_gate.check_page` with the two newer classes: `content_loss` and `untranslated_word` (same predicates as the live retry triggers), with tests, so a chapter replay reports them without the judge.
+- Dashboard over the latest stored output of 44 page payloads: **2 violations** — one `content_loss` on an old audit payload (`114 -> 46` chars, correctly the class the predicate targets) and the known `dropped_!` nuance on Iruma p1. No `untranslated_word` remains; every other gate class stays clean. Benchmark `2026-10-23-gate-classes-extension.md`.
+
+## MIT quality loop, round 122 — final-sweep latency outliers triaged: transient contention, not code (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Broke down the 39-page sweep: translation 39 % of wall, textline_merge 18 %, OCR 16 %, detection 10 % (rest mask/inpaint/render); avg 7.65 s.
+- Outliers analysed: cold detection 5.7 s on the first page (opt-in preload covers it), gateway translation 10.9 s (external), and a textline_merge spike of 8.8 s.
+- **The merge spikes are transient, not content-specific:** the same page ran 315-367 ms in other runs, spikes move between pages/runs, size does not correlate (1.8 MP -> 8.8 s vs 5.3 MP -> 1.1 s), and models are not reaped (`models_ttl = 0`). No code change; recorded so future sessions do not chase it (`2026-10-23-latency-outlier-triage.md`).
+
+## MIT quality loop, round 121 — durable memory consolidated; exclamation-loss guard rejected by measurement (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Measured before building:** an exclamation-lost guard looked like the last gate gap, but mining all stored segments found only **2 candidates in 15,578** — not worth a predicate; not built (documented here and in the vault).
+- **Consolidated the loop's durable knowledge** into `Obsidian-MangaDock/project-translation-eval-set.md`: the judge-noise-adjusted numbers (raw 1.44 -> **1.70/2**, 72 % perfect), the full guard inventory with default/env-off flags and 0.43 ms/page cost, the guard discipline (predicate -> trigger -> note + forced/natural proof), the performance decisions (filter-after-strip default; batch 1.46x, preload, widen, segment-retry opt-in) and every rejected experiment with its evidence, plus pointers to the benchmark docs and DONE rounds.
+- No code change; this is the hand-off memory for the next session.
+
+## MIT quality loop, round 120 — JP path issue closed as evaluated; PR updated with adjusted quality numbers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Closed #897** (JP→TH path unevaluated) as **completed**: the evaluation is done — layout squeeze measured with the opt-in fix (#1006), inversion fixed in #898, fresh JP run gate-clean with judge 1.57/2, rhetorical-prompt A/B showed no difference (not shipped), and the repo has only one real JP page (uploaded twice) so no further evaluation is possible without new data.
+- Posted the corrected quality measurement on PR #794: **noise-adjusted 1.70/2, 72 % perfect / 2.1 % broken**, plus the final full-corpus sweep (39/39 pages, 9 guard saves, 0 leftovers), latency (avg 7.65 s), guard cost 0.43 ms/page and the verified production wiring for `series_context`.
+- No code change; tree clean.
+
+## MIT quality loop, round 119 — final full-corpus sweep: 39/39 pages, 9 guard saves, 0 leftovers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran **all 39 corpus pages** with the final defaults (`MIT_LOG_GLITCH=1` + gate, real gateway): **9 guard triggers** — 3 foreign_script, 3 content_loss, 2 untranslated_word, 1 dropped_question — and a post-run predicate scan of the final payloads found **0 leftovers**: every triggered segment was re-asked and fixed in place.
+- Gate: **2 violations** — one minor `dropped_!` nuance (Iruma p1) and one name inconsistency that is expected in doctor runs (no `series_context` -> memory is a no-op; production path has it, verified).
+- Latency across 39 pages: **avg 7.65 s, median 6.96 s** (warm, GPU1). Benchmark `2026-10-23-final-corpus-sweep.md`.
+
+## MIT quality loop, round 118 — verified `series_context` reaches the MIT translator on the real path (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Traced the production wiring end-to-end: `mit-translation.service.ts:116` / `mit-batch-stream.ts:120` -> `composeSeriesContext` -> `mit-config.ts:250` (`translator.series_context`) -> MIT `TranslatorConfig.series_context` -> prompt seam -> `series_glossary_memory` keyed by `(target_lang, series_context)`.
+- Tests: Backend `mit-config.spec.ts` **27 passed** (includes the series_context branch); MIT series-memory + extraction **7 passed**. `series-context.spec.ts` fails to start locally on Node 26 (`fetch is not defined` in `page-source.ts`) — a test-runner environment issue, not a branch regression.
+- Conclusion: the cross-page name-consistency feature is reachable on the real production path (single-page and batch), not only in the batch pipeline. Benchmark `2026-10-23-prod-wiring-verification.md`.
+
+## MIT quality loop, round 117 — production-path acceptance passes; hedging guard rejected on false-positive rate (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Production path (sequential single-page requests + `series_context`):** series name memory applied 2 fixes on page 2 and the chapter kept one spelling; gate shows only the expected `empty_translation` findings for Japanese regions deliberately kept as original artwork on an English page. No other violations.
+- **Hedging-lost guard (I think/maybe/probably) rejected before implementation:** 180 raw hits in stored segments but ~10 unique and mostly false positives (`what KIND OF thing`, `I THINK?` -> `ใช่ไหม?`, `or so it seems` -> `หรือว่าแค่ฉันเอง`); a deterministic guard would fire mostly on non-hedges. Documented, no code.
+- Benchmark `2026-10-23-prod-path-acceptance.md`. The deterministic lever list is now exhausted for the current corpus; remaining classes are model-ceiling sense/nuance + the data-limited JP evaluation.
+
+## MIT quality loop, round 116 — judge-noise-adjusted quality: raw 1.44 -> **1.70/2**, 72 % perfect (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `tools/audit_summary.py`: it classifies the judge's typo-noise notes (identical strings around `→`, 'typos' with no other complaint) and reports raw vs noise-adjusted distributions.
+- On the 480 post-default segments: **raw mean 1.44/2 with 146 (30 %) noise flags**, **adjusted mean 1.70/2**, distribution **10/125/345 (2.1 % broken, 26 % partial, 72 % perfect)**.
+- Remaining real classes are model-ceiling nuance/sense (exclamations as greetings, dropped hedging, calques) and fragments/name variants — not the corruption classes the loop already guards. Future audits should quote the adjusted number; benchmark `2026-10-23-judge-noise-adjusted-profile.md`.
+
+## MIT quality loop, round 115 — detection_size 2048 rejected: changes detections for ~0.1-0.3 s (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A/B on 6 pages (`--set detector.detection_size`): 2048 made the detection stage ~0.1-0.3 s faster (wall differences up to 3 s on some pages were translation sampling variance), but the **region sets changed** (Boku 12->11, Maou 11->10, Mieruko 11->12; OCR text differs in 1-6 segments per page).
+- That is a recall change, not a free speed knob: **keep 2560** (same decision class as the earlier 3200 rejection) unless a corpus-wide recall proof exists. No code change; benchmark `2026-10-23-detection-size-ab.md`.
+
+## MIT quality loop, round 114 — JP rhetorical-prompt A/B: no measurable difference, rule not shipped (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested whether a prompt rule for Japanese rhetorical/tag endings (じゃないか/じゃねーか/じゃん/だろ/よね/かよ) fixes the previously reported flattening, via a temporary `MIT_PROMPT_EXTRA` seam.
+- **2 runs per arm on the real JP page:** both arms already keep the attitude (`ไปทำไม` / `สิ` / `สักหน่อย`); the flat sample did not reproduce. No measurable improvement -> **rule not shipped**, seam reverted (shipped prompt byte-identical).
+- Recorded the negative result in `2026-10-23-jp-prompt-ab.md`; the only gate finding in all runs is the expected empty translation of a source-language-filtered `X` region.
+
+## MIT quality loop, round 113 — guard cost measured (0.43 ms/page) and the corpus gate dashboard is clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Timed all nine deterministic guards over **15,071 real stored segments**: **0.025 ms/segment, 0.43 ms per 17-region page** (~0.005 % of a 9 s page) — the quality-first guard set is effectively latency-free; the retry cost is only paid where a guard fires.
+- Ran the deterministic gate over the **latest output of every corpus page** (44 rendered payloads): **0 violations** — every stored rendering passes every gate rule the loop built, with the judge baseline at 1.44-1.48/2.
+- Benchmark `2026-10-23-guard-cost-and-gate-dashboard.md`.
+
+## MIT quality loop, round 112 — issue bodies refreshed to current state (DoD handoff) + PR status comment (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added a dated **bilingual status section** to the bodies of #905, #980, #1047, #1051, #1055, #1056, #1057, #1058 (what shipped, commits, evidence, default-vs-opt-in state, escape flags) so the next reader/agent gets the current state from the body instead of replaying comments.
+- Posted the refreshed overall status (quality baseline 1.44-1.48/2, default guards list, performance profile, opt-ins with tradeoffs, remaining work) on PR #794 for review.
+- No code change; suite stays green (last run 929 passed).
+
+## MIT quality loop, round 111 — final post-default regression: 1.48/2 with all guards on (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 8 fresh pages with every guard at its default (foreign-script + salvage, negation, runaway, filler, lost/rare, dropped_question, untranslated_word, content_loss, contract, series name memory, filter-after-strip): **gate 0 violations, judge 86 segments mean 1.48/2, one 0-score**, and only **1 glitch trigger** (a content_loss true positive on an OCR-merged credit line).
+- Baseline holds: full corpus 1.44/2, previous post-default sweep 1.48. The guard profile is now quiet on ordinary pages (the earlier 7-trigger sweep deliberately used defect-rich pages).
+- All eight guards sit at their evidence-based default with escape-hatch flags and forced-injection/unit proofs; opt-in list unchanged (batch pipeline, preload, widen columns, segment retry, fit-below-floor, concise bubbles, context pages). Benchmark `2026-10-23-post-default-regression-48.md`.
+
+## MIT quality loop, round 110 — content-loss guard forced-proven, FP source fixed, promoted to default (#1058) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Forced injection:** corrupted a long line's answer to `พริบตา` -> `content_loss` fired, retry (**2 requests**) restored the full line, final payload had 0 content-loss regions.
+- **Found and fixed a false-positive source in the harness run itself:** retry queries carry an appended `[note: ...]`, which inflated the measured source length and spuriously flagged already-retried segments. The predicate now strips an appended note before measuring; a test pins both sides.
+- **False positives:** 13 pages with the flag on -> **0 content_loss triggers**, gate 0 (threshold is the measured deep tail, p10 0.66 vs cut 0.45).
+- **Default ON** (`MIT_CONTENT_LOSS_GUARD=0` disables); trigger test pins the default; heavy glitch suite 19 green; benchmark updated; #1058 updated.
+
+## MIT quality loop, round 109 — baseline sweep: 2 guard false positives fixed; content-loss class measured and guarded (opt-in) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 8-page baseline sweep with all defaults: 7 triggers, all true positives (CJK/Arabic/Cyrillic foreign-script leaks, two `lost_as_rare`); judge **1.48/2** over 92 segments (baseline 1.44-1.48).
+- **FP fix 1 (#1056):** `Episode?3` fired `dropped_question`; a `?` embedded between alphanumerics is OCR/title noise — stripped before the decision, tested.
+- **FP fix 2 (#990):** the gate's `dropped_?` look only at the last 16 chars, so a question particle earlier in a long answer was missed (false violation). It now searches the whole answer; the same 8 pages re-check to **0 violations** (was 1).
+- **New class measured (#1058):** over 8,423 segments, dst/src length ratio median 0.86 / p10 0.66, and 54 segments (0.6 %) below 0.45 are real content loss (truncated Thai, different short line). Added `content_loss` predicate + **opt-in** `MIT_CONTENT_LOSS_GUARD=1` retry (note asks for the whole line), with tests; forced-injection proof is the next step before any default.
+- Full suite **928 passed**; benchmark `2026-10-23-guard-fps-and-content-loss.md`.
+
+## MIT quality loop, round 108 — untranslated-word guard promoted to default after forced proof + 16-page FP sweep (#1057) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Forced injection:** corrupted an answer to `มีใครเอาENOUGH มาบ้างไหม?` -> guard fired (`untranslated_word`), retry (**2 requests**) left **0** untranslated-source-word regions in the final payload.
+- **False positives:** 16 pages with the flag on (13-page sweep + 3 credit/title pages) -> **0 triggers**; the credit/title/acronym/partial-copy licence rules held.
+- **Default ON** (`MIT_LEAK_LATIN_GUARD=0` disables); trigger test now pins the default. It only acts when a Thai line keeps an English source word, so clean pages are untouched. Heavy glitch suite 18 green; benchmark updated; #1057 updated.
+
+## MIT quality loop, round 107 — opt-in guard for an untranslated English word inside Thai (#1057) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the licence-based predicate `untranslated_source_word`: Thai target, mostly-Thai answer (credits/titles skipped), non-credit source line, an answer word matching a source word exactly **or a partial copy covering >= 60 %** (the observed `ATERIALS` case), with a vowel (`RTSD`/`TV` skipped).
+- Wired as an **opt-in** (`MIT_LEAK_LATIN_GUARD=1`) retry trigger + note, same predicate -> trigger -> note discipline as the other guards; tests cover the observed mangled line, the intact English word, credit line, title-only Latin, acronym and absent-word cases, plus the env gating (heavy glitch suite 18 passed).
+- **False-positive sweep:** Otome p0 (credits), Kage p0 (title) and Horimiya p1 with the flag on: **0 triggers, gate 0 violations**. Stays opt-in until a forced-injection proof and a wider sweep; benchmark `2026-10-23-1057-untranslated-word-guard.md`.
+
+## MIT quality loop, round 106 — sweep 43 (full 39-page coverage) + dropped-question retry guard (#1056) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Swept the last 13 pages with the current defaults: `spurious_filler` fired 3x (2 garbage variants, 1 legitimate `ทน` the guard cannot distinguish — shipped text reads naturally), and the gate caught two real issues.
+- **New guard `dropped_question` (#1056):** a source retort (`FOR NO REASON?`) shipped as a flat statement. `translation_quality.dropped_question` is true only when the source has `?` and the Thai target contains no question marker at all (particle/word list), wired as a real retry trigger + note — same predicate->trigger->note discipline as #1039/#1052, with predicate and trigger tests (55 tests in the two files).
+- **Tracked, not rushed (#1057):** a mangled untranslated English word glued to Thai (`เอามATERIALS`) — the `added_latin` gate caught the mangled token, but a retry class for intact untranslated words needs a licensed-copy design to avoid credit/name false positives.
+- Benchmark `2026-10-23-sweep43-dropped-question.md`.
+
+## MIT quality loop, round 105 — fresh 20-page sweep: guards caught CJK and Arabic leaks live; gate clause false positive fixed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh sweep of 20 pages with the current defaults (`MIT_LOG_GLITCH=1` + gate): **4 foreign_script triggers, all true positives** — CJK (`融入`, `总有`), an **Arabic** leak inside a character name (`ชิอينا`) and a retry of the same page; every one was re-asked and the final payloads contain **0 foreign-script regions** (verified by re-scanning the outputs).
+- **Gate false positive fixed (#990):** `inconsistent_name: TSUKUYOMI` came from a 17-char **clause** being stored as the name's spelling because `extract_glossary` took the longest Thai run of any region that merely mentioned the name. Extraction now requires a name-focused line (spelling run 3-12 chars, translation no longer than spelling + 6), matching the series-memory rule. With the fix the sweep reports the *true* inconsistency (`สึกุโยมิ` vs `ทสึคุโยมิ`) instead of a fabricated one, and clauses can no longer poison the batch/series glossary.
+- Tests: name-glossary extraction, series memory and gate suites green; benchmark `2026-10-23-sweep42-and-gate-fp.md`.
+
+## MIT quality loop, round 104 — post-default regression audit: quality stays at baseline (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran 7 real pages with the two new defaults active (#1051 filter-after-strip, series name memory): **gate 0 violations, 0 glitch triggers, judge 91 segments mean 1.45/2 with zero 0-score segments** — exactly the full-corpus baseline (1.44/2 over 403 segments).
+- Series-glossary fixes: 0, as expected — `doctor_page` sends no `series_context`, confirming the memory is a strict no-op without one (no behavior change for context-less work).
+- Conclusion: the filter move is a pure latency win (earlier A/B: translation 3.62 -> 2.12 s on a mixed page) and the name memory only acts with a series key; neither regressed quality. Benchmark `2026-10-23-post-default-regression.md`.
+
+## MIT quality loop, round 103 — series name memory promoted to default ON (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Keyed the memory by **`(target language, series_context)`** so a series translated to THA and ENG never shares spellings, and confirmed the first page is a strict learn-only no-op: a single-page replay with a series context is **byte-identical** to the run without it.
+- **Live two-page run with no env override:** `applied 2 name fix(es)`, both pages `สึกุโยมิ` — the same cross-page consistency the batch path already ships by default, now also on the production single-page path.
+- **Default ON** (`MIT_SERIES_GLOSSARY=0` disables; `MIT_NAME_GLOSSARY=0` disables both). The consistency-vs-correctness tradeoff is unchanged from the batch glossary, and there is no effect at all without a series context. Suite 920+ green; benchmark updated; #980 updated.
+
+## MIT quality loop, round 102 — series-scoped name memory for the single-page production path (#980 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Production translates page-by-page, so the batch glossary never runs there and names drift across pages (measured: `สึกุโยมิ` page 1 vs `ทสึคึโยมิ` page 2, gate `inconsistent_name`).
+- Added opt-in `MIT_SERIES_GLOSSARY=1`: `series_glossary_memory` keys a 32-series LRU by the Backend's stable `series_context` (#157), learns name->spelling votes from name-focused lines only (3-12 char Thai run, no clause lines), and applies the remembered spellings deterministically before rendering on later pages. No key -> no-op; `MIT_NAME_GLOSSARY=0` disables.
+- **Evidence:** 4 pure-Python unit tests (learn/first page, cross-page fix, series isolation, opt-in gating); live 2-page Tsuki run logged `applied 2 name fix(es)` and produced **consistent `สึกุโยมิ` on both pages** versus the inconsistent baseline.
+- **Opt-in:** it changes rendered output and can freeze an imperfect spelling series-wide (the same tradeoff as the batch glossary). Benchmark `2026-10-23-series-name-memory.md`; #980 updated.
+
+## MIT quality loop, round 101 — batch pipeline vs single-page: 1.46x faster, names consistent, quality within judge noise (#905) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured a real 2-page chapter (Tsuki c2 p0/p1) through both paths: single-page **29.4 s**, batch pipeline **20.2 s** -> **1.46x**.
+- **Quality:** deterministic win on names — batch keeps `TSUKUYOMI` consistent across the chapter (`ทสึคึโยมิ` twice) while single-page produced two spellings (gate `inconsistent_name`). Judge: single 1.55 vs batch 1.39 over 33 segments, a gap inside the 1.36-1.58 noise band measured for the same config; most lowered flags are the judge's known Thai-spelling false positives.
+- **Stays opt-in:** batch mode has no live per-page progress and a higher memory footprint — the documented tradeoff. Recommendation: use it for chapter jobs that don't need per-page progress; revisit the default when the Backend UX stops depending on per-page callbacks.
+- Benchmark `2026-10-23-batch-vs-single.md`; #905 updated.
+
+## MIT quality loop, round 100 — forced-guard harness proves the filler and LOST->หายาก guards fix live output (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New dev tool `tools/forced_guard_bench.py`: on the first translation response it replaces one prompt line's answer with a known-bad translation, then runs the real pipeline and checks requests + final payload.
+- **lost (#1052):** injected `ของหายาก` for a `LOST` line -> **2 requests** (guard re-ask), **no `ของหายาก` left**, final lines `ไอเทมที่สูญหาย` / `เทคโนโลยีที่สูญหาย`.
+- **filler (#1039):** injected `ฉันทันทำแบบนั้น` -> **2 requests**, **no `ฉันทัน` left** in the payload.
+- This is the reproducible live proof the issues' acceptance lists were missing (natural guard triggers are intermittent); benchmark `2026-10-23-forced-guard-verification.md`; comments on #1039/#1052.
+
+## MIT quality loop, round 99 — #1050 decided: the overlap already exists at page granularity (#905); in-page threading rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the single-page overlap opportunity (mask+inpaint 0.70 s/page, independent of translation) against the batch pipeline: `run_pipelined` already runs page i's **back stages (mask/inpaint/render) concurrently with page i+1's translation** — the same overlap at chapter granularity (1.37x in-process measured earlier).
+- **In-page threading rejected:** redundant for chapter throughput, and running GPU back stages + model unloaders in a worker thread next to the event loop is a reliability risk for ~0.5-0.9 s/page on one path. #1051 (default ON this round) already removed the original blocker, so the door is open if a single-page client ever needs it.
+- Recommendation recorded: enable the batch pipeline for chapter jobs that do not need per-page live progress (`MIT_BATCH_PIPELINE=1`, plus the quality wins of context + glossary); revisit the default when the Backend progress UX stops depending on per-page callbacks.
+- Benchmark `2026-10-23-1050-overlap-decision.md`; **#1050 closed as superseded by #905** with this rationale.
+
+## MIT quality loop, round 98 — #1051 implemented correctly: filter after the noise strip, default ON; unblocks #1050 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Moved the source-language filter from `_finish_patches` (post-translation) into `_run_text_translation`, immediately after `_strip_source_noise` — i.e. on exactly the text the translator is about to send; the finish stage reuses that list instead of filtering again. Guarded by `ctx.patch_mode`, so the full-page `translate()` API is untouched; `MIT_FILTER_AFTER_STRIP=0` restores the old path.
+- **Replay A/B: rendered PNG byte-identical** on Boku p0 (kept 12 of 17), Otome p0 (kept 10 of 11) and Horimiya p0 (no drops).
+- **Live latency on the mixed page:** translation **3.62 -> 2.12 s** and **1.96 -> 1.74 s** (12 prompt lines instead of 17); two-page sanity run at HEAD gate-clean.
+- **Default ON** for the patch/batch path: the rendered set is identical under replay and the model simply stops receiving non-source lines it could never render (fewer tokens/latency). Benchmark `2026-10-23-filter-after-strip.md`.
+- **It unblocks #1050:** the region list is now stable between translation and rendering, the precondition the mask+inpaint overlap needed (next step).
+
+## MIT quality loop, round 97 — consolidated status report of the whole loop (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Wrote `2026-10-23-quality-loop-status.md`: full-corpus judge baseline (39/39 pages, 403 segments, 1.44/2, 2.7 % broken, noise caveat), the shipped default fixes with their evidence, the opt-in list with the tradeoff that blocked each default, the 8-page latency profile, open items and the reusable tooling.
+- This is the hand-off view of the loop: what changed by default, what stays behind a flag and why, and where the remaining work is (#1050/#1051 blocked, #897 data-limited, #1052/#1039 intermittent confirmation).
+
+## MIT quality loop, round 96 — #899 second attempt (background-aware contrast): verified inert, visual check clean, issue closeable (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the issue's alternative proposal as opt-in `render.background_aware_fill`: sample the background ring around a region, score current fill/outline vs two neutral pairs by worst-case `max(|bg-fill|, |bg-outline|)`, switch only on a clear improvement.
+- **Replay A/B (only colour can change): byte-identical renders on all five pages (JP + 4 EN), 0 regions picked** — current sampled pairs already pass the worst-case threshold; nothing to fix at HEAD.
+- **Visual check of the issue's region #5 at HEAD**: renders black fill + white halo over the grey/black background and is readable in the crop (`2026-10-23-899-head-region5.png`) — the washed-out grey fill does not reproduce.
+- Reverted the experimental flag/helper (no code shipped). Verdict: the defect is obsolete at HEAD; a fix is not needed. Benchmark updated; #899 to be closed with this evidence.
+
+## MIT quality loop, round 95 — #899 investigated: grey-fill symptom gone at HEAD; the fix needs the erased background (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-measured the issue's real JP page: lettering is two-tone (dark ~41 / bright ~244 luma, 20 %/80 %), but the OCR colour head now samples the **dark** cluster (fg_l 8-44), not a mid-grey average — **the grey symptom does not reproduce at HEAD**.
+- Tried a pure bimodal fill heuristic (bright cluster as fill, dark as outline) behind an opt-in flag: it does not fire on this page, and a wider rule would also flip normal black-on-white lettering — no safe criterion from the lettering clusters alone. **Reverted, no code shipped.**
+- Remaining real risk: the rendered text is black over a bimodal background (black hair/white paper), so the dark half still has poor worst-case contrast. The correct fix must look at the **erased patch background** and pick the fill with the best minimum contrast (the issue's alternative), then gate on the 39-page replay. Benchmark `2026-10-23-899-bimodal-investigation.md`; #899 updated.
+
+## MIT quality loop, round 94 — traceability pass over the open render issues: most are fixed and only waiting for merge (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the still-open render issues against HEAD: **#791/#792/#793 are covered by tests** (13 pass, `compact_special_symbols` no longer deletes the space after punctuation); **#873 verified fixed on the real Otome page** (page-bounds clamp, crop checked); **#876 pinned by `clamp_box_to_neighbors` tests**; **#897 updated** with the JP audit (one real page uploaded twice, gate clean, judge 1.57/2, opt-in widen fix for the squeeze).
+- **#899 (outlined JP lettering -> grey contrast) is the one genuinely open item** — not re-measured here; recorded as the next real render-quality target.
+- Wrote `2026-10-23-render-issues-traceability.md` (issue -> test/evidence table) and posted status comments on #791/#873/#897.
+
+## MIT quality loop, round 93 — numbers are never broken across lines; นาทีละ segmenter tie verified fixed (#842/#844) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#844 re-check:** `_insert_thai_word_breaks('นาทีละ 5,000 เยน')` yields `นาที\u200bละ` — a word boundary, not the historical `นา|ทีละ`; test now pins it.
+- **#842 family fix:** a narrow wrap width used to split `30,000` into `30,00` / `0` (and `12:30` likewise) through the syllable/char fallback. Number-like tokens (`^[0-9][0-9.,:%/-]*$`) are now **atomic** in `_split_into_syllables`: they overflow instead of losing digits. Tests: `30,000` whole at widths 40/60/80/120; `50%` and `12:30` whole at 40 px; all 47 Thai-wrap tests pass.
+- Risk: the change only engages when a numeric token exceeds the wrap width (production floors normally prevent that); normal Thai/Latin wrapping unchanged. Benchmark `2026-10-23-numeric-wrap.md`; the suite stays green.
+
+## MIT quality loop, round 92 — translation-stability audit: dialogue reproducible, short lines are the unstable class (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New reusable metric/tool `tools/stability_audit.py`: translate a page 3x, match by source, measure min pairwise similarity per segment (stable >= 0.85 / moderate 0.5-0.85 / unstable < 0.5).
+- **Results:** Boku p0 16 segments -> 6 stable / 3 moderate / **7 unstable**; Otome p0 and Maou p0 have **0 unstable** (only synonym-level paraphrase). Boku's unstable set is concentrated in short interjection lines (`SOR`, `MAN..`, `OH..`, `Siiig`) where wording naturally varies.
+- **One real semantic drift found:** `IVE GOT ALLERGIES SO I DONT EAT SNACKS.` -> `ฉันแพ้ของกินเล่น...` (2 runs) vs `ฉันแพ้สารอาหารในขนม...` (wrong sense). A garbled variant (`ทักคู้บ`) also appeared on an unstable line — instability and garbling co-occur on that segment class.
+- **Decision:** self-consistency would mostly target low-value short lines for a second page call, so it remains an idea (restrict to short segments if ever tried); the audit becomes a regression metric. Benchmark `2026-10-23-stability-audit.md`.
+
+## MIT quality loop, round 91 — neighbour-context hint for segment retry: tried, did not reproducibly help, reverted (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Round 90 showed the isolated retry sometimes garbles/truncates, so tried appending the already-translated **previous line** as context to each retried segment (same opt-in path).
+- Forced-harness runs (2 reps, real gateway): whole-page retry stayed clean; segment retry + context still produced a garbled answer in 1 of 2 reps (`60 นน. ...`) and a fine answer in the other. The hint adds prompt tokens without reproducibly restoring quality.
+- **Reverted** — no unproven prompt complexity in the retry path. The simple flagged-subset retry stays behind `MIT_SEGMENT_RETRY=1`; default whole-page retry unchanged. Glitch-retry tests 16 green; benchmark `2026-10-23-1055-forced-retry.md` updated.
+
+## MIT quality loop, round 90 — forced-failure retry harness: segment retry saves 1.2-1.6 s/glitch but risks quality (#1055) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Committed a reproducible harness `tools/forced_glitch_retry_bench.py`: it corrupts the first translation so a guard fires deterministically, then alternates the whole-page retry vs `MIT_SEGMENT_RETRY=1` on the same real page through the real gateway.
+- **Latency:** warm glitched page **6.8 s -> 5.2 s** (and 5.6 s in the second rep) — **~1.2-1.6 s (20-25 %)** off a glitched page; with the measured ~1-in-6 guard rate that is ~0.2-0.3 s of average per-page latency.
+- **Quality risk observed:** with the line retried in isolation, one harness run produced a garbled retried line (`60 นน.`) and an earlier one a **truncated** line (`...เพราะฉันอายุ`) — the predicted page-context loss; the whole-page retry kept the page for the model and stayed clean in the same runs.
+- **Decision: opt-in stays.** The gain is real but only on glitched pages and the quality risk is observable in a tiny sample, so it is not free enough to default. Benchmark `2026-10-23-1055-forced-retry.md`; #1055 updated.
+
+## MIT quality loop, round 89 — opt-in segment-only retry for guard re-asks (#1055) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a cost of the quality guards:** the repeat loop re-sends the **whole page** for each retry, and guards fire on ~1 page in 6 of live traffic — so every caught glitch costs an extra full-page translation call (page of tokens).
+- **Added `MIT_SEGMENT_RETRY=1` (opt-in):** from the second attempt on, translate only the still-invalid segments and merge them back. Default unchanged (whole-page retry keeps page context for the re-ask).
+- **Evidence:** mocked 2-line page with a script leak — default retry prompt carries 2 lines, segment retry carries 1 (≈94 % fewer input lines on a real 17-line page); the new answer for the flagged line is kept in both. Both shapes pinned by tests (16 in the glitch-retry file); full suite **913 passed**.
+- **Tradeoff recorded:** the retried line loses its page-mates as context and the batch numbering changes, so it stays opt-in; live latency/quality comparison is the open acceptance item on #1055. Benchmark `2026-10-23-1055-segment-retry.md`.
+
+## MIT quality loop, round 88 — leaked-script salvage for retry-exhausted answers (#903 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Problem:** the round-87 audit observed Tsuki p0 going CJK leak -> CJK leak -> filler across the three attempts; with the repeat budget exhausted the last, still-glitched answer shipped (Chinese glyphs on the page).
+- **Fix:** `strip_leaked_script` runs in the final clean pass: removes CJK/Kana/Hangul/Cyrillic characters **only when the source does not use that script** (JP kana SFX copied into Thai stays), no model call, no latency.
+- **Evidence:** all **182** stored leaked regions become foreign-script-free (e.g. `ЦУคุโยมิ..` -> `คุโยมิ..`, `1 รょう` -> `1 ร`); a mocked translator that leaks on all three attempts returns Thai-only output with `call_count == 3`; fresh clean pages show no unexpected stripping (pre-existing English title region untouched). 35 translation-quality tests green.
+- **Default:** on — the only affected answers already violated the script contract; clean output is byte-identical, so there is no tradeoff to gate behind a flag. Benchmark `2026-10-23-leaked-script-salvage.md`.
+
+## MIT quality loop, round 87 — full-corpus audit complete: 39/39 pages, 1.44/2, 2.7 % broken; filler FP fixed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Completed judge coverage of the whole real corpus: 39/39 pages, 403 segments, mean 1.44/2, broken 2.7 %** (11 / 205 / 187 distribution). Batch means 1.36-1.58; the raw score is depressed by the judge's typo noise.
+- **Guard live catches over the same runs:** 3 `foreign_script` (CJK leaks) and 2 `spurious_filler` triggers, all true positives; shipped lines verified clean twice after re-ask.
+- **Fixed a guard false positive found live:** `ข้าทนทานดี` (ทนทาน = tough, for `IM PRETTY TOUGH`) was flagged as filler — the pronoun+ทน pattern now also excludes `ทาน`; regression test added (35 translation-quality tests green).
+- **Limitation recorded:** with the retry budget exhausted, the last (still-glitched) answer ships — observed on Tsuki p0 (`ICANT EVEN GIVE YOU ANY POWER`: CJK -> CJK -> filler). Follow-ups listed (extra retry for foreign_script only, or strip leaked chars as salvage) but not shipped without an A/B.
+- Also recorded: cross-page name inconsistency outside the opt-in batch glossary (`TSUKUYOMI` on Tsuki p0/p1); `--no-png` kept the whole sweep JSON-only. Benchmark `2026-10-23-full-corpus-audit.md`.
+
+## MIT quality loop, round 86 — p1-page audit: 1.58/2 judge mean, second live guard catch, disk-safe doctor flag (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited 8 more never-audited pages (p1 set + Iruma p0): **67 segments, judge mean 1.58/2** (39 perfect / 28 minor / **0 broken**) — the best fresh-set mean so far; flags are judge typo noise plus one fragment case (`IOO` -> `ฉัน`), the known model limitation.
+- **Second live guard true positive:** a Chinese leak (`觊觎`) was caught by the foreign-script guard, re-asked, and the shipped line is clean (`จอมเวทอื่นที่เล็งตำแหน่งนี้เช่นกัน`).
+- **Guard aggregate over 26 live pages** (rounds 21-23): 2 `spurious_filler` + 2 `foreign_script` triggers, **all true positives, 0 false positives** — the guards fire on ~1 in 6 pages and always on a real defect.
+- Gate clean on all 8 pages (question-marker fix holds). Added `doctor_page.py --no-png` (JSON/gate/timings kept, render PNGs skipped) after last round's disk-full incident; verified live. Benchmark `2026-10-23-fresh8-p1-audit.md`.
+
+## MIT quality loop, round 85 — fresh 8-page audit: guard caught a live CJK leak, gate question rule widened, fragment class recorded (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited 8 pages never used before (Kumo, Lv2 Cheat, Mushoku Tensei, Anta, Ki ni Natteru, Maou no Ore, Osoraku, Taida): gate-clean after one fix, judge raw mean **1.43/2** (53 segments).
+- **Guard true positive on live traffic:** the #903 foreign-script guard caught a Chinese leak (`...接连ไม่หยุด`), the segment was re-asked, and the shipped line is clean (`...ซ้ำแล้วซ้ำเล่า`).
+- **Gate fix:** two `dropped_?` on the Maou page were Thai questions whose marker is not at the string end (`...คืออะไร`, `...หรือไง`). The rule now looks at the final 16 characters and recognises `อะไร/ทำไม/ยังไง/เท่าไหร่/แค่ไหน`; re-gate = **0 violations on all 8 pages**, gate tests 12 green.
+- **Judge triage:** genuine flags are the **fragment class** (`ITS..`, `IN AN..`, `UNO?!`, trailing `S`) where the model commits to an unrelated word. No deterministic licence exists from the strings, so it is recorded as a known limitation rather than guarded.
+- **Housekeeping:** D: filled up mid-round; deleted the 2,722 regenerable `*.rendered.png`/`*.doctor.png` under `MIT/result` (4.36 GB) — all JSON evidence and corpus inputs kept.
+- Benchmark `2026-10-23-fresh8-audit.md`; #990 updated with the question-marker refinement.
+
+## MIT quality loop, round 84 — live 10-page guard sweep: guards fire correctly, gate refined twice (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Guards (after round-83 wiring fix):** on 10 real pages the env-gated log recorded **2 glitch triggers, both true positives** (`spurious_filler` on Dungeon p0: `ฉันทนมันมาหลายครั้ง...`, `นี่แหละว่่าวิธีที่ฉันทนอยู่...`). The lines were re-asked and the shipped output differs (filler removed); one replacement is still model-imperfect (`ทดเลือด` for drain), which is outside what the guard promises.
+- **Gate triage of the mixed-series batch (6 flags):** 3 `added_latin` were **false positives** (Chainsaw credits keep Latin names — `แปลโดย DALE`, `จัดหน้าโดย RTSD, ZERO`); the rule now only flags Latin tokens absent from the source. 1 `inconsistent_name` was **tool misuse** (name consistency is per chapter; the sweep mixed series) and 2 `dropped_?` were the known benign Thai rhetorical style.
+- After the refinement, gating each page separately: **9/10 clean**, only Boku p1 with its two documented style flags. Gate tests 11 green.
+- Benchmark `2026-10-23-guard-live-sweep.md`; #990 updated with the Latin-credit refinement and the per-chapter usage note.
+
+## MIT quality loop, round 83 — found and fixed our own guard-wiring bug: filler/lost were notes-only, not retry triggers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Bug in our own #1039/#1052 work:** `_is_glitched` is the retry trigger, but the filler/lost predicates had been wired only into `_modify_invalid_translation_query` (the retry *note*), so those segments were never re-asked. A live `MIT_LOG_GLITCH=1` audit exposed it; the mocked tests for both guards failed at HEAD.
+- **Fix:** `_is_glitched` now evaluates all five predicates (foreign_script, negation_lost, runaway, spurious_filler, lost_as_rare), with an env-gated `[glitch]` reason log for future precision audits. Added a **direct regression test** pinning the trigger for both guards (true for the real error examples, false for clean output and a real RARE source) so it cannot silently regress to notes-only. Mocked retry tests pass again (`call_count == 2`).
+- **Live audit after the fix:** 5 fresh pages, **0 trigger hits, 0 retries** (clean runs; both guards target intermittent errors, so the mocked tests are the deterministic coverage).
+- **Gate companion fix:** `Episode?3` (OCR punctuation between a letter and a digit) was a false dropped-`?`; the OCR-embedded rule now covers digits too, with a test. Full suite **909 passed** (the new trigger test skips in the torch-stubbed fast gate and runs in the translator suite: 48 passed there).
+- Benchmark `2026-10-23-guard-trigger-fix.md`; corrections posted on #1039 and #1052.
+
+## MIT quality loop, round 82 — fresh 6-page judge audit + fixed LOST->หายาก (rare) intermittent swap (#1052) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Fresh audit:** 6 pages / 71 segments, gate-clean, raw judge mean 1.37/2 (most flags are the judge's typo noise — it quotes identical strings as wrong).
+- **One genuine cluster found:** `LOST ITEMS.` -> `ของหายาก` (**rare items**) twice on the Otome page — `หาย` (lost) vs `หายาก` (rare). Intermittent (audit run yes; 3 following baseline runs no). Matrix scan found only these 2 unique pairs, both real, so the pattern is precise.
+- **Fix (#1052):** `lost_as_rare(dst, query)` (Thai target; source says LOST and not RARE/SCARCE) wired into `_is_glitched` with a retry note. Unit tests both directions + a mocked gateway that re-asks `ของหายาก` -> `ของหาย`; 4 fresh guarded runs of the page: 0 lost->rare outputs.
+- Other audit flags were judge typo noise or model-ceiling nuance (MORNING->general greeting, added เลย, music->song) — no deterministic licence, so no guard.
+- Benchmark `2026-10-23-1052-lost-as-rare.md`.
+
+## MIT quality loop, round 81 — Thai line-break audit (0 mid-word breaks) + live check of the filler guard (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Thai wrapping audit (negative result):** 71 real Thai translations wrapped at 2 widths x 2 font sizes (284 configurations) against the renderer's own ZWSP segmentation — **0 mid-word breaks**. The tokenization path is sound, so no fix/guard was added (an earlier audit run reported 147 flags, but that checker treated the boundary after a skipped ZWSP as a mid-word break).
+- **Filler guard live check:** fresh HEAD output of the two Tsuki pages whose stored history contained the hallucinated `ทน/ทัน` filler has **0 spurious-filler flags**, and the quality gate run separately on them is `pages=2 violations=0 ok=True` (historical runs of those pages had 24 unique flagged pairs). The planned third page (`corpus2/en_Dungeon_..._p0.png`) does not exist in that folder, so the doctor aborted before its gate step — corrected in the benchmark rather than overclaiming.
+- Benchmark `2026-10-23-thai-wrap-and-filler-check.md`.
+
+## MIT quality loop, round 80 — #1051 second design (real filter early) also not equivalent; experiment reverted (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Second attempt: run the **real** `_filter_regions_by_source_lang` at the front stage and reuse it in `_finish_patches` (so langdetect cannot flip between calls). Replay A/B: byte-identical on Boku p0, Otome p0, Kage p0 and the JP-probed-as-ENG page; **Kage p1 differed with `[replay] 2/8 texts unseen`** (live fallback sampling confound).
+- Re-tested with a **fresh dump**: off arm 0 unseen, on arm **1/8 unseen** — the early filter runs *before* `_strip_source_noise`, so the kept regions' translation texts are not the strings the dump recorded. The change is not equivalent until the filter moves between strip-noise and the translation dispatch, which is a deeper restructure than this experiment.
+- Upside is modest (translation tokens; latency is gateway-dominated), so the experiment was **reverted (no code shipped)** and parked on #1051 with the exact next design and the fresh-dump/0-unseen A/B requirement. #1050's overlap stays blocked on it.
+
+## MIT quality loop, round 79 — #1051 early source-lang drop: tried, proved output-changing, reverted (negative result) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented a deterministic front-stage drop (non-Latin text when the source is Latin-script) behind `MIT_FILTER_BEFORE_TRANSLATE=1` and replay-A/B'd it (same recorded translations, so only the region set can differ).
+- **Result: output-changing on real pages.** Byte-identical on Boku p0, Otome p0, the JP page probed as ENG, Kage p0 — but **Kage p1 differs**: the early drop removed 2 regions that the real filter keeps and the off-arm renders (the ザワ / 「平ク」 SFX), so the page changed.
+- Root cause: the post-translation filter keeps some non-Latin regions (vision-rescued SFX, UNKNOWN language detection), so a **script-only heuristic is not equivalent to the filter**. The uncommitted experiment was reverted; **no code shipped**.
+- Evidence recorded in `2026-10-23-latency-profile.md`; revised design left on #1051 (run the real filter early + byte-identical gate across a corpus that includes Kage p1, and a judge A/B before any default).
+
+## MIT quality loop, round 78 — #1050 probe: the region list really changes after translation; split out "translate only rendered regions" (#1051) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added an env-gated probe (`MIT_LOG_REGION_FILTER=1`) printing `[region-filter] before=N after=M` in `_finish_patches` and ran 7 real pages: the post-translation `_apply_source_lang_filter` **does drop regions** — 13->12 (Boku p0), 11->10 (Otome p0), and 7->0 on the JP page probed with the wrong source language.
+- **#1050 verdict:** a mask precomputed before translation would erase text that is never re-rendered (blank balloons) — the overlap is unsafe as-is and stays blocked, with the evidence recorded in the latency-profile benchmark.
+- **Split out #1051:** the shared fix is to apply the source-language filter at the **front** stage (opt-in experiment) — translate only the regions that will be rendered (fewer tokens/latency on mixed pages) and make the region list stable, which unblocks the overlap. A/B acceptance: same rendered region set, judge not worse, translation chars lower on dropped-region pages, byte-identical on clean pages.
+
+## MIT quality loop, round 77 — latency profile from 8 real pages + overlap opportunity scoped (#1050) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Consolidated a **latency profile** from the round's live sweeps (8 pages): wall **8.98 s** avg (warm 3.6-7.9 s), translation **1.91 s**, mask_refinement+inpainting **0.70 s**, OCR ~1.4 s, detection 0.5 s warm / 5-6 s cold, rendering 0.1-1.9 s.
+- Ranked the remaining opportunities with evidence and wrote them down (`2026-10-23-latency-profile.md`): (1) overlap mask+inpaint with the translation wait — **up to 0.70 s/page (~8 % wall, ~14 % warm)**; (2) cold start — opt-in preload already shipped (#1047); (3) translation wait — batch pipeline opt-in only; (4) OCR — cuDNN-off is a deliberate quality choice; (5) rendering supersampling 4 — a quality tradeoff.
+- **Filed #1050** for (1) with the blocker made explicit: `_finish_patches` re-derives the region list after translation, so a pre-translation mask could erase un-rendered text. Proposed opt-in `MIT_OVERLAP_PREP=1` + byte-identical-render acceptance; no code change yet (an unproven render-timing refactor is exactly the phantom-class risk this loop avoids).
+
+## MIT quality loop, round 76 — e2e proof for the opt-in preload: first page 21.5 s -> 18.1 s (#1047) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Started the real worker twice on the same page and measured the **first HTTP request**: lazy arm **21.5 s**; `MIT_PRELOAD=1` arm **18.1 s** with `[share] models preloaded in 1878 ms` in the log -> **3.4 s (16 %)** off the first user page on this loaded host (single samples, directional).
+- The preload timing line now goes to stdout (a default-level `logger.info` was being filtered, which hid the evidence).
+- #1047's e2e acceptance item is satisfied; the feature stays **opt-in** (idle GPU/RAM + slower boot are real costs).
+- Benchmark `2026-10-23-1047-preload.md` updated.
+
+## MIT quality loop, round 75 — opt-in model preload at worker boot (#1047) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured the cold-start cost: one real page takes **19.4 s** cold vs **14.6 s** after an explicit preload (~1.9 s) — the weight load is ~5 s of the first page's latency.
+- Added **opt-in** `MIT_PRELOAD=1`: `MangaTranslatorShared.start()` warms the heavy models while uvicorn boots via an asyncio task (`_model_lifecycle.preload(Config(), device, 0)`), logs `[share] models preloaded in N ms`, and swallows failures so preload can never break boot.
+- Gate is a pure helper `server/readiness.preload_enabled(env)` with a unit test; default behaviour unchanged (lazy loading). Opt-in because preloading holds GPU/RAM while idle and slows boot.
+- Benchmark `2026-10-23-1047-preload.md`; e2e check on a real worker restart remains the open follow-up on #1047.
+
+## MIT quality loop, round 74 — JP audit: the two JP pages are one page twice; gate-clean, one model-ceiling sense flip (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Corpus correction:** `jp_chapter_p0.jpg` and `jp_chapter_p1.jpg` are **byte-identical** (same sha1) — all JP→TH measurements in this loop are **one real page run multiple times**, not two pages. Recorded in the render-audit benchmark and the team vault.
+- **Fresh JP run:** wall 13.1 s cold / 5.2 s warm, translation 1.2 / 2.8 s, **gate 0 violations**.
+- **Judge audit** (14 segments over both runs): mean **1.57/2** (earlier 1.64 was the same page; delta = judge noise). Flags are model-level: じゃねーか rhetorical flattening, あ？ variants, and one **sense flip** — `でも可愛くないなコイツ` came out `...ไม่น่ารัก...` (correct) in one run and `...ไม่ไร้เดียงสา...` (wrong concept) in the other. The negation is preserved, so no deterministic guard can catch it; recorded as model-ceiling, with self-consistency sampling as a future opt-in idea (+1 call/page).
+- **Negative result:** across **1,241 stored pages**, 73 contain duplicate source lines and all groups already translate identically — no dedupe/memory feature needed.
+- Benchmarks: `2026-10-23-jp-audit-and-stability.md` (new), `2026-10-23-jp-render-font-audit.md` (correction).
+
+## MIT quality loop, round 73 — filler guard precision: reviewed every corpus flag, removed 9 false positives, JP-safe (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Applied `spurious_filler` offline to **1,239 stored THA doctor pages** and reviewed all unique flags: first regex 33 flags of which **9 were false positives**; after narrowing, **24 flags and all 24 are genuinely broken Thai** (historical Tsuki/Dungeon shapes: `ฉันทนมัน...`, `ฉันทนเลือดในกาย`, `ฉันทันด้วยซ้ำ`, `ฉันทนฟัง...`).
+- Fixed false positives now pinned as regression tests: `ทันที` (immediately), `ทนไม่ได้...`/`ทนไม่ไหว` (natural idioms — `ฉันทนไม่ได้ที่จะมอบพลัง` for `I CANT EVEN...` is no longer re-asked), `เข้าทันที` (no pronoun adjacency).
+- **Japanese-source safety:** the licence check reads English words, so the detector returns False for non-Latin sources (a JP line that really says 我慢 must not be re-asked). Two JP-source tests.
+- 32 translation-quality tests green; benchmark `2026-10-23-1039-spurious-filler.md` updated.
+
+## MIT quality loop, round 72 — judge audit of 8 fresh pages + fixed hallucinated Thai filler words (#1039) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Audit:** 8 fresh HEAD pages (85 segments) via the judge — raw mean 1.45/2, but the score distribution is dominated by the judge's known typo noise (it even quotes identical strings as "wrong"); the real meaning flags clustered on one class.
+- **Fixed (#1039):** the model inserts a Thai filler the source never says — `ฉันทันมอบพลัง...` for `I AM GRANTING YOU ALL THE POWER I CAN.`, `ฉันทันด้วยซ้ำ...` for `I CANT EVEN GIVE YOU ANY POWER`, and historically `ฉันทนฟัง...` for `I HEARD YOUR CONVERSATION...`. New `spurious_filler(dst, query)` (Thai only, licence words in the source: endure / in time) is wired into `_is_glitched` with a retry note; `ทนทาน` and honest endure/timing sources are excluded (tested).
+- **Live evidence:** 3 reruns of the page that leaked `ฉันทนฟัง` -> 0 spurious lines, 0 false re-asks; mocked translator re-asks a `ฉันทัน...` answer once and returns the corrected text. Unit tests cover both variants + the false-positive class. Suite **902 passed**.
+- **Gate refinement (#990):** `IT WONT KILL ME?!` -> `มันจะฆ่าข้าไม่ได้งั้นเหรอ?` was a false positive (Thai rhetorical question keeps the `?`); the gate now accepts `?` covering a dropped `!`.
+- Benchmark `2026-10-23-1039-spurious-filler.md`.
+
+## MIT quality loop, round 71 — live 5-page baseline sweep + gate OCR-punctuation fix (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh live sweep at HEAD over 5 pages with the gate: wall **16.1 s cold / 3.6 / 3.8 / 4.8 / 7.9 s**, translation **1.3-2.6 s** — the pipeline is in its normal performance band.
+- Gate flagged 2 dropped `?`; triage found one **false positive** (`IF?YOU` — OCR punctuation embedded inside a word) and one benign style variation (`YKNOW?` -> `มันไม่แฟร์เลยนะ!`, rhetorical tone carried by `!`).
+- Refinement: the gate strips punctuation embedded in an OCR word before comparing; re-gate = **1 flag** (the style case). 8 gate tests green.
+- Initial baseline recorded: 5 live pages -> 0 hard violations after the refinement, 1 documented style flag.
+
+## MIT quality loop, round 70 — contract guard verified quiet on clean pages; residual shift audited to zero (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Guard is quiet in normal operation:** 3 live pages with the #1026 guard active produced **0 contract-mismatch re-asks**, gate 0 violations, translation time unchanged within noise (the check is a pure block count).
+- **Residual-risk audit:** a count-equal corruption (one block merged + one split) would slip past the guard. A digit-anchor scan for it (source number missing from its own balloon but present in the next one) over **12,004 stored regions** found **0 cases** — no evidence to justify a second, heuristic guard (avoided per the North Star).
+- Fallback for persistent breakage stays the previous normalizer: missing items become empty translations (blank balloon), never literal `[Missing item N]` text.
+- Benchmark `2026-10-23-1026-numbered-contract-shift.md` updated; #1026 comment with the verification.
+
+## MIT quality loop, round 69 — fixed a page-wide translation line shift + glossary extraction precision (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a real page-wide defect while reviewing a live page:** a 2-page batch run shipped Tsuki c2 p1 with every Thai translation shifted one balloon down (`I HEARD YOUR CONVERSATION WITH THE GODDESS` split across two balloons). Direct translator calls on the same 21 lines were correct 3/3, so the model had **split one numbered block into two**; `normalize_numbered_output` guarantees the count but the extra block silently shifted every later balloon.
+- **Fix (#1026):** pure `numbered_contract.contract_gap(raw, n)` (missing/duplicate/extra block) checked before normalizing; `custom_openai` re-asks that batch (bounded 2 retries, then the old fallback). Unit tests: `contract_gap` cases + a mocked gateway that returns a 3-block answer for 2 lines -> one re-ask, aligned output; persistent breakage stops after 2 retries.
+- **Live rerun after the guard:** page-2 alignment correct, TSUKUYOMI consistent across the pair, gate clean. Full suite **896 passed**.
+- **Glossary extraction precision (#980):** the prompt block was polluted by ordinary ALL-CAPS words (`MAN`, `RUNS`, `FAMOUS`, `OPENS`, ...). Added a curated common-word/OCR-junk stoplist: candidates per page dropped from 34/31/16 to 2/2/0-1 while real names (`TSUKUYOMI`, `HORI`, `MIYAMURA`, `コトラ`) survive; live two-page run stays consistent. 20 glossary tests green.
+- Benchmarks `2026-10-23-1026-numbered-contract-shift.md` (new) and `2026-10-22-980-name-glossary.md` (round-69 section).
+
+## MIT quality loop, round 68 — widen-vertical verified visually + reachable from Backend (`MIT_WIDEN_VERTICAL_COLUMNS`) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Visual check** of the widened layouts: cropped off/on renders of every changed region (2x) show the larger Thai block inside its balloon/white space, no neighbour overlap, no panel-border crossing -> the opt-in layout is sound; the block-wider-than-column tradeoff is why it stays opt-in.
+- **Production reach:** Backend `MIT_WIDEN_VERTICAL_COLUMNS=1` maps to `render.widen_vertical_columns` (same pattern as `MIT_FIT_BELOW_FLOOR`), doc comment added; absent -> config byte-identical. Backend config spec **46 passed** (new test).
+- Benchmark updated (`2026-10-23-jp-render-font-audit.md`); #1006 updated.
+
+## MIT quality loop, round 67 — opt-in `render.widen_vertical_columns`: JP floor-bound regions gain 20-42% font (#1006) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the #1006 experiment **opt-in (default off)**: `region.source_direction` is stamped by textline merge ('v' for a Japanese column; `region.horizontal` follows the target preset and cannot tell), and with `render.widen_vertical_columns=true` a vertical-source region also tries a wider layout (wrap up to 1.5x the source column, no height-fill squeeze), used **only if it yields a larger font**, so nothing can shrink.
+- **Deterministic replay (same translations, only layout can differ):** p0 #5 24->**34 px (+42 %)**, p0 #6 22->**30**, p1 #4 21->**27 (+29 %)**, p1 #5 20->**24 px (+20 %)**; all other regions unchanged. overlap 0, spill 0, gate 0 both arms.
+- **EN regression:** an EN page replayed with the flag on/off renders **byte-identical** (sha1 match). 2 new unit tests for the direction stamp; full suite **894 passed**.
+- Tradeoff recorded -> opt-in: the block can become wider than the original column (up to 1.5x), a deliberate layout change versus the letterer-column convention, proven on 2 real JP pages.
+- Benchmark `2026-10-23-jp-render-font-audit.md`; #1006 updated.
+
+## MIT quality loop, round 66 — JP render audit: vertical sources squeeze Thai to 50% font; concise does not fix it (#1006) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Font-size audit over 216 HEAD live regions: 176 are equal/upscaled, 3 are **<=0.6** — all JP vertical-source regions (worst `jp_chapter_p1` #5 at **20 px from 40 px**, at the font floor). Render metrics stay clean (overlap/spill/small_font 0), so it is readability, not overflow.
+- Tried `concise_bubbles` on the two JP pages: chars -12 % on p1 but the floor-bound region stayed 20/40, and p0's worst region got smaller (24->20) — the lever is layout, not translation length. Concise stays opt-in.
+- Filed **#1006** for the next experiment: opt-in `render.widen_vertical_columns` (grow the wrap width toward the bubble interior for floor-bound vertical-source regions), acceptance >=15 % font gain on the worst JP regions, overlap/spill 0, EN renders byte-identical, verified via deterministic replay.
+- Benchmark `2026-10-23-jp-render-font-audit.md`.
+
+## MIT quality loop, round 65 — gate baseline over all HEAD live output + question-particle refinement (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the deterministic gate over **every HEAD live output** (19 files / 237 regions, EN and JP): exactly **1 flag** — `Mornin?` -> `อ้าว...` on Horimiya p0, a Thai interjection with a trailing ellipsis. Triaged as a benign style variation (a greeting, not a true question) and recorded, not whitelisted.
+- One real refinement from the data: a **final Thai question particle** (เหรอ/หรอ/หรือ/ไหม/มั้ย/รึ/เปล่า/ไหน) now counts as carrying the question when `?` is absent (Thai manga routinely drops the mark). Unit-tested both ways; gate tests **7 passed**.
+- Benchmark updated (`2026-10-22-990-quality-gate.md`).
+
+## MIT quality loop, round 64 — chapter-level deterministic replay + `--gate-only` (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `doctor_page.py --replay` now takes **one or more dumps** — one for all pages (previous behaviour) or **one per page in reading order**; `_install_replay` accepts a getter for the current page's dump, so stacked installs no longer cross-map pages.
+- Added **`--gate-only`**: exit nonzero only for gate violations (the doctor's own page flags still print), so CI can gate on quality without the diagnostic table flipping the code.
+- Validated: two-page **legacy** Tsuki chapter replay -> `[gate] violations=5 ok=False` (4 foreign-script + 1 inconsistent name), exit 1; two-page **clean** live chapter replay -> `[gate] violations=0 ok=True`, exit 0 with `--gate-only`.
+- Benchmark `2026-10-22-990-doctor-gate-flag.md`; this closes #990's replay-wiring follow-up.
+
+## MIT quality loop, round 63 — quality gate wired into doctor replays (`--gate`) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--gate` to `tools/doctor_page.py`: after processing the pages of one invocation (reading order) it runs the #990 gate and prints violations; the command exits 1 on a gate violation (or on the doctor's own page flags, which share the signal by design). No pipeline change.
+- Validated both ways: replaying the legacy Tsuki page that shipped the Cyrillic bug prints `foreign_script` #5/#6 with `violations=2 ok=False` -> **exit 1**; two fresh live pages print `pages=2 violations=0 ok=True`.
+- Benchmark `2026-10-22-990-doctor-gate-flag.md`; #990's wiring acceptance item is now satisfied.
+
+## MIT quality loop, round 62 — deterministic chapter quality gate (#990) + three clean integrity scans (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **New gate** `quality_gate.py` + `tools/quality_gate.py`: one deterministic command over chapter doctor JSONs that re-checks every defect class this loop found — foreign-script leaks (#903), runaway repetition (#901), doubled/leading Thai marks, control/Latin leaks, dropped `! ? …`, and cross-page name spellings (#980). Exit 1 on violation, `--json` output.
+- Validation: 4 HEAD live pages -> **0 violations**; the legacy Tsuki pair that shipped the Cyrillic bug -> **5 violations, exit 1** (4 foreign-script + 1 inconsistent name). 6 unit tests; full suite **891 passed**.
+- **Three clean scans recorded as negative results** (no guard added because the data does not justify one): punctuation drops 9/11,633 all false positives (`…`->`...`, `?!`->`⁈`); Thai-integrity violations 0/11,633; unexpected Latin words 0/11,633.
+- Issue **#990** carries the gate; follow-up is wiring it into the chapter replay workflow. Benchmark `2026-10-22-990-quality-gate.md`.
+
+## MIT quality loop, round 61 — name glossary covers JP katakana names too (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `candidate_names` now also returns **katakana runs (2-8 chars)** from Japanese sources, so the extract → prompt → deterministic-enforce pipeline covers JP→TH characters (the production path), with the same contraction/stoplist and two-occurrence filters.
+- **Real-page safety check** on the two uploaded JP pages: candidates are `ガキ` / `コイツ` / `フッ`, each appearing once — recurring set empty, so **no enforcement can fire** there (extracted entries are filtered at apply time); no output change on the current JP corpus.
+- Unit tests for katakana candidates (hiragana/kanji excluded) and `アリス -> อลิส` extraction; gate **885 passed**.
+- Caveat recorded: extraction still needs a region whose output is essentially the name alone; name+particle outputs may not be extractable yet.
+
+## MIT quality loop, round 60 — glossary precision pass + the digit audit's negative result (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Glossary precision:** a within-page scan of 60 stored pages found two false-positive entries — `SHES` (OCR of "SHE'S") taken as a name with the whole Thai clause as its "spelling". `extract_glossary` now accepts spellings only **3-18 chars** (a transliterated name, not a clause) and the stoplist covers common contractions; re-scan = **0 within-page variants** (was 2 FPs), real Tsuki pair still consistent, gate **883 passed**.
+- **Digit audit (negative result):** scanned **11,633** stored src/dst pairs for numbers lost from the translation — no credible case; all hits were formatting (`20, 000`), fullwidth digits, or OCR noise inside words (`60NNA`). No guard added (a retry would only waste calls).
+- Benchmark updated (`2026-10-22-980-name-glossary.md`); #980 comment with the precision guards.
+
+## MIT quality loop, round 59 — name glossary hardened: wider drift bound, pipeline regression test, consistency tool (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A real run showed the model copying `ทสึคุโยมิ` as `ทสึคิโยมิ`, so the deterministic enforcement bound widened to **edit distance <=3 / similarity >=0.6** (still only on regions whose source contains the name; unrelated Thai untouched, tested).
+- **Pipeline-level regression test** (`test_batch_pipelined_translator.py`): page 1 spells the name, page 2 drifts, batch pipeline must correct page 2 to page 1's spelling; also pins the two-occurrence filter.
+- **New tool** `tools/name_consistency.py`: takes page doctor JSONs, prints every name's per-page Thai spelling, exits 1 on inconsistency — a re-runnable chapter-level gate.
+- Re-measured on the real Tsuki pair: baseline `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) -> glossary arm `ทสึคุโยมิ / ทสึคุโยมิ` (**consistent**). Gate **881 passed**.
+- Known limits: names that appear only once are pinned once they recur; JP/kanji names not extracted yet.
+
+## MIT quality loop, round 58 — name glossary: TSUKUYOMI consistent across pages, default ON (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented `name_glossary.py` and wired it into `translate_batch_pipelined`: after each page, romaji names are extracted with the Thai spelling the page used (existing spelling wins), filtered to names seen at least twice (one-off ALL-CAPS words like SKY/GROUND are not characters), fed to the next page's prompt through the same `chatgpt_config` seam, and then **deterministically enforced** after translation — prompt-only enforcement proved unreliable (the model copied `ทสึคุโยมิ` as `ทสึคิโยมิ` in one run).
+- **Measured result** (real 2-page pairs): TSUKUYOMI `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) -> `สึกิโยมิ / สึกิโยมิ` (**consistent**); targeted judge shows **0 mistranslations in both arms**; wall time unchanged within noise (no extra model call). 13 new unit tests + prompt-carriage tests; gate **880 passed**.
+- **Default ON** for the batch path (`MIT_NAME_GLOSSARY=0` disables; single-page requests unaffected) — no model call, no measurable latency, and the only new behaviour is deterministic spelling enforcement. Caveats: romaji names only (JP kanji not covered yet); conservative extraction (two-occurrence filter + edit-distance bound).
+- Benchmark `2026-10-22-980-name-glossary.md`; #980 updated with the result.
+
+## MIT quality loop, round 57 — cross-page context A/B: mixed (keep default off); names still inconsistent (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A/B'd the existing **rolling cross-page context** (#159, `MIT_CONTEXT_PAGES`, default 0) on 3 two-page chapter pairs via `translate_batch_pipelined`, judged with a targeted two-page prompt (name spellings, page-2 coherence, meaning errors).
+- **Mixed, not a win:** context ON fixed an invented word and raised Boku page-2 coherence 1->2, but on Tsuki page 2 it produced **four meaning errors including a garbled Thai line** — the injected prior dialogue can pull the model off the current page. Wall time unchanged within noise.
+- **Names are the real cross-page defect:** `TSUKUYOMI` came out with three different Thai spellings across two pages (สึกุโยมิ / ทสึคุโยมิ / ทสึคโยมิ) and context ON did **not** fix it.
+- Decision: `MIT_CONTEXT_PAGES` stays **0**; filed **#980** for a focused *name-glossary* context experiment (names only, extracted per page) with the name-consistency metric as the acceptance gate.
+- Benchmark `2026-10-22-905-context-ab.md`.
+
+## MIT quality loop, round 56 — GPU inventory: the loop has been testing on the RTX 5060 Ti 16 GB; the 4070 SUPER was idle (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Answered the standing question with real hardware data: every doctor/A-B/worker run in this loop used `CUDA_VISIBLE_DEVICES=1` = **RTX 5060 Ti 16 GB**; the **RTX 4070 SUPER 12 GB** (GPU0) had been idle.
+- Both cards fit the production pipeline with ease (peak torch alloc **2.6 GB**, reserved 3.3 GB vs 4.1 GB). Replay benchmarks (GPU-compute only) show the same speed class — 4070 SUPER marginally ahead on detection/render in the sample, 5060 Ti ahead on some OCR runs; differences are inside run-to-run noise and translation (the dominant phase) is gateway-bound.
+- Recommendation recorded: keep the loop and production workers on the **5060 Ti** for the VRAM headroom (batch pipeline keeps two page contexts); the 4070 SUPER is a valid second single-page worker.
+- Benchmark `2026-10-22-gpu-inventory.md`.
+
+## MIT quality loop, round 55 — #905 production-path chapter A/B: 9 pages, 1.16×, structure identical (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Drove a standalone worker over HTTP with the real endpoints: 9 pages serial = **98.42 s** vs one batch request = **84.66 s** = **1.16×**; all 9 pages returned identical patch counts, region counts and page sizes.
+- Host load was 45-100 % CPU, which is why this measured 1.16× rather than the quiet-host in-process **1.37×** (round 42) — CPU-bound phases are what the overlap cannot hide.
+- A second run failed on **host commit exhaustion** (numpy 40 MiB allocation) — the batch path holds two page contexts, so its peak memory is higher than serial. That is a real operational tradeoff.
+- Decision: remains **opt-in** (`MIT_BATCH_PIPELINE`, default off) — faster with identical output, but loses live per-page progress and needs the memory headroom. Benchmark `2026-10-22-905-chapter-ab.md`.
+
+## MIT quality loop, round 54 — #905 worker HTTP path verified structurally; today's timings are host-load noise (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Stood up a real standalone worker and drove the new endpoints over HTTP: `translate_patches` x4 sequential vs one `translate_batch_pipeline` request. **Structural parity exact** (patches 10/5/4/8, regions 17/15/30/12, page sizes) — the endpoint/client/worker plumbing works end-to-end.
+- Timings are **not a verdict**: sequential 45.61 s vs batch 50.18 s (0.91×) while host CPU load sat at **84 %**. The same in-process A/B that measured **1.37×** on a quiet host re-measured **1.06× / 1.02×** today with per-page wall rising 6.58 s -> 9.2 s — CPU-side phases dominate under desktop/agent load.
+- One transient numpy OOM (60 MiB) in the worker under host RAM pressure: the batch path holds two pages of context, so peak RAM is higher than serial — flagged for the production 9-page run.
+- Decision unchanged: **opt-in**, default off until a quiet-machine chapter A/B (CPU <20 %, 9 pages, VRAM/webhooks/cancel checked).
+- Benchmark `2026-10-22-905-worker-http-check.md`.
+
+## MIT quality loop, round 53 — #905 opt-in production path wired: worker endpoint + client + batch_runner flag (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the worker endpoint `/simple_execute/translate_batch_pipeline` (pickled `{images, config}` -> pipelined patch list on the existing streaming/pickle contract), `fetch_batch_data` + `ExecutorInstance.sent_batch_pipeline` on the server side, and an `MIT_BATCH_PIPELINE` opt-in branch in `batch_runner`: the whole batch goes to **one worker**, results come back in page order, then the existing per-page webhook delivery + cancellation drop semantics run unchanged.
+- Known limitation of the opt-in path (documented in the endpoint): per-page **live progress** events are not forwarded mid-batch (the worker's hook channel is per request); per-page completion webhooks still arrive. Default stays **off** until the production chapter A/B.
+- Tests: 4 new light batch_runner tests (single worker call, worker released, per-page webhooks in order, worker failure reported per page, cancellation drops remaining deliveries, flag default off) — **12 passed** in that file; gate **867 passed**.
+- Remaining: start the server/worker and run the 9-page chapter A/B (wall time, webhooks, VRAM, cancellation), then the on/off decision.
+
+## MIT quality loop, round 52 — HEAD quality audit: EN 1.55/2, JP 1.64/2 — no regression (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged **fresh live runs at HEAD** (no replay) with the source-agnostic judge: **EN 1.55/2** over 113 segments / 8 unique pages (baseline 1.51/372), distribution 58 % perfect / 40 % minor / 3 % broken (baseline 54/43/3); **JP 1.64/2** over the two real pages (baseline 1.57) with **0 inversions** (was 1).
+- The guards added this loop (#898 negation, #901 runaway, #903 script leak) show no quality cost on either path. Remaining score-0 cases are model-ceiling items (Iruma stammer `I- I DONT WANT THEM.` -> `ท้องไม่`; `W-` -> `ฉ-`) plus one judge spell-check false alarm — recorded, not guard-able.
+- Limitation re-confirmed: the gateway exposes **one model**, so judge == translator; per #902 only ≥~5 page-vote margins are meaningful, and this was a status check, not an A/B.
+- Benchmark `2026-10-22-head-quality-audit.md`.
+
+## MIT quality loop, round 51 — `translate_batch_pipelined` on 6 real pages: **1.37× wall, identical structure** (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented `MangaTranslator.translate_batch_pipelined(images, config)`: the existing three phases (front detect/ocr/merge, ordered translation, back mask/inpaint/render) scheduled through `server/batch_pipeline.run_pipelined` — page i+1's front starts during page i's translation wait; translation order unchanged so #159 context still works when enabled.
+- **Real measurement** (one process, models warm, tuned config, 6 real pages): sequential `translate_patches` **39.49 s** (6.58 s/page) -> pipelined **28.91 s** (4.82 s/page) = **1.37×**. Patch counts (10/5/4/8/6/7), region counts (17/15/30/12/7/13) and page sizes identical across arms.
+- Tests: 2 new heavy tests (phase order per page; no-region page returns empty patch result) + the 5 `batch_pipeline` loop tests; gate unchanged.
+- Remaining for #905: worker endpoint + batch_runner submission behind a flag (production still sends one page per task), then the production chapter A/B (webhooks, cancellation, VRAM) and the on-by-default decision.
+- Benchmark `2026-10-22-905-pipelined-real-pages.md`.
+
+## MIT quality loop, round 50 — #905 slice 2 start: the page pipeline is now two phases (`_finish_patches`) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Spike findings: the page pipeline already has the seam the batch needs (`_translate_until_translation` = front, `_run_text_translation` = ordered translation), and the rolling cross-page context is **off by default** (`MIT_CONTEXT_PAGES=0`) — ordering only constrains batches that opt into context.
+- Extracted the long post-translation tail of `translate_patches` (mask → inpaint → render → PNG, incl. full-page inpaint, bubble tagging, per-group concurrency) **verbatim** into `_finish_patches(ctx, config, source_icc)`; `translate_patches` now delegates. No behaviour change.
+- Two source-inspection wiring tests (`test_bubble_association`, `test_text_layer`) now assert the new seam and the delegation; relevant suites **206 passed**; gate **863 passed**.
+- Next (slice 3): `translate_batch_pipelined(images, config)` driving the three phases through `run_pipelined`, worker endpoint + batch_runner submission, then the real 9-page chapter A/B and the enable/opt-in decision.
+
+## MIT quality loop, round 49 — #905 slice 1: the pipelined batch loop, unit-tested (1.69× in simulation) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Spike answer for #905: two-phase API across the worker process boundary is the wrong shape (the ctx would have to cross an HTTP boundary); the batch loop belongs **inside the worker**. `#905` body updated with that design.
+- Built slice 1: `server/batch_pipeline.run_pipelined` — translation stays strictly ordered and chains the #159 rolling context, page i+1's **front** GPU stages start before page i's translation awaits, page i's **back** stages run during page i+1's translation, cancellation polled between pages, results in page order. Heavy work is injected → unit-testable without the ML stack.
+- Evidence: **5 unit tests** (order, strict translation order + context chaining, overlap ordering, cancellation, failure propagation); simulation with warm-profile numbers (8 pages, front 2.05 s / translate 3.2 s / back 0.75 s) → sequential 48.2 s vs pipelined **28.5 s = 1.69×** (ceiling 1.88×). Gate **863 passed**.
+- Remaining for #905: worker task type that runs the loop inside the worker + real 9-page chapter A/B (byte-identical patches, flat VRAM, cancellation/webhooks intact).
+- Benchmark `2026-10-22-905-pipelined-loop.md`.
+
+## MIT quality loop, round 48 — concurrency dependency analysis; safe stage-pipelining design scoped (#905) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Read the real batch path: Backend `submitBatch` → MIT `server/batch_runner.py`, which loops pages **serially on purpose** — page i+1's translation is conditioned on page i's translated dialogue (#159 rolling `prev_context`, name/pronoun consistency). Page-level parallelism would break that context or need speculative re-translation, and the per-page pipeline is monolithic (`get_ctx` → one worker call) with no seam to overlap.
+- **Safe design filed as #905:** keep translation ordered, but pipeline the **front GPU stages of page i+1** into the **gateway wait of page i** (translation needs only the previous page's translation result). Ceiling from the warm profile: GPU ~2.8 s/page vs translation 1.6-5.4 s → wall/page ≈ max(GPU, translation) = **1.5-1.8×** per chapter with identical outputs.
+- #905 carries the acceptance bar: 9-page chapter ≥1.4× faster, byte-identical patches/prompts/context, peak VRAM unchanged, cancellation/progress intact, `batch_runner` no-ML unit tests extended.
+- #904 updated (measurement record + pointer to the safe implementation).
+
+## MIT quality loop, round 47 — translation latency levers measured: cap tuning dead, bounded concurrency real (#904) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Cap tuning is a dead end:** `CUSTOM_OPENAI_MAX_COMPLETION_TOKENS` 4096 / 8192 / 1024 on the same 4 pages — per-call 2.5-3.3 / 2.9-4.1 / **3.7-4.4 s**, 0 empty outputs. The gateway emits reasoning regardless of the disable levers, so a smaller cap does not save time and risks #623. No change.
+- **Bounded page concurrency is the remaining speed lever:** 3 pages sequential 9.39 s -> concurrent (K=3) **5.22 s (1.80×)**; 5-page test ~2× effective at K=2-3; **K=5 chokes** (44.8 s, timeouts + retries). Per-call latency inflates only 10-45 %; single-page latency unaffected.
+- Filed **#904** with the numbers and the design sketch: Backend batch bounded concurrency K=2-3 (`MIT_BATCH_CONCURRENCY`, default 2) + MIT server overlapping page N+1 translation with page N GPU stages, verified on chapter wall time / VRAM / output identity.
+- Benchmark `2026-10-22-904-translation-concurrency.md`.
+
+## MIT quality loop, round 46 — live quality sweep clean; fresh warm latency profile (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran 8 risk pages **live** (names, long captions, SFX) plus the #903 verification runs and scanned all 139 fresh segments: **0 hits** on foreign-script leaks, runaway length, truncation, duplicate outputs, doubled marks, name inconsistency or empty segments (1 passthrough = SFX). Render metrics on those pages: overlap/spill/small_font all **0**.
+- Fresh warm profile (one process, pages 2-4): wall 4.2 / 7.6 / 8.6 s — **translation 1.6-5.4 s (39-63 %)** dominates; non-translation is ~2.3-3.0 s (detection 0.45, OCR 1.0-1.6 (the #884 cuDNN-off cost), merge 0.2-0.6, mask 0.25, inpaint 0.3, render 0.2); cold start ≈3.6 s of detection.
+- Next candidate designed for the #902 calibration: **thinking on/off** measured on ~150 segments (40-line JP set + 11-page EN set) with segment-level binomial counts — the largest remaining latency lever, testable only at that sample size.
+- Benchmark `2026-10-22-live-quality-and-latency-sweep.md`.
+
+## MIT quality loop, round 45 — script audit finds Cyrillic leaks; the retry now names the script (#903) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A script audit over **11,128 stored src/dst pairs** (every run) found **5 segments on 3 pages** where the output uses a script the source does not: the model transliterates **Tsukuyomi into Cyrillic** (`ЦУКУโยมิ`) and "CHEATS" into `ЧИТ`. The 169 raw hits were those 5 segments repeated across ~34 historical runs.
+- The `foreign_script` guard already detects them; the model repeated itself through every retry, so they shipped. The retry now carries an explicit note (`leaked_script` -> "the previous answer used cyrillic letters… write the whole answer in the target script only — transliterate names into Thai letters").
+- Evidence: 2 units + 1 integration test (Cyrillic reply -> retry with note -> clean Thai, 2 calls); the 3 affected pages re-run **twice** (92 segments) → **0 leaks** (baseline 5); gate **858 passed**.
+- Benchmark `2026-10-22-903-cyrillic-leak.md`; #903 records it.
+
+## MIT quality loop, round 44 — null calibration: the judge scores 8-3 on identical configs (#902) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the same translator config **twice** over 11 pages (only sampling differs) and judged it blind: **page votes A 8 / B 3**, segments **50 / 37 / 29 ties**. So an 8-3 page split is inside the null distribution.
+- Segment level: 50/87 decided = 57.5 %, about +1.4σ (p ≈ 0.16) with identical configs, no X/Y slot bias — per-page variance, not blind ordering.
+- **Consequence:** every earlier translation A/B (few-shot 7-5, temperature 7-4, concise 5-5, JP prompt 2-2) is indistinguishable from noise. All of them correctly ended in "no default change"; the loop now knows it cannot claim a prompt win from a 12-page A/B. Process rule recorded: ≤5-page margin at 12 pages = no effect; future A/Bs need ≥40 pages, aggregated repeats, or segment-level binomial checks.
+- Side finding that paid for the round: the null run's 4,462-character repetition loop → #901 detector.
+- Benchmark `2026-10-22-902-judge-noise-calibration.md`.
+
+## MIT quality loop, round 43 — null experiment finds a repetition loop that escaped the hallucination check (#901) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran a **null A/A experiment** (same config twice, to calibrate judge noise) and it produced one segment of **4,462 chars** of a cycling phrase for a 30-char line. The pipeline's repetition check **passed it**: `check_repetition_hallucination` only flags consecutive identical tokens, and the loop cycles a short pattern.
+- Added `translation_quality.runaway_translation(src, dst)` — longer than 3x the source **and** over 120 chars — wired into the per-region post-translation retry and the translator's page-level glitch loop. A 4.4k-character segment would otherwise reach the renderer (font floor/clip).
+- Verification: 4 units + 1 integration test (runaway page reply -> re-ask, 2 calls), **0/372** real EN translations flagged, gate **856 passed**.
+- Harness note: `translation_ab` measures raw translator output (no pipeline post-checks), so its arm votes need that caveat — recorded in the benchmark.
+- Benchmark `2026-10-22-901-runaway-repetition.md`; #901 records it.
+
+## MIT quality loop, round 42 — a JP-specific prompt ties the shipped one; synthetic JP set built (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built a **40-line manga-register Japanese evaluation set** (4 synthetic pages: particles/よ・ね・な・かな・ぞ, です/ます/敬語 registers, negations + idioms, fragments/names/SFX/omitted subjects) that the existing `translation_ab` harness can drive via fake `doctor.json` pages — the repo only has 14 real JP segments, this is the reusable surrogate.
+- A **Japanese-source prompt arm** (shipped v2 + a JP section: subject omission, final particles, trailing が/けど, politeness, idioms, onomatopoeia) A/B'd blind against the shipped prompt: **tie 2-2 page votes** → no default change.
+- Offline the arm is mixed: `うるせえな` and `仕方ないなあ` read more naturally, but a keigo line lost its polite `ครับ` and `お願いします！` turned into “sorry” — the politeness nuance the section was meant to protect, so the tie is not a hidden win.
+- Benchmark `2026-10-22-900-jp-prompt-ab.md`; JP arm YAML + the 40-line set kept for a future politeness-only attempt.
+
+## MIT quality loop, round 41 — #899 corrected: the fill was dark, my "grey" reading was wrong; nothing shipped (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built the proposed #899 rule (bimodal patch + mid-grey fill -> white fill + black outline) with six unit tests, then **traced the real page**: the OCR colour head predicts a **dark** fill (RGB 8-50) with a white outline on every region — never mid grey. Rendered dark-fill + white-outline stays legible over the black hair (the white outline carries the letters) and the judge scored the page 1.71/2 with no contrast complaint. The "washed-out grey" reading came from a zoomed crop, not from the pixel values.
+- Since the rule cannot fire on the case it was written for, shipping it would be an unproven render change — **reverted the implementation and tests; nothing shipped** (second time this loop catches itself; the #895 lesson applied before commit instead of after).
+- #899 corrected: the real (smaller) observation is that colour is sampled over the whole textline bbox, so an outlined white-fill lettering over mostly-white paper can get a dark fill (the source style inverted). Recorded with the measurement needed next (sample under the ink, 39-page EN replay).
+- Benchmark rewritten as the correction record.
+
+## MIT quality loop, round 40 — JP visual review: outlined lettering averages to grey (#899) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Reviewed every region of the two real JP pages at high zoom (generous crops, the #895 lesson). What held: all 14 regions contain their Thai, no overflow, narrow columns are the #183 design, negation guard keeps meaning.
+- **Found a real production-path readability defect (#899):** region #5 (p0) straddles black hair and white paper; the source lettering is white fill + black outline (readable on both), but the renderer uses the sampled **average** colour — mid grey — so the Thai is washed out on the black half and nearly invisible on the white half. Source histogram is bimodal (20 % near 0, 74 % near 224), and `merge_bboxes_text_region` averages per-textline colours.
+- Filed #899 with evidence, a proposal (snap the fill to the dominant cluster when the sample is bimodal; fallback worst-case contrast) and the acceptance bar (unit test + real page + 39-page EN replay) — **not implemented** this round: colour changes ship with corpus evidence (#266's attempt was rolled back).
+- Benchmark `2026-10-22-jp-visual-review.md`.
+
+## MIT quality loop, round 39 — negation guard verified on the production path (#898) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the two real JP pages after the guard: **8/8 runs keep the negation** of `可愛くない` (before: 2/4 inverted); judged quality across three runs **1.57 / 1.57 / 1.64** (avg 1.59 vs the 1.57 baseline; the single remaining score-0 is a register issue `あ？`->`อ๋อ`, not a negation).
+- Targeted probe, 12 Japanese negation lines: guard off **1/12** missing in one run, guard on **0/12** in both — and no extra gateway calls in these runs (the retry path is pinned by the integration test instead).
+- **Limitation recorded:** the detector only checks that a Thai negation marker is present, not polarity — `大丈夫じゃない` -> `ไม่เป็นไรหรอก` slips through. A polarity test would need clause structure; noted for later.
+- Benchmark updated with the before/after table.
+
+## MIT quality loop, round 38 — a dropped Japanese negation is re-asked (#898) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The real JP→TH path inverted `可愛くない` in **2 of 4 runs** (`น่ารักดีนะ`) — sampling-driven. `translation_quality.negation_lost` flags a clause-final Japanese negation whose Thai output has no Thai negation marker, and the translator's existing retry loop re-asks it with an explicit "keep the negation" note.
+- Scope is deliberately **Japanese sources only**: the EN→TH path's idioms ("like there's no tomorrow") legitimately drop the word — the 372-region EN scan flagged exactly that idiom, so a source-agnostic check would only waste retries.
+- Evidence: unit tests + integration test (inverted reply -> re-ask -> correct, 2 gateway calls; EN source stays 1 call), and **5/5 real JP runs kept the negation** after the fix (2/4 inverted before). Gate **852 passed**.
+- Cost: only pages with a dropped negation pay a retry; the five JP runs measured translation 1.7-2.6 s, the same band as before.
+- Benchmark `2026-10-22-898-negation-guard.md`; #898 records it.
+
+## MIT quality loop, round 37 — JP→TH baseline on real pages, repeatable (#897) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `tools/judge_translations.py` is now **source-language agnostic** ("any source language", `SR:` prefix), so the judge can score JP→TH.
+- Baseline on the two real Japanese pages: **14 segments, mean 1.57/2** (p0 1.71, p1 1.43; EN corpus reference 1.51). Repeatable commands recorded in the benchmark.
+- Data-driven finding: the priority JP→TH defect is **negation handling** — `可愛くない` ("not cute") came out inverted on p0 (`น่ารักดีนะ`) and as a different negative on p1 (`ดูไม่ได้เลย`); two `が` nuances dropped, one register shift.
+- Layout (narrow Thai column on vertical JP regions) is **#183 by design**, not an oversight — a typesetting choice to take up with the product, recorded rather than changed inline.
+- Benchmark `2026-10-22-897-jp-th-baseline.md`.
+
+## MIT quality loop, round 36 — found real Japanese pages in the app uploads: the JP→TH production path is unevaluated (#897) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `Backend/uploads/chapters/752fc515-…/` holds **two real Japanese chapter pages** (vertical JP text) uploaded through the app — production-language material for the first time, since every prior experiment used EN scanlation pages.
+- Smoke run (`JP→TH`, both pages): the pipeline works but the output shows (1) **Thai squeezed into the source's vertical-column width** — 4-7 chars per line instead of filling the bubble as an official Thai edition would; (2) **an inverted translation**: `でも可愛くないなコイツ` ("this kid isn't cute") rendered `แต่เด็กนี่น่ารักดีนะ` ("cute").
+- Filed **#897** with the evidence figure and a two-step plan: build a JP→TH smoke set + source-agnostic judge first, then fix the vertical-source layout for horizontal-only target scripts (same idea as `clean_layout` for EN), verified on the real pages with no EN regression.
+- Follows the #896 finding: translation conclusions so far measure EN→TH only; this is the missing JP set's first material.
+
+## MIT quality loop, round 35 — few-shot Thai sample A/B: built-in JP→TH wins, and the eval-set language gap (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The built-in Thai few-shot is a **JP→TH** page while our corpus is **EN→TH**. Built an EN→TH sample from the judged-audit patterns and A/B'd it on 12 pages (blind, chunked judge): **built-in won 7 pages to 5** — the EN sample fixed the Iruma-1 stammer hallucinations offline but lost elsewhere.
+- No change (the built-in sample is the correct one for the JP→TH production path); `thai_manga_v2_en_fewshot.yaml` kept as the experiment record. Issue **#896** records the result.
+- **Methodology caveat recorded (vault note `project-translation-eval-set`):** every translation A/B so far measures the EN→TH path, while production for Japanese chapters is JP→TH — a real JP→TH evaluation set is the missing piece before further prompt/sample/temperature work. Baseline on record: 372 segments, mean 1.51/2.
+- Benchmarks `2026-10-22-896-fewshot-ab.md`; gate unchanged (no code change).
+
+## MIT quality loop, round 34 — #895 was a phantom: the marks were there, the crop was wrong (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the #895 claim **before** trusting it: pixel comparison of the same Kumo p0 render across three runs gives **identical images (0 changed pixels)**, and a crop that includes the mark rows shows `ครั้งนั้น` with both mark pairs. The original crops started below the marks, so the line only *looked* mark-less.
+- The leading-reserve fix from round 33 was **reverted** (`2f8a5e92`): with the defect unproven and the change unnecessary (it did not alter Kumo p0 at all, yet moved line spacing on 8/11 other pages), it must not ship.
+- Investigation record + corrected figure `2026-10-22-895-stacked-marks-fix.md` / `-phantom-investigation.png`; issue closed as invalid with the reason.
+- **Lessons recorded:** crop bounds are part of the evidence — include the rows the marks live in; a pixel-identical page across runs proves a rendering change did not happen (the difference is in observation); a render change motivated by an unproven defect does not ship.
+
+## MIT quality loop, round 33 — Thai stacked marks get the leading they need (#895) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Root cause found:** the horizontal renderer's line pitch is `font_size`; a Thai tone mark stacked on an upper vowel is lifted (#793) above its own row and drawn over the previous line. Where that row has ink at the same x the mark is dark-on-dark and vanishes — Kumo p0's `ครั้งนั้น` rendered as `ครงนัน`.
+- **Fix:** `_stacked_mark_overhead(line, font_size)` (excess over one row + an 8 % descent allowance) added only to lines that need it — canvas height, first-line offset and per-line advance. Latin text and fonts whose marks already sit high add nothing (byte-identical).
+- Kumo p0 re-render: line 7 reads `ครั้งนั้น` with both mark pairs (figure `2026-10-22-895-stacked-marks-fix.png`). 2 new tests, gate **851 passed**.
+- ~~Corpus verification pending~~ — **round 34 closed this as a phantom defect and reverted the fix**; see the entry above.
+
+## MIT quality loop, round 32 — concise targeted A/B + a real render bug: stacked Thai marks vanish on the page (#895) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Concise targeted A/B** (#892 follow-up): on the 21 segments whose base translation is >= 1.25x the source chars (the tight-bubble pain set), concise is **-17 % chars** and the blind judge prefers it **8-3 (10 ties)**; overall the 12-page A/B was a 5-5 tie. Direction is right but not enough for a default flip (which also needs a patch-cache version bump), so it stays opt-in.
+- **New render bug found while zooming Kumo p0**: the caption line `ครั้งนั้น` renders as `ครงนัน` — the stacked marks (ั+้, and ้) disappear in the final page image, while the payload text is correct and a direct `text_render.put_text_horizontal(29, …)` shows the marks. Ruled out: `compact_special_symbols`, line-splitting (cluster stays whole at widths 180-340), and `_stacked_mark_lift` math (10 px lift, manual draw correct). Filed **#895** with the figure and the next instrumentation step (supersampling/warp path in `render()`).
+- Benchmark/figure `2026-10-22-895-thai-stacked-marks.png`.
+
+## MIT quality loop, round 31 — the two unreachable levers are reachable from the Backend now (#894) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `MIT_BUBBLE_SYNTH=1` -> `detector.det_bubble_synth` (#170/#178 synthesized balloons) and `MIT_FIT_BELOW_FLOOR=1` -> `render.fit_below_floor` (#883 overlap opt-in) to `Backend/src/books/mit-config.ts`, following the existing `flagEnv` pattern; unset → payload byte-identical.
+- Documented both in the env block; `renderConfigHash` already hashes every `MIT_*` key, so patch caches roll when either is switched.
+- 3 new spec tests, `books-mit-config.spec.ts` **45 passed**; MIT side unchanged (both Pydantic fields already existed). Everyone of this loop's MIT quality levers now has a Backend path.
+- Benchmark `2026-10-22-894-backend-env-exposure.md`.
+
+## MIT quality loop, round 30 — config audit: two more dead Backend keys fixed (#893), two unreachable features recorded (#894) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited every key `Backend/src/books/mit-config.ts` emits against the MIT Pydantic models: **two dead keys** — `translator.api_key` / `api_url` were dropped, so a non-gemini deployment's endpoint/key never reached MIT (wrong endpoint, or `MissingAPIKeyException` at construction although the request carried a key). Added both fields; `OpenAITranslator` builds its client from `.env` when a key exists, rebuilds it from the request in `parse_args`, and raises at request time otherwise (env-only behaviour unchanged; 3 tests).
+- Opposite direction recorded in **#894**: `detector.det_bubble_synth` (#170/#178) and `render.fit_below_floor` (#883) are implemented in MIT but no Backend field sends them — proposed `MIT_BUBBLE_SYNTH` / `MIT_FIT_BELOW_FLOOR` flags.
+- Benchmark `2026-10-22-config-audit-dead-keys.md`; gate **849 passed** (new test file marked heavy — it imports the torch-holding translators package).
+
+## MIT quality loop, round 29 — `concise_bubbles` was a dead flag; now carried, A/B is a tie (#892) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a dead flag:** the Backend has sent `translator.concise_bubbles` since #526 and `ConfigGPT` implements the directive, but `TranslatorConfig` had no field and `chatgpt_config` carried only the context fields — Pydantic dropped it, so `MIT_CONCISE_BUBBLES` did nothing. Added the field + carriage (absent → byte-identical, 3 tests).
+- A/B (12 pages, blind, chunked judge): translation **-7.2 % chars** (56 segments shorter) and the judge is **dead even 5-5 (2 ties)**. Not enough to flip a default that changes every translation — kept opt-in; the flag now actually works.
+- Benchmark `2026-10-22-892-concise-bubbles-ab.md`; gate **849 passed**.
+
+## MIT quality loop, round 28 — pipeline determinism verified; DBNet needs no cuDNN-off (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 3 pages replayed twice each (`--replay`, `--set ocr.vlm_rescue=0`): **identical regions, boxes, sources, translations** — the pipeline is deterministic once live gateway calls are excluded.
+- Following #884's OCR pattern, DBNet's forward was re-run with cuDNN disabled: **identical boxes**, and slower (3726/3692 ms vs 3466/3612 ms cold) — no code change; detection is already deterministic and cuDNN-off would only cost time.
+- **Corrected #891's note** that claimed DBNet is not bit-deterministic: its corpus diff was `_final` (2560) vs `_d3200` (3200), i.e. a config change, not nondeterminism. Benchmark + rule `2026-10-22-detection-determinism.md`: with replay + rescue off, every difference is attributable to config/code/live calls.
+
+## MIT quality loop, round 27 — detection_size 3200: recovers missed lines, but it is a tradeoff (#891) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0: at `detection_size` 2560 the `NOTICE: You can read this chapter…` paragraph is never detected (15 textlines); at **3200** it is (19 textlines) — the #883 leftover-English gap can be closed without touching thresholds.
+- Warm cost: detection ~473 -> **584 ms** (+23 %, ~+110 ms/page). Corpus replay (39 pages): **24-37 pages change** their region source texts (mostly tiny re-reads from shifted boxes), a handful of genuinely recovered lines (credits, Mieruko fortune lines, a few dialogue lines) — plus new kana/CJK art-glyph candidates (`ん`, `刀`, `ベ`, `才`).
+- Verdict per the tradeoff rule: **not default**; `MIT_DETECTION_SIZE=3200` / `--set detector.detection_size=3200` documented for maximum-recall use. Benchmark `2026-10-22-891-detection-size-3200.md`; #891 records it.
+- Also learned: **detection is not bit-deterministic** (cuDNN DBNet) — identical configs differ by a few textlines and small OCR re-reads between runs, so detection A/Bs must compare duplicate-tolerant sets, not counts.
+
+## MIT quality loop, round 26 — sampling temperature A/B: 0.5 stays, 0.0 rejected (#890) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Blind pairwise A/B on 12 pages (audit's lowest + 3 controls), same v2 prompt, arms differing only in `temperature: 0.0`: **0.5 won 7 pages, 0.0 won 4, 1 tie**.
+- Offline check: the arms are **identical on most segments** (122 segments, a handful differ) — the gateway's sampling is already near-deterministic — and the differing lines favour 0.5. No default change; `thai_manga_v2_t0.yaml` kept as the record.
+- Reading recorded: prompt (#888, v2 won 6-2) and temperature are at a local optimum **under this judge**; the judge is the production model, so the next quality step is reference-based (gold) data, not self-grading.
+- Benchmark `2026-10-22-890-temperature-ab.md`; issue #890 closed with the result.
+
+## MIT quality loop, round 25 — prompt v3 lost the blind A/B; the A/B exposed a mark-order defect (#888, #889) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Blind pairwise A/B (9 pages: the audit's lowest + 3 controls; `translation_ab.py` translate/packet + a segment-level judge): **v2 won 6 pages to 2, 1 tie** — v3's stammer/fragment rules helped those lines but the longer rule list made other lines literal. No default change; `thai_manga_v3.yaml` kept as the experiment record.
+- **Real defect the A/B exposed (#889):** the model emits Thai tone marks before their above-vowel (`ท่ี`, `น้ี`) — 1 segment/9 pages in the v2 arm, 3 in v3. New `translation_quality.normalize_thai_marks` (canonical order + drop a repeated mark in one cluster) wired into `_clean_translation_output`: both arms normalise to 0 invalid sequences, the 372-segment corpus dump is byte-identical, gate **849 passed**.
+- Benchmarks `2026-10-22-888-prompt-v3-ab.md`, `2026-10-22-889-thai-mark-order.md`.
+
+## MIT quality loop, round 24 — LLM-judged translation audit: 372 segments, mean 1.51/2, five patterns (#888) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New reusable `tools/judge_translations.py`: grades each page's source/translation pairs 0-2 with a strict editor prompt, chunked (a whole dense page truncates a thinking model). First full run: **39/39 pages, 372 segments, mean 1.51/2** (54 % perfect, 43 % minor, 3 % broken).
+- **Judge caveat recorded:** its character-level "typo" notes are noise (it flagged correctly stacked Thai marks; a code-point scan found 0 doubled marks) — only meaning-level notes are usable.
+- Five repeatable patterns → **#888** (prompt v3 + blind pairwise A/B): stammer/hesitation flattened (`U-UM` -> `อ-อ๋อ`), cut-off fragments dropped or wrong initial (`AGAI-`, `W-`, `BA`, `THE`), names guessed from a familiar reading (`Plicia`), sense slips (`carefree`, `paragons`), one inverted self-correction.
+- Benchmark `2026-10-22-translation-judge-audit.md`; lowest pages listed (Iruma p1 0.88, Taida/Kage/Kumo/Otome/Tsuki 1.00).
+
+## MIT speed loop, round 23 — warm profile at HEAD: one gateway call per page, and the overlap that cannot be done (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Warm, single-process profile: wall ~3.9-6.3 s/page, of which **translation 1.7-4.2 s (45-60 %)**; pipeline (detection ~0.4-0.7, OCR ~0.2-0.9, merge ~0.2-0.6, mask ~0.1-0.2, inpaint ~0.1-0.8, render ~0.1-0.4) is ~1.5-2.0 s.
+- Instrumented the translator: **exactly one gateway request per page, no retries** — the stage time is one round trip, not duplicated work.
+- Rejected with reasons: overlapping mask+inpaint with the translation call (the mask must follow the post-translation region list, or dropped junk/art regions get inpainted — behaviour change, not a speed tweak); OCR chunk 32 (5-20 % OCR, inside noise, read risk); panel downscale (round 22); thinking-off (measured no-op on this gateway).
+- Benchmark `2026-10-22-warm-profile-at-head.md`. Next levers are model/detection-resolution trades or Backend cross-page pipelining — user-level decisions.
+
+## MIT quality loop, round 22 — current-state audit of all 39 pages, plus a rejected speed idea (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Replayed the whole corpus at HEAD (`_final`): 39/39 pages, **372 regions, 6 SFX renders (was 20 before #887), 0 phantoms, 0 duplicate-over-balloon**. Every remaining doctor flag is a documented tradeoff (Chainsaw overlap = #883 default, Latin credits, Kage title shrink) or a replay artifact (stale pre-#763 recordings on Otome/Tsuki). Report: `2026-10-22-corpus-audit-39-pages.md`.
+- **Rejected:** panel-detection downscale (#888 idea). Measured warm: full-res Kumiko panels **406 ms**/page (not the ~2 s a cold profile suggested); max_side 1200 saves 86 ms but changes reading order on 1/39 pages, 1000/800 on 5 and 7. Reverted, benchmark `2026-10-22-panel-downscale-rejected.md`.
+- Method notes: payload anomaly scans find real defects (font ratio, Thai src in non-SFX region); check page extensions (.jpg vs .png) when scripting sweeps.
+
+## MIT quality loop, round 21 — a container that swallows dialogue is never rescued as an SFX (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Akuyaku p1 rendered a **second meow**: a merge container region (its own OCR read junk) fully covered the balloon's `NYA` line, so the rescue lettered `เหมียว` over the bubble next to the real `เมี๊ยว`.
+- New `ocr_vlm.swallows_dialogue(box, dialogue_boxes)`: a region containing >= 70 % of another region's dialogue box is not an SFX; wired into the rescue gate beside `should_rescue_sfx` (dialogue boxes exclude the region itself).
+- Replay of the page: 9 regions, **no Thai source text** (duplicate gone), both bubbles keep their `เมี๊ยว`. Figure + benchmark section `2026-10-22-887-double-meow.png`. Gate **846 passed**.
+
+## MIT quality loop, round 20 — the last phantom SFX are gone: lettering is several strokes (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 4 phantoms that survived the contrast rule were each **one connected dark stroke** (arc, thick oval, `刀` art glyph, `あせ` art). `crop_has_lettering` now also requires **>= 2 dark components covering >= 1% of the crop** (cv2 connected components, lazily imported; falls back to the contrast verdict if unavailable).
+- 13 affected pages replayed again: rescued regions **8 -> 5**, pages with SFX **6 -> 4**, and all 5 remaining are real lettering (`ザッ` x2, `ドン`, `Dash!`, `あせ`) — **phantom count 0** (was 15 at the start of #887).
+- Tests: 2 new stroke-rule tests + the contract fixture now uses a lettered crop; gate **844 passed**. Benchmark updated (`2026-10-22-887-phantom-sfx.md`).
+
+## MIT quality loop, round 19 — a crop without lettering never reaches the SFX rescue (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured the rescue's output: of the 20 rescued SFX regions on the corpus, **15 were art/blank crops with no lettering** — the model invented the SFX and pages rendered phantoms (Taida p0's `ฟู่` over plain armour).
+- New `ocr_vlm.crop_has_lettering`: grayscale **std >= 75 and >= 12% very-dark pixels** (real katakana: std 78-92 / 0.15-0.32; art crops: 27-74 / <=0.12). Checked **before** the vision call, so ~2.3 s per refused crop is saved too.
+- 13 affected pages replayed: rescued regions **20 -> 8**, pages with SFX **13 -> 6**, the reported page shows the art intact. Residual phantoms are 4 single thick non-lettering strokes (next: count letter strokes with cv2, at the cost of a dependency in the torch-free module).
+- Doctor LLM contracts updated: a uniform canvas now reports *no request, guard refused* as OK (the bug class is prevented upstream); test renamed. Gate **842 passed**; benchmark + figure `2026-10-22-887-phantom-sfx.md/.png`.
+
+## MIT quality loop, round 18 — text_threshold 0.3 A/B over 39 pages: keep the default (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0's missed credits are recovered by `detector.text_threshold` 0.5 -> 0.3, so the whole corpus was run both ways (replay, rescue off). **20/39 pages change** textline structure, **134 region source texts** shift with the boxes; new text includes 4 real dialogue lines, the credit paragraphs — and 6 newly detected CJK art glyphs (`ザ`, `平ク`, `ベ`, `才`, `刀`, `禁`).
+- Decision: **0.5 stays the default** — not a pure recall win, and credits left in English are acceptable; the knob is documented for maximum-recall setups. Benchmark `2026-10-22-text-threshold-39-pages.md`.
+- Phantom SFX found while auditing Taida p0 (a det_sfx false positive on plain armour got an invented `ฟู่`) — filed as **#887** with the rejected prompt-hardening A/B (it refused 15/20 real SFX) and the pixel signals that do not separate it.
+
+## MIT quality loop, round 17 — #883's leftover English is detection recall, not the mask (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Dumped the pipeline's real mask + inpainted page (driver-level monkeypatch, return values saved): every detected credit line has **100 % mask coverage**, so the leftover English is not an inpaint bug — the white `You can read this chapter…` pair and `PLEASE DON'T SUPPORT WEBSITES THAT DO.` are **never detected** (15 textlines).
+- `detector.text_threshold` 0.5 → **0.3** recovers them (18 textlines, white line present); `box_threshold` changes nothing. Not shipped: a lower threshold is corpus-wide and needs a 39-page A/B (false textlines on artwork change masks and renders), recorded as next step on #883.
+- Method note for future traces: patch the stage functions in the DRIVER module (binds at import), and call `initialize()` (`.env`) before importing the driver — otherwise translator keys are empty (#614) and live calls fail with `APIConnectionError`.
+
+## MIT quality loop, round 16 — opt-in `fit_below_floor` for a block that cannot fit its gap (#883) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0's `NOTICE:` credits: three 9 px lines 6-15 px apart, floor lifts each block to 20 px (~48 px) which cannot fit the gap, so the anti-overlap pass (designed to centre a too-tall block) leaves them overlapping. New `render.fit_below_floor` (default **off** — byte-identical) re-lays such a block below `font_size_minimum` and takes the largest size that fits.
+- Replay A/B (rescue off, same dump): **overlap 2 → 0**, regions 8/9 20 px → **10 px**, boxes moved into the gaps. Figure + benchmark `2026-10-22-883-below-floor-fit.md`.
+- Opt-in by the goal's tradeoff rule (small text is a readability call). Caveat recorded: the original English credits stay partly visible because thin lines get tight inpaint masks — that half of #883 is still open.
+- Self-caught during the A/B: the new stage kwarg landed before the `dispatch()` signature did, so rendering silently no-op'd (0 ms). Fixed, and the check is now explicit in the signature. 2 new tests, gate **839 passed**.
+
+## MIT quality loop, round 15 — 39-page replay sweep: no dialogue lost, and a replay caveat (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Set-based comparison (region source-text multisets, not indices) of all 39 corpus pages against `_r2`: **16 pages changed, all explained** — 2 expected guard drops (`Siiig` #882, `月` #886), 1 rescue upgrade (`을` -> `เคี้ยว`), 11 pages of rescue nondeterminism, 2 pages of one-character OCR read variance (`IIMF`/`IIM`, `ZBYTHE`/`7BYTHE`; #884 numerics). **No dialogue region lost on any page.**
+- **Rule recorded:** `--replay` still runs the vision SFX rescue live, so SFX pages vary between runs — accept that noise or run with `--set ocr.vlm_rescue=0`; index-based render diffs on those pages are not regression evidence.
+- Vault note `project-art-text-handling` written (the three art/SFX guards, rescue precedence, the rule for adding a 4th).
+
+## MIT quality loop, round 14 — a single logo glyph is dropped, the artwork stays (#886) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tsuki p0: detection caught only the `月` of the title logo `月が導く異世界道中`; the page rendered a big Thai `เดือน` in its place while the rest of the logo stayed Japanese. New `is_oversized_art_glyph` (1-2 CJK/Hangul glyphs, source lettering >= 100 px) drops such regions in the post-translation filter, so they are not inpainted and the art stays.
+- Replay: Tsuki regions 16 -> 15 with the `月` drop, logo intact (figure). Mushoku c110 p0's `을` was RESCUED meanwhile (`เคี้ยว`, sfx_display) — rescued regions are excluded from the guard, so the SFX path wins when it can serve.
+- Tests for the predicate + filter; benchmark `2026-10-22-886-logo-glyph.md`; corpus scan: exactly 2 art-scale single-glyph regions.
+
+## MIT quality loop, round 13 — `text_raw` now reaches the regions the pipeline keeps (#885) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The raw-OCR-text stamp now runs on the single surviving dispatch (extracted helper `textline_merge.stamp_text_raw`). Instrumented replay: **6/6** merged regions carry `text_raw`, and it differs from `text`: raw `I'VE BEEN KILLED BY IT SO MANY TIMES...` vs the normalised `IVE BEEN...` that every consumer used to see.
+- **No render change:** A/B with the change stashed on 3 deterministic replay pages gives byte-identical renders and 0 region diffs (no pre-translation dictionary in this config); the helper refactor is byte-identical to the inline version. Value is correctness: with a configured dictionary, render scaling (rendering:792) and the page-translation record key on the raw text again.
+- Benchmark `2026-10-22-885-text-raw-restored.md`; 3 new tests; torch-free gate **833 passed**.
+
+## MIT quality loop, round 12 — letter-name spellings are dropped, the junk `ซีไอไอ` is gone (#882) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Boku p0's bubble-letter SFX `Siiigh` was read as `Siiig` and the translator spelled the letters out into `ซีไอไอ` — junk rendered over the art. New pure guard `is_letter_name_spelling` (Thai-only translation that fully segments into >=3 letter-name syllables via DP; source is one 4-10 letter ASCII token, not all-caps, with a repeated letter) wired into the drop filter with reason *Letter-name spelling of stylized art*. The region is not inpainted, so the original art stays.
+- **Corpus scan (39 pages): exactly 1 drop, 0 false positives**; replay Boku p0: regions 12 -> 11, junk gone; gate 830 passed. Negatives pinned in tests (`SOR`->`ขอ...`, `OMG`->`โอเอ็มจี`, `OK`->`โอเค`, `LOOM`->`ลูม`).
+- Benchmark `2026-10-22-882-letter-name-spelling.md` + before/after PNG. Follow-up recorded in #882: localize such art as a Thai SFX via the vision rescue (needs a discriminator for letter-read art, which the provenance gate refuses today).
+
+## MIT speed loop, round 11 — the merge stage ran its dispatch twice (dead) + a stage-timer caveat (#885) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `_run_textline_merge` dispatched `dispatch_textline_merge` **twice**; the first result was stamped with `text_raw` and then dropped (`dispatch()` builds new TextBlock objects). Removed the dead pass: ~0.1 s/page, and the merge module's profiled cost is 0.185 s for two calls — the 2-5 s the stage timer showed was host contention.
+- Replay A/B with the change stashed: **renders byte-identical** on the two deterministic pages (Boku p1, Dungeon p1). Horimiya p0 differs only through live model calls — proved by running the same code twice and getting the same two diffs (SFX rescue `ฟึ่บ` vs `วูบ`; live translation of `STRANGELY…`).
+- **Measurement caveat (the real lesson):** `timing_ms` stage numbers vary up to **6x** for the same page and code (merge 782 ms vs 4828 ms). Rank by profiler cumulative + repeated medians; never time with another job running. The round-4 'textline_merge 35 %' was such a reading, not a real stage cost.
+- **Where the stage's seconds actually are:** a cold single-page profile attributes 2.04 s of the merge stage to `sort_regions -> get_panels_from_array` — **Kumiko panel detection for reading order**, not the merge (0.185 s). Next round's target: panel detection on the full-resolution page (downscale is the obvious lever, but it moves panel boxes → reading order, so it needs a 39-page replay A/B first).
+- Filed **#885**: `text_raw` lands on thrown-away regions, so the render box and page-translation record never see the raw OCR text. Restoring it needs a 39-page replay A/B (recorded in the issue).
+
+## MIT speed loop, round 10 — OCR was paying ~2.2 s per chunk in cuDNN host work (#884) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Warm profile put OCR at 54 % of an 11.1 s page. Traced: each OCR chunk call inside the pipeline spends ~2.2-2.6 s in host-side cuDNN work (`aten::cudnn_convolution` ~16 ms x 109 calls, profiled), the same call repeated immediately is 0.3 s and in an isolated process 0.1 s. NOT padding, NOT rescue (measured separately), NOT chunk size (chunk 64 was faster but changed OCR reads — rejected), NOT shape warmup (no effect).
+- **Fix:** run the 48px OCR model's forward with cuDNN disabled (`_cudnn_flags()` scoped to the call); every other model keeps cuDNN (LaMa regressed 3-12x without it). Windows default off, non-Windows unchanged, `MIT_OCR_CUDNN` override. OCR **4656->1128, 3980->769, 4403->1311, 9643->1930 ms** on 4 warm pages; page wall 2.4x. **Reads identical: 62 regions, 0 diffs.**
+- Benchmark `2026-10-22-884-ocr-cudnn.md`. Unit test `test_ocr_cudnn.py` (torch-heavy set).
+
+## MIT quality loop, round 9 — the SFX rescue now serves: 20 localized SFX over 39 pages (#881) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full corpus replay (`_r2`, 39 pages) after the budget fix: **0 -> 20 `sfx_display` regions on 13 pages** — วูบ · ฟู่ · ฟึ่บ · วืด · ฟาด · แวบ · ซ่า · เป๊าะ · กึกกัก — where the raw Japanese art used to stay. No dialogue region changed; spill/small_font 0; overlap unchanged (Chainsaw p0 + Mieruko p0 = the #883 stacked-credit class). Benchmark `2026-10-22-881-rescued-sfx.*`.
+- The four regions that vanished were single JP glyphs the translator had transliterated (`刀`->`ดาบ`, `才`->`ซาย`, `ザワ`->`ซาวา`, `平ク`->`เฮย์ระคุ`) — now the rescued Thai SFX.
+- **Doctor false positive fixed twice**: the display branch first (`8a326900`), then the real signal — the patches payload carries an additive `sfx_rescued` key and the implausible-region probe skips it (`b8d5d8aa`), so a rescued SFX inside a balloon is no longer a detection error. Replay mode still flags recorded SFX (the replay feeds the recorded dst, so no live flag) — documented.
+- **`_r2` is the new scoreboard**: 39 pages, failures only `merge` (pre-existing split-container class), `render` (Chainsaw/Mieruko, #883), `detect` on huge art glyphs / recorded SFX.
+- **Warm latency baseline** (`2026-10-22-warm-latency-profile.md`): 5 pages in one process — page 1 cold, pages 2-5 warm = **11.1 s/page**, of which **OCR 54 %**, textline_merge 16 %, translation 15 %, detection 6 %, rendering **2 %**. The cold per-page doctor timings mislead by ~10 s of model load; the next speed target is the OCR stage (part of it is the 2.3 s/crop vision rescue).
+- **Harness notes:** (a) the corpus replay must NOT pass `--source ENG` for the `corpus` set — it enables the source-language filter and drops Japanese title art, which produced phantom "removed regions" in the first baseline; (b) rescue counts vary 20-22 between runs because the rescue is a live model call.
+
+## MIT quality loop, round 8 — credit-block overlap traced to the readable floor (#883, no code change) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#883** — Chainsaw p0's `NOTICE:` credit block renders its three lines on top of each other (doctor `render` FAIL, overlap 2). Traced: the source lines are 9-10 px tall and 6-15 px apart; the readable floor lifts each block to 20 px (~48 px tall), so the block is **taller than the gap** between its neighbours. The anti-overlap pass already centres a block taller than its gap in that gap (#795) — overlap is the designed fallback here, not a broken dodge.
+- **Tried and reverted:** dodge each neighbour's *rendered* box instead of its detection box (union with its own territory so a balloon keeps its outline). Principled — a grown block's ink is its territory — but the boxes still overlap (1.4k / 4.5k px²) because no placement fits; reverted rather than shipped without evidence.
+- **Needs a decision** (recorded in #883): coalesce the stacked notice lines into one region before translation (#757-style paragraph block), or allow a sub-floor font when a block cannot fit between neighbours.
+- Full-corpus replay tagged `_r2` started against the current head as the next baseline.
+
+## MIT quality loop, round 7 — the SFX rescue was a silent no-op on a thinking model (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#881** — `vlm_localize_sfx` sent `max_tokens: 24` with no thinking lever. The configured gateway model (`qwen3.8-27b-fp8`) spends ~154 tokens on reasoning before any content, so every rescue truncated (`content=''`, `finish_reason='length'`), which the pipeline reads as "no SFX here"; after three in a row the `#693` breaker paused the rescue for 300 s. Measured on the Boku crop: 24 and 128 truncate, 192 completes, 256/384/512 identical. Thinking must stay on — with `enable_thinking=false` the same crop reads as junk (`ซึ่่ง`). Now `SFX_MAX_TOKENS = 512`; the doctor's `vlm-send` thresholds were re-measured for the configured model (128 truncating / 192 completing; were 2048/4096 from qwen3.6-35b-a3b).
+- **Gateway E2E, same crop:** `vlm_localize_sfx -> 'เฮ้อ'` in 2.3 s, where it returned `''` before.
+- **#882 filed, not fixed** — the `Siiigh` → `ซีไอไอ` junk on Boku p0 is translator-side: `should_rescue_sfx` correctly refuses ASCII-readable text, so the line-OCR read went to the translator as dialogue and was transliterated letter by letter. Needs a discriminator (the `#796/#797` class).
+- **Gate:** torch-free suite 823 passed / 3 skipped (one subprocess self-test deselected — it inherits `PYTHONPATH` in the local torch-absent simulation only).
+
+## MIT quality loop, round 6 — page edge, English kept, neighbour bbox (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Every fix replayed through the doctor; the before/after arms differ only by code.
+- **#873 page edge** — `clean_layout` centred the Thai block on the source region; wider than the source, it crossed the page edge (Otome p0 narration rendered from x = -7, first letters cut). The block's centre is now clamped to the page — image bounds on a full-page render, `region.page_bounds` in crop coordinates on a patch. 1 of 250 regions re-laid; spill/overlap unchanged.
+- **#857 follow-ups** — the mostly-ASCII Latin guard counts **letters, not punctuation** (`피 WONDER WHY..` stays English); look-alike katakana inside an English word (`＼` read for `I`) map back to Latin before translating. Across every recording exactly 4 texts change, all correct (`STRANGELY…` -> `แปลกประหลาด…`).
+- **#876 neighbour bbox** — `_neighbor_territories` clamped the polygon-interior fit box against the next balloon's **bbox**, whose balloon overlaps this one though the polygons never touch; the fit box was left 14 px wide, so Horimiya p0 `REJECT-ED!` rendered 13 px across the edge. When the fit box is the region's own polygon interior, neighbours now count by their **text box**. r2 13 -> 20 px, `render` FAIL gone, corpus 3 **11/12 pages byte-identical**.
+- **Benchmarks:** `2026-10-21-{873-page-edge,857-english-kept,857-strangely,876-neighbour-bbox}.*`.
+- **Open, not addressed:** doctor `merge` FAIL/WARN on Horimiya p0 r18/19/22/23 shows in both arms; two Tsuki replay pages fail identically under every tag (`detect` / `merge`) — pre-existing. Replay re-translates any text the recording never saw (live LLM), so a text-only diff in an A/B is sampling, not code.
+
+## MIT quality loop, round 5 — dropped English, tall-balloon columns, page font size (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Every fix replayed on both EN corpora + the JP page.
+- **#857 English kept** — `TextBlock.source_lang` is a lazy langid guess (never empty), so `_detect_region_source_lang` returned it before its mostly-ASCII Latin guard ever ran; English with one OCR-noise glyph (`피 WONDER WHY..`, `… ○`, `♡`) was guessed KO/MT and silently dropped. Guard first; `strip_noise_glyphs` removes non-Latin-only tokens before translating; the filter's drops now reach the payload `dropped` list. Regions 253 → 257.
+- **#864 tall balloons** — `squeeze_width` filled the whole interior height, turning short wide lettering into one word per line. The interior proxy carries the source footprint: squeeze toward the source height, start at 0.9 × the source width (both steps forced by replay findings). 24 regions re-laid, spill/overlap/edge contact unchanged.
+- **#851 page font size — opt-in** `font_src_scale`: page dialogue size = scale × median source size, balloon text only, credits from their own size, untagged SFX keep the absolute font. At 1.4: balloon font spread within a page 1.55× → 1.33×, Thai/source size 0.55 → 0.77, but overlap +4 / spill +1 → stays opt-in, awaiting the user's call on the scale.
+- **Review fixes** (`775c864b`): dodge at the re-laid size; one-sided second dodge; TNC floor for compounds TNC lacks.
+- **#872 lossless latency** (warm cProfile → fix → byte-identical render probe, 8 pages): panel detection reads the array (no temp PNG), cached segment length/angle, plain-float `projected_point`, bbox before ray cast → textline_merge 0.74 → 0.54 s; glyph **stroke** bitmaps via `_bitmap_bytes` → rendering 1.0 → 0.61 s; mask refinement skips shapely pairs that cannot change the pick → 0.56 → 0.39 s; **`import ultralytics` had left OpenCV single-threaded for the whole process** (`cv2.setNumThreads(0)`) — restored after the YOLO imports → detection 1.28 → 0.58 s, rendering −37 %; OCR reads beam results from the CPU once per region instead of per-character GPU syncs → OCR −13 %. Round total 5.84 → 3.70 s/page warm (LLM excluded), renders byte-identical at every step; a review subagent fuzzed each change (30k–300k cases) — one non-production edge (grayscale/float panel input) fixed.
+- **#851 follow-ups** — fit-or-shrink instead of a hard fallback; no fit slack; still opt-in (scale is a look the user picks).
+- **Tooling** — doctor JSON records `font_src_px`. Lessons: a probe on the full-page path misses `/patches`-only filters (run the doctor with INFO logs); falsify each hypothesis before fixing (two were wrong here).
+
+## MIT quality loop, round 4 — second corpus: narrow balloons, merged balloons, numbers, segmenter ties (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). A second EN corpus (11 mid-chapter pages, 6 new series) found new defect classes; each fix replays both corpora (27 pages) and lands only with its benchmark.
+- **#832 narrow tall balloons** — a clean-layout block wider than its balloon interior is laid out again on the interior (dictionary breaks, then shrink): spill 4 → 0, same font size.
+- **#795 merged balloons** — `_place_off_neighbours`: free space = dodged box ∩ own balloon; a block wider than it is re-laid to fit; per axis the block moves flush with the edge a neighbour pushed (the balloon clip is not a push); a move that hits another neighbour centres in the gap. Replay caught two regressions of the first version (lost vertical dodge — Anta p1; flush onto the next line — Mieruko p0), each fixed red-first. Second corpus overlap 1 → 0, first unchanged.
+- **#842 numbers** — `_clean_translation_output` spaced the comma in `5,000` (`\w` matches digits) → `5, 000 เยน`. Separators between digits are kept; verified with a live run (a replay skips the cleanup).
+- **#844 Thai segmenter ties** — newmm takes the shorter first word when a compound splits into two dictionary words two ways (`นา|ทีละ`, `บอ|กว่า`, `โจม|ตีเมือง`). `_retie_thai_pairs` re-splits by TNC frequency (bundled); `longest` engine rejected (wrong far more often). 8 distinct pairs change over 651 translations, all correct.
+- **Lessons** — gate commits on the pytest summary line, not a grep of the whole log (`errors.pydantic.dev` matched `error`); corpus pages are .png *and* .jpg; replays reuse recorded text, so translation-stage fixes need a live run.
+
+## MIT quality loop, round 3 — proven configs become defaults, scrutinize fixes (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Goal rule added 2026-10-21: a config proven on real pages becomes the MIT default without asking.
+- **#762 Thai manga prompt is the Thai default** — the generic prompt inserted a spurious `ทน` (`ฉันทนฟังบทสนทนา` for "I heard your conversation", `ฉันทะโกด`) in 1/3 runs on Tsuki p1 and across the corpus; the Thai prompt had 0 in 9 runs. Shipped in-package (`translators/prompts/thai_manga_system.txt`), picked by `ConfigGPT.system_prompt(to_lang)` unless a gpt_config overrides; all GPT-family translators format through it.
+- **#757 container merge on by default** — replay A/B: split containers 3 → 1, spill/overlap unchanged, merges correct (`2026-10-21-757-container-merge-default.*`).
+- **Scrutinize fixes** — `(ผู้ชาย)` no longer char-split by its trailing space; newmm multi-word tokens (`ไป ๆ มา ๆ`) split so `ๆ` never starts a line; #754/#797 drops recorded in the payload (`speculative box read as junk`). Kept: the exhaustive font scan (#761, ~7× slower than bisection on short text, but finds the largest fitting size) — speed phase. Deploy: bump `MIT_RENDER_VERSION` so cached pages re-render (code changes are not in the cache key).
+- **#816 tall balloons** — wrap to the balloon interior (dictionary breaks) before shrinking; the supersampled render re-wraps at the layout's width; dodged blocks stay in their balloon. Tsuki root spills → 0 at 20/20/18 px.
+- **#797** placeholders with OCR confidence < 0.9 dropped (junk ≤ 0.657, real ≥ 0.959). **#759** full-width closers; lone non-word characters glue back (`ซิ / ด!!`); auxiliary glue tried and rejected (font-size cost). **Knuth–Plass** A/B: worse on Thai, kept off (#545).
+- **#822 lossless latency** — one balloon detection per page, crop-only bilateral in mask refinement, numpy glyph bytes, set-based panel union, cached OCR XPOS tables: warm 6.30 → 4.02 s/page, renders pixel-identical 16/16. OCR chunk 64 rejected (slower, changes reads). Note: doctor `timing_ms` runs a fresh process per page (cold models) — use a warm in-process probe for latency.
+- **Doctor** — replay reproduces texts the recording dropped as identical, so A/B arms differ only by code.
+
+## MIT quality loop, round 2 — spaces, punctuation, tone marks, review fixes (2026-10-20)
+
+Branch `feat/mit-quality-loop`.
+- **#791 Thai spaces kept (default)** — a space the translator wrote rides on the previous newmm token; lines never start/end with it. **#792** — `compact_special_symbols` deleted every space after punctuation (upstream v1.0.0 CJK rule): English rendered `Well,I / so!Yes.`, Thai credits `RTSD / ,ZERO`. Now only after full-width/CJK punctuation or before Han/kana; a token starting with a closer glues back. Replay A/B 17 pages: 46/177 regions re-laid out, 5 font changes, spill 7→7 (`docs/reports/benchmarks/2026-10-20-791-792-thai-spaces-punctuation.*`).
+- **#793 Thai tone marks vanished with the prod font** — Prompt sets a tone at the upper vowel's height and relies on OpenType mark-to-mark; our per-glyph FreeType renderer has no shaping, so `ที่ นี้ ชื่อ กั้น` drew as `ที นี ชือ กัน` and `น้ำ ต่ำ` merged tone + nikhahit — every Thai page. The line loop lifts the tone clear of the vowel / sara am, measured from the bitmaps (0 for Arial → goldens byte-identical). Doctor now renders with Prompt-Regular like prod (it used Prompt-Bold).
+- **Code-review fixes** — kept trailing space broke the dictionary split (mid-word `เดีย|วกัน`); over-wide dictionary parts now split recursively; a demonstrative after a real space may start a line; glitch re-ask ignores a script the source already uses (a JP page's kana SFX made 3 full-page LLM calls); SFX breaker (#771) is half-open — one trial call after 300 s instead of disabled until restart.
+- **#795 anti-overlap** — a region sharing its balloon was clamped against its sibling's territory (= the whole balloon) and shoved onto the next balloon's text (Tsuki p1). Same-balloon siblings now own only their detection box. Doctor gained an `overlap` render verdict: corpus overlapping pairs 5 → 4 → (with the fixes below) 1.
+- **#754 / #797 junk-read DROP** — a region whose every line is a detector guess (det_sfx box or empty-balloon/ink-cluster placeholder, `TextBlock.speculative`) is dropped when its OCR read is one ASCII char, or real text lying > 50% inside a dialogue line: `w→ว`, `I→ฉัน`, `n→น`, `v→ว`, `S→ซ` gone from the corpus; real lettering (`CHAINSAWMAN`, `LEAK OUTSIDE`) kept — narrower than main's blanket real-text DROP, chosen from a corpus probe and tightened after code review (merged real+det_sfx lines are never speculative; a big SFX around a small line is kept). **#796 reverted** — a 2× pitch limit made the 2-line split vacuous (separate stacked captions would merge); still open. **Doctor:** renders with Prompt-Regular (prod) since 2026-10-20 — doctor runs before that used Prompt-Bold and are not comparable; `--replay` also answers the batch retry and replays texts the recording dropped as identical, so A/B arms differ only by code. Benchmark `2026-10-20-754-796-797-false-positives-and-split.*`.
+- **Payload** — `text_layer.empty_patch_result`: a page whose regions were all dropped still reports them (Chainsaw p0 credits: OCR garble → LLM echo → page ratio check → everything dropped silently).
+- **Lesson:** `_greedy_pack` assumes no piece is wider than the column; a piece that was (kept space appended) made it break empty lines forever — a test run reached 13 GB and could not be killed from the session. The packer now places an over-wide piece instead of looping; run risky suites under an in-process watchdog (`threading.Timer(..., os._exit)`), since killing the venv launcher leaves the real python orphaned.
+
+## MIT quality loop — Pipeline Doctor page mode + merge/fit/ink-cluster fixes (2026-10-20)
+
+Branch `feat/mit-quality-loop` (off `integrate/render-reconcile`; lands after #642).
+- **#756 Pipeline Doctor page mode** — `MIT/tools/doctor_page.py <pages…> [--target] [--set sec.key=val] [--tag] [--replay doctor.json]`: runs the production patches path, composites patches **with their alpha** (as the Reader does), and attributes each defect to its first stage (`detect` implausible region · `ocr` · `merge` split/paragraphs/shared/near-miss · `translate` empty/untranslated/Latin · `render` spill/small/suppressed · `composite` blank). `--replay` reuses recorded translations → deterministic render A/B. Pure probes in `tools/pipeline_doctor/page_probes.py`, torch-free tests.
+- **#757 container merge (opt-in `detector.det_bubble_merge` / `MIT_BUBBLE_MERGE=1`)** — caption lines spaced 1.00–1.74× the font were one region per line (strict `< 1.0×` merge gap). Lines sharing one balloon/caption polygon are coalesced when one is a single-line fragment, they chain as one block (gap ≤ 2× font, ≥30% cross-overlap) and none is det_sfx. Caption page: 21 → 8 regions, merge split 3 → 0; Lv2 p1 split 2 → 0. **Opt-in, not default:** exposes the bubble-fit small-font case (#761, now fixed) and needs more pages before a default flip.
+- **#760 ink-cluster rescue** rejected panel-wide light art (a UI-screen panel became a `'d'` region → 120 px glyph). Clusters > 70% page width are not text.
+- **#761 bubble fit** — bisection over a non-monotonic wrap fit returned 13 px where 26 fits; now a descending scan with an area cap. Replay A/B over 17 pages: 182 regions, 2 changed with identical translations, both bigger, none smaller (`docs/reports/benchmarks/2026-10-20-761-bubble-fit-scan.*`).
+- **#759 Thai line breaks** — glue newmm tokens that must not split (prefix `ผู้/นัก/การ/ความ/ชาว/ช่าง` + opener → next; `ๆ/ฯ`, demonstratives `นี้/นั้น/โน้น`, closer → previous; straight `"` alternates); Thai words are atomic in the wrapper (no mid-word char-split); an over-wide compound splits at dictionary sub-words (`_thai_subwords`, `ใน|เวลา|เดียวกัน`). Replay A/B: 0 font changes, spill 7→7, prefix/quote/demonstrative/mid-word breaks fixed (`docs/reports/benchmarks/2026-10-20-759-thai-line-breaks.*`). The `resize_regions_thai` golden caught the mid-word split; regenerated 31→38 px.
+- **#763 translation glitch re-ask (default)** — qwen leaks Chinese/Cyrillic/Korean into Thai under every prompt tried; `CommonTranslator._is_glitched` (via pure `translation_quality.foreign_script`) re-asks only the leaking segment. Corpus: foreign-script segments 1–2/run → **0** (2 runs); clean pages still one call.
+- **#762 prompt A/B (not shipped as default)** — blind judges (Codex sol + Gemini 4 Argon), 2 rounds × 17 pages: variant B won round 1 (11–6, 12–5), tied round 2 (8–9, 8–9) → style difference is below sampling noise. Objective glitch counts favour `tools/prompts/thai_manga_v2.yaml` (untranslated 0, the systematic `ฉันทน` corruption of the default prompt 0). No safe in-app switch yet (`gpt_config` is a host file path) — follow-up on #762.
+- **Lesson:** the first doctor composite pasted patch rectangles without alpha and invented "text missing" findings; any composite must use the patch alpha.
+- **Disk:** a full MIT pytest in a fresh worktree downloads ~4.3 GB of offline translator weights (`test_offline_translators`) — D: hit 0 GB; deselect it in worktrees.
+
 ## #693 — SFX rescue gate: ADR 026 Addendum guard restored on integrate (2026-10-20)
 
 **What:** `MIT/manga_translator/manga_translator.py` rescue site now gates via `ocr_vlm.should_rescue_sfx`

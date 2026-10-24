@@ -61,6 +61,7 @@ const ENV_KEYS = [
   'MIT_DET_INVERT',
   'MIT_DET_GAMMA_CORRECT',
   'MIT_BUBBLE_SEG',
+  'MIT_BUBBLE_MERGE',
   'MIT_FONT_SIZE_OFFSET',
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
@@ -72,6 +73,9 @@ const ENV_KEYS = [
   'MIT_EN_UPPERCASE',
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
+  'MIT_BUBBLE_SYNTH',
+  'MIT_FIT_BELOW_FLOOR',
+  'MIT_WIDEN_VERTICAL_COLUMNS',
   'MIT_PATCH_FEATHER',
   'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
@@ -185,6 +189,30 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.ocr).toEqual({ prob: 0.05 });
   });
 
+  it('exposes det_bubble_synth via env (#894)', () => {
+    process.env.MIT_BUBBLE_SYNTH = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_synth).toBe(true);
+  });
+
+  it('exposes render.fit_below_floor via env (#894)', () => {
+    process.env.MIT_FIT_BELOW_FLOOR = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.fit_below_floor).toBe(true);
+  });
+
+  it('exposes render.widen_vertical_columns via env (#1006)', () => {
+    process.env.MIT_WIDEN_VERTICAL_COLUMNS = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.widen_vertical_columns).toBe(true);
+  });
+
+  it('keeps both absent when their envs are unset (#894)', () => {
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_synth).toBeUndefined();
+    expect(cfg.render.fit_below_floor).toBeUndefined();
+  });
+
   it('exposes detector rescue knobs via env (#167)', () => {
     process.env.MIT_TEXT_THRESHOLD = '0.3';
     process.env.MIT_DET_INVERT = '1';
@@ -219,6 +247,19 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.det_bubble_seg).toBeUndefined();
+  });
+
+  /** #757 container merge — opt-in; coalesces caption lines that share one balloon. */
+  it('enables container merge via MIT_BUBBLE_MERGE (#757)', () => {
+    process.env.MIT_BUBBLE_MERGE = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_merge).toBe(true);
+  });
+
+  it('omits det_bubble_merge unless MIT_BUBBLE_MERGE is exactly "1" (#757)', () => {
+    process.env.MIT_BUBBLE_MERGE = '0';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_merge).toBeUndefined();
   });
 
   /** #166 font-size fidelity — the renderer's auto floor is (img.h+img.w)/200,

@@ -1,0 +1,62 @@
+"""Tests for tools/omission_verify pure helpers."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / 'tools'))
+
+from omission_verify import build_user, combine_passes, flagged, long_pairs, parse_verdicts
+
+
+def _doctor(regions):
+    return {'regions': regions}
+
+
+def test_long_pairs_keeps_only_long_source_lines():
+    doctor = _doctor([
+        {'src': 'ALSO... THIS PIQUED MY CURIOSITY EARLIER IN THE DINING HALL,', 'dst': 'แล้วอีกอย่าง... เมื่อตอนกลางวันในโรงอาหาร'},
+        {'src': 'MAN..', 'dst': 'เฮ้...'},
+        {'src': 'A LONG LINE WITH NO TRANSLATION HERE', 'dst': ''},
+    ])
+    pairs = long_pairs(doctor, min_words=8)
+    assert len(pairs) == 1
+    assert pairs[0][0].startswith('ALSO')
+    assert long_pairs(doctor, min_words=4) == [pairs[0]] or len(long_pairs(doctor, min_words=4)) == 2
+
+
+def test_build_user_numbers_pairs_and_parse_verdicts_round_trips():
+    pairs = [('SRC ONE', 'ไทยหนึ่ง'), ('SRC TWO', 'ไทยสอง')]
+    user = build_user(pairs, offset=3)
+    assert '<|3|> SR: SRC ONE' in user and '<|4|> SR: SRC TWO' in user
+    parsed = parse_verdicts('[{"i":0,"omitted":true,"missing":"x"},{"i":1,"omitted":false}]')
+    assert parsed and len(parsed) == 2
+    assert parse_verdicts('no json here') is None
+
+
+def test_flagged_selects_only_omitted_entries():
+    pairs = [('A', 'a'), ('BB', 'bb')]
+    verdicts = [{'i': 0, 'omitted': True, 'missing': 'clause x'}, {'i': 1, 'omitted': False}]
+    hits = flagged(pairs, verdicts)
+    assert len(hits) == 1 and hits[0][0] == 0 and hits[0][3] == 'clause x'
+    assert flagged(pairs, None) == []
+
+
+def test_combine_passes_keeps_only_agreed_hits():
+    pairs = [('SRC A', 'ก'), ('SRC B', 'ข'), ('SRC C', 'ค')]
+    pass1 = [{'i': 0, 'omitted': True, 'missing': 'x'}, {'i': 1, 'omitted': True, 'missing': 'y'}]
+    pass2 = [{'i': 0, 'omitted': True, 'missing': 'x'}]
+    agreed, disagreed = combine_passes([pass1, pass2], pairs)
+    assert [a[0] for a in agreed] == [0]
+    assert agreed[0][3] == 'x'
+    assert disagreed == [1]
+    assert combine_passes([], pairs) == ([], [])
+
+
+def test_combine_passes_supports_a_majority_threshold():
+    pairs = [('A', 'a'), ('B', 'b'), ('C', 'c')]
+    p1 = [{'i': 0, 'omitted': True}, {'i': 1, 'omitted': True}]
+    p2 = [{'i': 0, 'omitted': True}]
+    p3 = [{'i': 0, 'omitted': True}, {'i': 1, 'omitted': True}]
+    kept, _disagreed = combine_passes([p1, p2, p3], pairs, min_votes=2)
+    assert [k[0] for k in kept] == [0, 1]
+    strictly, _ = combine_passes([p1, p2, p3], pairs)
+    assert [k[0] for k in strictly] == [0]
