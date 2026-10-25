@@ -10,7 +10,6 @@ The web server (server/main.py) spawns this process, which:
 """
 
 import asyncio
-import io
 import logging
 import os
 import pickle

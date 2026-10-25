@@ -361,8 +361,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
         # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
-        details = getattr(response.usage, 'completion_tokens_details', None)
-        reasoning_tokens = getattr(details, 'reasoning_tokens', None) if details is not None else None
+        reasoning_tokens = getattr(getattr(response.usage, 'completion_tokens_details', None), 'reasoning_tokens', None)
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
             f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
