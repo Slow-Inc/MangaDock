@@ -7,7 +7,7 @@ import { useChapterUnlock } from "../hooks/useChapterUnlock";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
-import { levelKey } from "../lib/contentLevel";
+import { levelKey, useContentLevel } from "../lib/contentLevel";
 import { chapterAccess } from "../lib/chapterAccess";
 import { addToHistory } from "../lib/readingHistory";
 import { useAuth } from "../contexts/AuthContext";
@@ -165,6 +165,8 @@ export default function ChapterList({
   onReadyState,
 }: ChapterListProps) {
   const [chapters, setChapters] = useState<MangaChapter[]>([]);
+  // the list depends on the content level: a fetch made before the level loaded is redone when it arrives (#1114)
+  const level = useContentLevel();
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [langFilter, setLangFilter] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -187,17 +189,18 @@ export default function ChapterList({
       },
     });
 
-  // Fetch MangaDex chapters + user-uploaded versions in parallel on mount.
+  // Fetch MangaDex chapters + user-uploaded versions in parallel on mount, and again when the level changes.
   // forceLocal: skips CDN and pulls from local img-cache (set via localStorage).
   // Versions are HWID-gated so apiFetch (not plain fetch) is required.
   useEffect(() => {
+    let cancelled = false; // a slower answer for the previous level must not overwrite this one
     setLoadingChapters(true);
     const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
     const qs = forceLocal ? "?forceLocal=true" : "";
 
     Promise.all([
       cacheOrFetch<MangaChapter[]>(
-        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}${levelKey()}`,
+        `manga:${book.id}:chapters${forceLocal ? ":local" : ""}${levelKey(level)}`,
         () =>
           apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then(async (r) => {
             if (!r.ok) throw new Error("chapters fetch failed");
@@ -213,6 +216,7 @@ export default function ChapterList({
     ])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(([mangaDexChapters, versions]: [MangaChapter[], any[]]) => {
+        if (cancelled) return;
         const tagged = mangaDexChapters.map((ch) => ({ ...ch, source: "mangadex" as const }));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
@@ -241,10 +245,11 @@ export default function ChapterList({
           if (lang) setLangFilter(lang);
         }
       })
-      .catch(() => setLoadingChapters(false));
-  // book.id is stable for the modal's lifetime — intentional single-run
+      .catch(() => { if (!cancelled) setLoadingChapters(false); });
+    return () => { cancelled = true; };
+  // book.id is stable for the modal's lifetime; the level changes at most when it loads or the user changes it
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id]);
+  }, [book.id, level]);
 
   // Surface loading/firstReadable/isEmpty to parent for CTA buttons
   useEffect(() => {

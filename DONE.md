@@ -1,3 +1,14 @@
+## MIT dual-GPU throughput — two transport bugs fixed, 5-worker layout (2026-10-25, #1119)
+
+Branch `fix/mit-worker-transport` (+ dispatch on `feat/mit-gpu-aware-dispatch`, stacked on #1118).
+- Traced where each page's time goes: GPU stages 2–3 s, the remote LLM call ~10 s, and **2.5–13 s lost moving the result from worker to front** (`StreamingResponse(BytesIO)` streams line by line: 30 s vs 0.05 s for 21.6 MB). Fixed with one `Response`.
+- **Front queue dropped waiting requests under concurrency** (instant HTTP 500, 2/10 pages on 4 workers): `update_event` iterated the live list across awaits. Fixed + post-mortem.
+- Results (10 pages, one run each): sequential 21.98 → 14.09 s/page; batch 4.36 s/page with 5 workers on 2 GPUs, 10/10. GPU util target (≥70 %) not met — GPU work is short; both cards now carry pages.
+- Rejected after measuring: hedged translation request (slower sequentially 2/2). Correction: `reasoning_effort=none` was being dropped by `resolve_reasoning_effort`; sent for real it gives 0 reasoning and ~2.3–4.8 s per call but loses a blind A/B 46:76 to `low` → opt-in only. The Backend's chapter path was sequential; PR #1122 → 94.9 s → 26.8–34.5 s for 10 pages on 4 workers. Strata-xeno studied as a reference design; its engine cannot run beside MIT on this PC (RAM) and decodes slower than the gateway.
+- Report: `docs/reports/benchmarks/2026-10-25-mit-dual-gpu-throughput.md`.
+
+---
+
 ## MIT quality loop, post-merge — Strata inference-engine principles applied to MIT (2026-10-24)
 
 Branch `feat/opencode-extra-headers` (PR #1111).
@@ -83,6 +94,59 @@ Branch `feat/opencode-extra-headers` (PR #1111).
 - Added all five native return URLs to the existing hosted project through authenticated Supabase CLI 2.119.0. Preserved ten web URLs, Site URL and all 17 undeclared remote properties; reviewed config updates changed from 1 before push to 0 afterward.
 - Live diagnostic cancellations passed 7/7 destination checks, including Google/Facebook native callbacks and the original web callback. No application source changed; actual account login/device session acceptance remains open. [Evidence and rollback](Mobile/docs/2026-10-05-native-auth-redirects.md).
 - ภาษาไทย: เพิ่ม native URL ทั้งห้าแล้ว คงเว็บเดิม 10 ค่าและ settings อื่น ตรวจปลายทางจริงผ่าน 7/7 ให้ลอง social login ใหม่ได้โดยไม่ต้อง build การตรวจนี้ยังไม่ใช่การเข้าสู่ระบบบัญชีจริง
+
+---
+
+## #1114 Chapter lists follow the content level once it loads (2026-10-24)
+
+**Why:** a friend raised their level, then opened Tanaka-kun wa Mite Iru. (MangaDex `suggestive`: 7 chapters with
+`suggestive` in the rating list, 0 at `safe` only) from home and saw no chapters. The same title from search had
+them.
+- On a page load the client level is `off` until `ContentLevelSync` resolves.
+- `ChapterList` and `HeroDetailButton` fetched once on mount (`[book.id]`), so a popup that mounted earlier sent no
+  token, got the `off` scope, and never re-fetched.
+- The backend log shows the empty chapters request (14:51:10.229) before that page's content-settings read
+  (14:51:10.367).
+
+**What:**
+- Both fetches subscribe to `useContentLevel()` and depend on it. They key on `levelKey(level)` and re-fetch when
+  the level arrives or changes.
+- A cancelled flag stops a slower answer for the previous level from overwriting the new one.
+
+**Validated:**
+- Production build, signed-in fake session at "ชวนคิด", the level answered 1.5 s late. The chapters endpoint answers
+  like the server: chapters only with a token.
+- Before the fix: one tokenless request, and the popup stays on "ไม่มีตอนให้อ่าน".
+- After the fix: two requests, the second carrying the token, and the popup shows "อ่านตอนที่ 1".
+- The level-switch probe still opens home titles with their chapters.
+- Frontend unit tests 511/511, tsc and eslint clean.
+- Note: a clean `next build` panics on the `../docs/**` `outputFileTracingExcludes` (#1064). That is tracked
+  separately in #1115. This verification build ran with that block removed locally; the change was not committed.
+
+---
+
+## #1112 Home page no longer offers titles with nothing to read (2026-10-24)
+
+**Why:** a friend opened the home hero, Sousou no Frieren (`b0b721ff`), and saw "ไม่มีตอนให้อ่าน", while search
+showed a similarly named entry that has chapters.
+- MangaDex still lists `th`/`en` in that title's `availableTranslatedLanguages`.
+- Its feed is empty for every rating and every include flag.
+- `hasAvailableChapters` does not filter it out either.
+- The content level and the caches were ruled out: the backend log and a production E2E run of the level switch
+  both returned chapters for every other home title.
+
+**What:**
+- `MangaDexService.findUnreadable(ids)` checks each title with one `feed?limit=1` request (th + en, every rating),
+  five at a time.
+- Each answer is cached for 24 h (`manga:readable:v1:<id>`). A failed check is neither reported nor cached.
+- `LandingService` drops the reported titles from every row before choosing the hero.
+- The landing key moves to `landing:full:v7`.
+
+**Validated:**
+- jest: 4 new tests for `findUnreadable` and 1 for the landing, red first. Backend 1231/1231.
+- Live: the landing was rebuilt in about 3 s.
+  - Frieren is gone, and the hero is Akuyaku Reijou (48 chapters).
+  - All 63 remaining home titles return chapters.
 
 ---
 

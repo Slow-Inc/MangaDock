@@ -31,6 +31,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [021](021-deployment-and-cost-architecture.md) | Deployment & cost: ephemeral on-demand 2-tier (serverless GPU + shared VPS), near-zero marginal cost, deferred until validated | Infra | Accepted — **planned** |
 | [029](029-frontend-strata-design-system-and-mascots.md) | Frontend design system: Strata tokens, dark default + 3 modes, no purple, one loader family, bot-avatars mascots as profile identity, on-demand ECharts in Studio | Frontend | Accepted — **implementing** (#764) |
 | [022](022-mit-detection-completeness-and-overlap-safe-patches.md) | MIT detection-completeness nets (empty-balloon / white-caption / ink-cluster rescue) + overlap-safe patch alpha + index-based numbered-contract; the Otome-p10 8-defect sweep | MIT | Accepted |
+| [034](034-mit-dual-gpu-serving-layout.md) | MIT dual-GPU serving: 4–5 workers over both cards with least-busy-GPU dispatch; Strata-xeno as reference design, not runtime; hedging rejected | MIT | Accepted (#1119) |
 
 ## Conventions
 

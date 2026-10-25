@@ -32,7 +32,7 @@ function isTranslationLine(line: string): boolean {
 /** Longest description we send to a translation provider (MangaDex descriptions are far shorter). */
 const MAX_DESCRIPTION_CHARS = 6000;
 
-const LANDING_CACHE_KEY = 'landing:full:v6'; // v6: rows are safe-only since #1105
+const LANDING_CACHE_KEY = 'landing:full:v7'; // v6: rows are safe-only (#1105); v7: no unreadable titles (#1112)
 
 /**
  * Landing assembly + Gemini text translation carved out of BooksService (#231,
@@ -351,6 +351,17 @@ export class LandingService {
           : { ...r, items: staleRows.find((s) => s.id === r.id)?.items ?? [] },
       );
     }
+
+    // MangaDex can list a title as translated after its chapters were removed: the home page (and its hero) never
+    // offers one with nothing to read (#1112). A title whose check fails is kept.
+    const unreadable = await this.mangaDex.findUnreadable(
+      rows.flatMap((r) => r.items.map((b) => b.id)),
+    );
+    if (unreadable.size > 0)
+      rows = rows.map((r) => ({
+        ...r,
+        items: r.items.filter((b) => !unreadable.has(b.id)),
+      }));
 
     const hero = rows.find((r) => r.items.length > 0)?.items[0] ?? null;
     const payload: LandingPayload = {

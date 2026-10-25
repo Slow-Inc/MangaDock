@@ -16,6 +16,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
+from ..tls import ssl_context
 
 
 class EmptyContentError(Exception):
@@ -138,6 +139,8 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         if CUSTOM_OPENAI_EXTRA_HEADERS.strip() and not extra_headers:
             self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
         client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
+        # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
+        client_kwargs['http_client'] = openai.DefaultAsyncHttpxClient(verify=ssl_context())
         self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama", **client_kwargs) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
@@ -360,9 +363,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # not populate these fields; log 'n/a' rather than raise if absent.
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
+        reasoning_tokens = getattr(getattr(response.usage, 'completion_tokens_details', None), 'reasoning_tokens', None)
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
-            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
+            f'reasoning={reasoning_tokens if reasoning_tokens is not None else "n/a"} '
+            f'content_chars={len(response.choices[0].message.content or "")} '
+            f'finish={getattr(response.choices[0], "finish_reason", "?")}'
         )
 
         content = response.choices[0].message.content

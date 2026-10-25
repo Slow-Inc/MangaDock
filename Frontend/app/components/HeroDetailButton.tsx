@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { apiFetch } from "../lib/apiFetch";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
-import { levelKey } from "../lib/contentLevel";
+import { levelKey, useContentLevel } from "../lib/contentLevel";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -23,14 +23,17 @@ export default function HeroDetailButton({ book }: Props) {
   const [hasReadable, setHasReadable] = useState<boolean | null>(null); // null = loading
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(book.id);
   const isManga = isUUID || book.thumbnail.includes("mangadex.org");
+  // re-checked when the content level loads or changes: an earlier answer was for another level (#1114)
+  const level = useContentLevel();
 
   useEffect(() => {
     if (!isManga) return;
+    let cancelled = false;
     const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
     const qs = forceLocal ? "?forceLocal=true" : "";
 
     cacheOrFetch<MangaChapterSummary[]>(
-      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}${levelKey()}`,
+      `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}${levelKey(level)}`,
       // a failed load must not be cached — it would hide อ่านเลย until the entry expires (#983)
       () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
         if (!r.ok) throw new Error(`chapters ${r.status}`);
@@ -39,6 +42,7 @@ export default function HeroDetailButton({ book }: Props) {
       TTL.MEDIUM,
     )
       .then((d) => {
+        if (cancelled) return;
         setHasReadable(d.some((ch) => {
           if (forceLocal || ch.isOfflineFallback) {
             return ch.readerAvailable === true;
@@ -46,8 +50,9 @@ export default function HeroDetailButton({ book }: Props) {
           return ch.pageCount > 0;
         }));
       })
-      .catch(() => setHasReadable(false));
-  }, [book.id, isManga]);
+      .catch(() => { if (!cancelled) setHasReadable(false); });
+    return () => { cancelled = true; };
+  }, [book.id, isManga, level]);
 
   function openDetail() {
     setScrollToChapters(false);
