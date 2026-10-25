@@ -1,3 +1,12 @@
+## MIT translator sees the page image (2026-10-26, #1141)
+
+Branch `feat/mit-translate-page-image`.
+- Blind A/B on 29 real pages (captured live request bodies, haiku; judge deepseek with the image): votes text 97 / image 163 / tie 82, pages 8 / 19 / 2. The image fixes OCR slips and speaker gender.
+- `manga_translator/page_image.py`: a per-page contextvar (`page_image_scope`) set by `_run_text_translation`; `custom_openai` puts the JPEG (long side 1568) in front of the numbered segments. On by default (`MIT_TRANSLATE_PAGE_IMAGE=0` turns it off); a 400/422 with the image is retried as text, and only an image-named refusal stops images for that model; the JPEG is encoded in a thread. [ADR 036](docs/adr/036-mit-translator-sees-the-page-image.md).
+- Cost: input tokens ~3x (1,111 -> 3,346 median), call +1.1 s; the real 14-page chapter took 16.6-23.7 s over 5 runs (18.1-22.7 s without the image).
+
+---
+
 ## MIT credit pages no longer re-translated by guards that can never pass (2026-10-26, #1139)
 
 Branch `fix/mit-untranslatable-retry`.

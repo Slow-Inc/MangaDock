@@ -112,6 +112,11 @@ def parse_numbered_translations(response: str, query_size: int):
     return parts
 
 
+#: #1141: models that refused the page image get text-only requests for the rest of the process
+_TEXT_ONLY_MODELS = set()
+_IMAGE_REFUSAL = re.compile(r'image|vision|multimodal|multi-modal', re.I)
+
+
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
     _INVALID_REPEAT_COUNT = 2  # 如果检测到"无效"翻译，最多重复 2 次
     _MAX_REQUESTS_PER_MINUTE = 40  # 每分钟最大请求次数
@@ -358,7 +363,13 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             messages.append({'role': 'user', 'content': lang_chat_samples[0]})
             messages.append({'role': 'assistant', 'content': lang_chat_samples[1]})
 
-        messages.append({'role': 'user', 'content': prompt})
+        # #1141: the page image goes with the request, so the model sees speaker, gender and scene
+        from ..page_image import current_page_image, with_page_image
+        anthropic = protocol_from_env() == 'anthropic'
+        sent_model = anthropic_model(self.model or CUSTOM_OPENAI_MODEL) if anthropic else (self.model or CUSTOM_OPENAI_MODEL)
+        # the first call of a page encodes it; a thread keeps the JPEG encode off the slots' shared event loop
+        page = await asyncio.to_thread(current_page_image) if sent_model not in _TEXT_ONLY_MODELS else None
+        messages.append({'role': 'user', 'content': with_page_image(prompt, page, protocol_from_env()) if page else prompt})
 
         create_kwargs = dict(
             model=self.model or CUSTOM_OPENAI_MODEL,
@@ -382,11 +393,25 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             _extra['reasoning_effort'] = _effort
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
-        if protocol_from_env() == 'anthropic':
-            response = await self._request_anthropic(messages, anthropic_model(create_kwargs['model']),
-                                                     create_kwargs['max_tokens'])
-        else:
-            response = await self.client.chat.completions.create(**create_kwargs)
+        async def send():
+            if anthropic:
+                return await self._request_anthropic(messages, sent_model, create_kwargs['max_tokens'])
+            return await self.client.chat.completions.create(**create_kwargs)
+        try:
+            response = await send()
+        except openai.APIError as e:
+            # #1141: a request the gateway refuses (400/422) with the image goes again as text. Only a refusal that
+            # names the image stops attaching it for this model; any other 400 (e.g. context length) is one-off.
+            refused = isinstance(e, (openai.BadRequestError, openai.UnprocessableEntityError)) or                 str(e).startswith(('Anthropic endpoint 400', 'Anthropic endpoint 422'))
+            if not page or not refused:
+                raise
+            if _IMAGE_REFUSAL.search(str(e)):
+                _TEXT_ONLY_MODELS.add(sent_model)
+                self.logger.warning(f'{sent_model} rejected the page image ({e}); sending text only from now on')
+            else:
+                self.logger.warning(f'request with the page image refused ({e}); retrying this one as text')
+            messages[-1]['content'] = prompt
+            response = await send()
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
