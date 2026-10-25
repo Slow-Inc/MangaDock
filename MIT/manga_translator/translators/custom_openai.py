@@ -16,6 +16,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
+from ..anthropic_messages import anthropic_endpoint, from_anthropic_response, protocol_from_env, to_anthropic_payload
 
 
 class EmptyContentError(Exception):
@@ -137,6 +138,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         extra_headers = parse_extra_headers(CUSTOM_OPENAI_EXTRA_HEADERS)
         if CUSTOM_OPENAI_EXTRA_HEADERS.strip() and not extra_headers:
             self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
+        self._extra_headers = extra_headers or {}
         client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
         self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama", **client_kwargs) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
@@ -310,6 +312,21 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         return translations
 
+    async def _request_anthropic(self, messages, model, max_tokens):
+        """#1119: the same request on the Anthropic Messages protocol (CUSTOM_OPENAI_PROTOCOL=anthropic).
+
+        Non-200 answers raise openai.APIError so the existing server-error retry loop handles them.
+        """
+        import httpx
+        url = anthropic_endpoint(str(self.client.base_url))
+        headers = {'Authorization': f'Bearer {self.client.api_key}', 'anthropic-version': '2023-06-01',
+                   **self._extra_headers}
+        async with httpx.AsyncClient(timeout=self._TIMEOUT * 2) as http:
+            r = await http.post(url, headers=headers, json=to_anthropic_payload(messages, model, max_tokens))
+        if r.status_code != 200:
+            raise openai.APIError(f'Anthropic endpoint {r.status_code}: {r.text[:300]}', request=r.request, body=None)
+        return from_anthropic_response(r.json())
+
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
         messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
@@ -343,7 +360,10 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             _extra['reasoning_effort'] = _effort
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
-        response = await self.client.chat.completions.create(**create_kwargs)
+        if protocol_from_env() == 'anthropic':
+            response = await self._request_anthropic(messages, create_kwargs['model'], create_kwargs['max_tokens'])
+        else:
+            response = await self.client.chat.completions.create(**create_kwargs)
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
