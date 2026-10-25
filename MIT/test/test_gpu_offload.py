@@ -48,3 +48,38 @@ def test_enabled_frees_the_loop_and_serialises_forwards():
     starts = sorted(e[3] for e in log if e[0] == "start"); ends = sorted(e[3] for e in log if e[0] == "end")
     assert starts[1] >= ends[0]                                    # one forward at a time
     assert len(ticks) == 8 and ticks[3] < ends[-1]                 # the loop kept running meanwhile
+
+
+def test_call_runs_a_sync_gpu_function_under_the_same_lock():
+    """The YOLO balloon/SFX passes are plain functions outside ModelWrapper: they must not run on the loop while an
+    offloaded forward (OCR, which turns cuDNN off process-wide) holds the GPU."""
+    gpu_offload.set_enabled(True)
+    log = []
+
+    def yolo():
+        log.append(("start", "yolo", threading.get_ident(), time.perf_counter()))
+        time.sleep(0.05)
+        log.append(("end", "yolo", threading.get_ident(), time.perf_counter()))
+        return "boxes"
+
+    try:
+        async def main():
+            loop_thread = threading.get_ident()
+            res = await asyncio.gather(gpu_offload.run(_blocking_forward(log, "ocr")), gpu_offload.call(yolo))
+            return res, loop_thread
+        res, loop_thread = asyncio.run(main())
+    finally:
+        gpu_offload.set_enabled(False)
+    assert res == ["ocr", "boxes"]
+    assert all(e[2] != loop_thread for e in log)
+    starts = sorted(e[3] for e in log if e[0] == "start"); ends = sorted(e[3] for e in log if e[0] == "end")
+    assert starts[1] >= ends[0]
+
+
+def test_call_disabled_is_a_plain_call():
+    gpu_offload.set_enabled(False)
+
+    async def main():
+        return await gpu_offload.call(lambda a, b: (a, b, threading.get_ident()), 1, 2), threading.get_ident()
+    (a, b, tid), loop_thread = asyncio.run(main())
+    assert (a, b, tid) == (1, 2, loop_thread)

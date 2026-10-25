@@ -45,12 +45,14 @@ async def run_detection(config, ctx, device, verbose):
                                     device, verbose)
     # #168: optional SFX/outside-bubble second pass (AnimeText YOLO). Boxes the
     # primary detector missed are appended as empty textlines for OCR to read.
+    # #1123: both are YOLO forwards outside ModelWrapper - gpu_offload.call keeps them under the GPU lock.
+    from . import gpu_offload
     if config.detector.det_sfx:
-        result = merge_sfx_detections(ctx, result, device)
+        result = await gpu_offload.call(merge_sfx_detections, ctx, result, device)
     # #535 empty-balloon rescue: an inked balloon DBNet left uncovered is missed text
     # (the Otome "STARTING WITH…" caption). Needs the balloon model → same gate.
     if config.detector.det_bubble_seg:
-        result = merge_empty_balloons(ctx, result, device)
+        result = await gpu_offload.call(merge_empty_balloons, ctx, result, device)
     return result
 
 

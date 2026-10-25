@@ -36,3 +36,16 @@ async def run(make_coro):
     if not _enabled:
         return await make_coro()
     return await asyncio.to_thread(_run_locked, make_coro)
+
+
+def _call_locked(fn, args):
+    with _gpu:
+        return fn(*args)
+
+
+async def call(fn, *args):
+    """Run a synchronous GPU function (the YOLO balloon/SFX passes, outside ModelWrapper) - inline, or in a thread
+    under the same GPU lock. Without the lock it ran on the loop while an offloaded OCR forward had cuDNN off."""
+    if not _enabled:
+        return fn(*args)
+    return await asyncio.to_thread(_call_locked, fn, args)
