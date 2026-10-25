@@ -961,6 +961,12 @@ class MangaTranslator:
 
     @_timed_stage("translation")
     async def _run_text_translation(self, config: Config, ctx: Context):
+        # #1141: every translation call of this page (retries included) carries the page image
+        from .page_image import page_image_scope
+        with page_image_scope(getattr(ctx, 'img_rgb', None)):
+            return await self._translate_page_texts(config, ctx)
+
+    async def _translate_page_texts(self, config: Config, ctx: Context):
         # 检查text_regions是否为None或空
         if not ctx.text_regions:
             return []
