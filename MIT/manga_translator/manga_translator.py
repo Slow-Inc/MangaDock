@@ -1748,10 +1748,7 @@ class MangaTranslator:
             except Exception:
                 logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
 
-        await self._report_progress('mask-generation')
-        await self._report_progress('inpainting')
-        await self._report_progress('rendering')
-
+        # #1137: each back stage reports when it starts (they used to be reported together, before the work)
         pad = 40
         render_extra = 80
         patches = []
@@ -1782,6 +1779,7 @@ class MangaTranslator:
         if getattr(config.inpainter, 'full_page_inpaint', False):
             try:
                 ctx.text_regions = regions
+                await self._report_progress('mask-generation')
                 full_mask = await self._run_mask_refinement(config, ctx)
                 text_only = create_text_only_mask(img_h, img_w, regions)
                 if full_mask is not None:
@@ -1818,6 +1816,7 @@ class MangaTranslator:
                 if getattr(config.inpainter, 'mask_tighten', False):
                     from .patch_geometry import tighten_text_mask
                     ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
+                await self._report_progress('inpainting')
                 full_inpainted = await self._run_inpainting(config, ctx)
                 # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
                 # reconstructs faint text from the stroke stubs around a tight mask —
@@ -1859,6 +1858,8 @@ class MangaTranslator:
             full_inpainted=full_inpainted,
         )
 
+        # #1137: with the full-page inpaint done, the groups only render; per-crop, each group still erases first
+        await self._report_progress('rendering' if full_inpainted is not None else 'inpainting')
         # Fire all groups concurrently (semaphore gates GPU work)
         results = await asyncio.gather(*[renderer.process_group(g) for g in region_groups], return_exceptions=True)
         for r in results:
