@@ -34,3 +34,28 @@ def test_contained_child_dies_when_the_job_closes():
 
 def test_contain_none_is_a_harmless_no():
     assert win_process.contain(None) is False
+
+
+@windows_only
+def test_a_process_in_its_own_job_takes_its_grandchildren_down_when_killed():
+    # The front joins the job itself (contain_self) before spawning, so the venv launcher AND the interpreter it
+    # starts are born inside the job: no window where a grandchild escapes (#1118 review of eff473e9).
+    code = ("import subprocess, sys, time\n"
+            "from server import win_process\n"
+            "assert win_process.contain_self()\n"
+            "g = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+            "print(g.pid, flush=True)\n"
+            "time.sleep(60)\n")
+    parent = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True,
+                              cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    grandchild = int(parent.stdout.readline())
+    parent.kill()                                      # what a force-kill of the front does
+    parent.wait(10)
+    import psutil
+    deadline = time.time() + 10
+    while psutil.pid_exists(grandchild) and time.time() < deadline:
+        time.sleep(0.1)
+    alive = psutil.pid_exists(grandchild)
+    if alive:
+        psutil.Process(grandchild).kill()
+    assert not alive

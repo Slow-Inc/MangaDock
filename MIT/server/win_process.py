@@ -3,8 +3,10 @@
 - ``no_throttle``: opt a process out of Windows power throttling (EcoQoS). Windows 11 treats a process with a
   hidden or minimized window as background work and, on a hybrid CPU (this PC's i5-13500: 6 P + 8 E cores), moves
   its threads to the E-cores; Strata measured ~20 % slower generation from it (Strata #691).
-- ``contain``: put a spawned worker in a kill-on-close job object, so it dies with the front even when the front is
-  force-killed (an orphan worker would keep its port and serve stale code).
+- ``contain_self``: put the front in a kill-on-close job object before it spawns workers; every worker (the venv
+  launcher and the interpreter it starts) inherits the job and dies with the front, even when the front is
+  force-killed (an orphan worker would keep its port and serve stale code). ``contain`` does the same for one
+  already-started process.
 
 Both are no-ops returning False off Windows or on failure. Pure ctypes, no ML imports.
 """
@@ -67,6 +69,19 @@ if os.name == "nt":
             return None
         return job
 
+    def contain_self() -> bool:
+        """Put THIS process in the kill-on-close job (+ EcoQoS off). Children spawned afterwards inherit the job, so a
+        venv launcher and the interpreter it starts are both covered with no race; when this process dies, the job's
+        last handle closes and every one of them is killed."""
+        global _job
+        with _lock:
+            if _job is None:
+                _job = _make_job() or 0
+            if not _job:
+                return False
+        no_throttle()
+        return bool(_k32.AssignProcessToJobObject(_job, _k32.GetCurrentProcess()))
+
     def contain(proc) -> bool:
         """Kill-on-close job + EcoQoS off for a started ``subprocess.Popen``. True when it joined the job."""
         global _job
@@ -87,4 +102,7 @@ else:
         return False
 
     def contain(proc) -> bool:
+        return False
+
+    def contain_self() -> bool:
         return False
