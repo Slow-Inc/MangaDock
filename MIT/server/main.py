@@ -38,6 +38,7 @@ from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
+from server.win_process import contain
 from server.worker_plan import exited_worker_ports, plan_extra_workers, worker_settings_from_env
 from server.path_utils import safe_result_folder
 from server import metrics, diagnostics, auth as dev_auth
@@ -603,6 +604,9 @@ def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=No
         env = os.environ.copy()
         env['CUDA_VISIBLE_DEVICES'] = str(device)
     proc = subprocess.Popen(cmds, cwd=parent, env=env)
+    # #1119 (Strata-xeno serve/winjob.py): a kill-on-close job, so the worker dies with the front even when the
+    # front is force-killed (an orphan would keep its port and serve stale code). Also opts it out of EcoQoS.
+    contain(proc)
     _WORKER_PROCS.append(proc)
     _WORKER_PORT_PROCS[port] = proc
     where = f"GPU {device}" if device is not None else "front GPU"
