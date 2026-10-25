@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   translateMangaChapterBatchPatches,
-  translateMangaPagePatches,
+  translatePageWithProgress,
   checkMitHealth,
   isCaptchaExpiredError,
   type PatchData,
@@ -371,12 +371,17 @@ export function useChapterTranslation(
     setPageElapsedSec(0);
     console.log(`[PageTranslate] Translating page ${pageIndex + 1} (index ${pageIndex}):`, pageUrl);
     try {
-      const patches = await translateMangaPagePatches(chapterId, pageIndex, pageUrl, undefined, {
-        sourceLang: sourceLang ?? undefined,
-        targetLang,
-        imageModel: await getEffectiveImageModel(),
-        derivative,
-      });
+      // #1137: through the batch stream, so the label follows MIT's live stages for this page too
+      stageTrackerRef.current.reset();
+      const patches = await translatePageWithProgress(
+        chapterId,
+        pageIndex,
+        pageUrl,
+        { sourceLang: sourceLang ?? undefined, targetLang, imageModel: await getEffectiveImageModel(), derivative },
+        (stage) => {
+          if (!stale()) setCurrentStage(stageTrackerRef.current.stage(pageIndex, stage));
+        },
+      );
       if (stale()) return;
       console.log(`[PageTranslate] Page ${pageIndex + 1} done — ${patches.length} patches:`, patches);
       if (patches.length > 0) {
@@ -406,6 +411,8 @@ export function useChapterTranslation(
         setTranslatingCurrentPage(false);
         setTranslatingCurrentPageIndex(null);
         pageStartRef.current = null;
+        stageTrackerRef.current.reset();
+        setCurrentStage(null);
       }
     }
   };
