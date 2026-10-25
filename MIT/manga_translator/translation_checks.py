@@ -14,9 +14,12 @@ logger = logging.getLogger('manga_translator')
 
 
 _PLAIN_WORD = re.compile(r"^[A-Za-z][A-Za-z'’-]+[!?.,…]*$")
-#: a URL, e-mail, domain or wallet/handle-like token (letters mixed with digits) — no translation can change it
+#: a URL, e-mail, domain or wallet address — no translation can change it. Shaped tightly so dialogue does not match:
+#: `WAIT...WHAT`, `MR.SMITH`, a grawlix `@#%!` and a short ID like `ab12cd34ef` stay outside.
 _UNTRANSLATABLE_TOKEN = re.compile(
-    r'\S*(?:@|https?://|www\.|\.[A-Za-z]{2,}\b)\S*|\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{8,}\b')
+    r'https?://\S+|www\.\S+|\w@\w+\.\w'
+    r'|\b[A-Za-z0-9-]+\.(?:com|net|org|io|gg|me|co|xyz|to|pm|tv)\b'
+    r'|\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{16,}\b', re.I)
 
 
 def _verbatim(text: str, translation: str) -> bool:
@@ -50,7 +53,8 @@ def check_target_language_ratio(text_regions: List, target_lang: str,
 
     answered = [r for r in text_regions if getattr(r, 'translation', '') and r.translation.strip()]
     judged = answered
-    if any(_credit_line(r) for r in answered):
+    # a credit page carries several addresses/links; one alone is not enough to exempt short lines
+    if sum(_credit_line(r) for r in answered) >= 2:
         judged = [r for r in answered
                   if not _kept_untranslatable(getattr(r, 'text', ''), r.translation, script_ratio(r.translation, target_lang))]
     # a page where every line came back verbatim was not translated at all: judge it whole (#1139)

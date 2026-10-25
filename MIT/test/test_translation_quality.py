@@ -435,3 +435,9 @@ def test_name_detection_holes_found_in_review_1139():
     assert u('Done.  Materials are here', 'เสร็จแล้ว Materials อยู่ตรงนี้นะจ๊ะ')
     assert u('Wait…Materials are here', 'เดี๋ยว Materials อยู่ตรงนี้นะจ๊ะ')
     assert u('Bring The Resource Materials Now', 'เอา Materials มาเดี๋ยวนี้เลยนะจ๊ะ')
+
+
+def test_a_platform_word_does_not_hide_the_rest_of_the_line_1139():
+    from manga_translator.translation_quality import untranslated_source_word as u
+    assert u('DONATELLO, GRAB THE MATERIALS!', 'โดนาเทลโล่ ไปหยิบ MATERIALS มาเร็วเข้า!')
+    assert u('THERE IS DISCORD AMONG THE MATERIALS', 'มีความขัดแย้งกันเรื่อง MATERIALS อยู่นะ')

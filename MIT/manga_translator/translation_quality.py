@@ -514,11 +514,13 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
 _LATIN_WORD = re.compile(r'[A-Za-z]{4,}')
 _THAI_CHAR = re.compile('[\u0E00-\u0E7F]')
 _CREDIT_SRC = re.compile(
-    # #1139: donation lines on scanlator credit pages name the platform, which stays Latin (`Plz Paypal.`)
-    r'(TRANSLAT|TRANSLATED BY|WRIT|DRAW|DESIGN|LETTER|EDITING|EDITOR|AUTHOR|STORY|THANKS|SPECIAL|CREDIT|CLEAN|TYPESET|PUBLISH|ART BY'
-    r'|PAYPAL|PATREON|DISCORD|KO-?FI|DONAT)',
+    r'(TRANSLAT|TRANSLATED BY|WRIT|DRAW|DESIGN|LETTER|EDITING|EDITOR|AUTHOR|STORY|THANKS|SPECIAL|CREDIT|CLEAN|TYPESET|PUBLISH|ART BY)',
     re.I)
 _VOWELS = set('AEIOUaeiou')
+
+
+#: #1139: donation platforms named on scanlator credit pages stay Latin (`Plz Paypal.`); only the word is exempt.
+_PLATFORM_WORDS = {'PAYPAL', 'PATREON', 'DISCORD', 'KOFI'}
 
 
 _URLISH = re.compile(r'(?:https?://|www\.)\S+|\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\b')
@@ -557,7 +559,7 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
     src_words = {w.upper() for w in _LATIN_WORD.findall(src)}
     # URLs / domains in the source or answer are legitimate Latin: `READ MORE CHAPTERS AT KDTSCANS.COM`
     # ships as `อ่านต่อได้ที่ KDTSCANS.COM`, not a lost translation (measured on unseen pages).
-    url_words = _url_words(src) | _url_words(dst)
+    url_words = _url_words(src) | _url_words(dst) | _PLATFORM_WORDS
     for word in _LATIN_WORD.findall(dst):
         upper = word.upper()
         # exact source word, or a partial copy glued into the Thai (observed: MATERIALS -> 'ATERIALS' after the

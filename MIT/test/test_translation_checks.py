@@ -119,3 +119,17 @@ def test_a_foreign_script_line_returned_verbatim_still_counts_1139():
     page = [_Pair("今日はいい天気ですね", "今日はいい天気ですね"), _Pair("明日も晴れるといいな", "明日も晴れるといいな"),
             _Pair("SEE YOU", "แล้วเจอกัน"), _Pair("https://discord.gg/x8sjNQP", "https://discord.gg/x8sjNQP")]
     assert check_target_language_ratio(page, "THA", target_script_ratio) is False
+
+
+def test_dialogue_punctuation_does_not_look_like_a_credit_page_1139():
+    shouts = ["HUH?!", "NO WAY!", "STOP IT!", "WHAT?", "GET OUT!"]
+    for odd in ["WAIT...WHAT?!", "WHAT THE @#%!", "MR.SMITH", "ID: ab12cd34ef"]:
+        page = [_Pair(l, l) for l in shouts + [odd]]
+        page.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
+        assert check_target_language_ratio(page, "THA", target_script_ratio) is False, odd
+
+
+def test_one_url_alone_does_not_open_the_credit_exemption_1139():
+    page = [_Pair(l, l) for l in ["HUH?!", "NO WAY!", "STOP IT!", "WHAT?", "www.x.com"]]
+    page.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
+    assert check_target_language_ratio(page, "THA", target_script_ratio) is False

@@ -20,12 +20,14 @@ last page finished 39–46 s after the page before it. The retry log lines never
 ## Decision
 
 1. **On a credit page, the ratio check skips short Latin lines handed back verbatim.** A page counts as a credit page
-   when at least one line came back verbatim and holds a URL, an e-mail or a wallet-like token (letters mixed with
-   digits, 8+ characters). On such a page, a verbatim line is skipped only when its source is ASCII, it has no
+   when at least two lines came back verbatim and hold a URL, an e-mail, a domain with a known TLD, or a wallet-like
+   token (letters mixed with digits, 16+ characters). The token is shaped so dialogue does not match: `WAIT...WHAT`,
+   `MR.SMITH`, a grawlix `@#%!` and a short ID stay outside. On such a page, a verbatim line is skipped only when its source is ASCII, it has no
    target-script letter, and it has fewer than 4 plain words (a coin name, an address, a handle). Every other page is
    judged exactly as before. A page whose every answer is verbatim is judged whole.
-2. **`untranslated_source_word` treats donation-platform lines as credit lines.** `PAYPAL|PATREON|DISCORD|KO-FI|DONAT`
-   joins the existing `_CREDIT_SRC` list (`TRANSLATED BY`, `CREDIT`, ...), which the guard already skips.
+2. **`untranslated_source_word` lets donation-platform names stay Latin.** `PAYPAL`, `PATREON`, `DISCORD` and `KOFI`
+   join the words the guard already exempts (the URL words). The exemption covers only the word, so the rest of the
+   line is still checked.
 
 ## Alternatives considered
 
@@ -37,14 +39,15 @@ last page finished 39–46 s after the page before it. The retry log lines never
 - **First revision (reviewed and replaced before merge):** skip any short verbatim line on any page, and treat
   mid-sentence Capitalised words as names. Independent review found inputs that slip through: verbatim Japanese
   lines, short English shouts hidden behind one Thai line, and quote, ellipsis or Title Case sources that
-  defeat the name regex. Gating on the credit-page signal and reusing `_CREDIT_SRC` closes all of them with less
-  code.
+  defeat the name regex. A second revision gated the exemption on one credit line and skipped whole donation lines,
+  but `WAIT...WHAT?!`, `@#%!` and `MR.SMITH` could open that gate, and `DONATELLO, GRAB THE MATERIALS!` went
+  unchecked. The final rule needs two tightly shaped credit lines and exempts platform names word by word.
 
 ## Consequences
 
-- Credit page: 1 LLM call, 7.8–14.2 s (it was 24–40 s with 4–8 calls). Real chapter: 18.8–23.8 s (it was
-  58.5–60.1 s). The last-page gap is 2.3–6.0 s (it was 39–46 s).
-- Replayed against the session logs: across 577 page translations, only credit pages change verdict (67 flips, fail →
-  pass), and none gets stricter. Of 4,112 segments, the only ones no longer flagged as untranslated words are the
+- Credit page: 1 LLM call, 7.9–11.3 s (it was 24–40 s with 4–8 calls). Real chapter: 18.1–22.7 s (it was
+  58.5–60.1 s). The last-page gap is 1.1–5.9 s (it was 39–46 s).
+- Replayed against the session logs: across 586 page translations, only credit pages change verdict (69 flips, fail →
+  pass), and none gets stricter. Of 4,188 segments, the only ones no longer flagged as untranslated words are the
   `Paypal`/`Patreon` donation lines.
-- A dialogue line that mentions Discord, Patreon or PayPal is no longer checked for leftover English words.
+- A dialogue line may keep the words Discord, Patreon, PayPal or Kofi in Latin. The rest of the line is still checked.
