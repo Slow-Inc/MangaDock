@@ -1,3 +1,12 @@
+## MIT credit pages no longer re-translated by guards that can never pass (2026-10-26, #1139)
+
+Branch `fix/mit-untranslatable-retry`.
+- Root cause of "the last page of a chapter finishes far later": the last page is usually the scanlator credit page (6/7 chapters the developer translated). Its wallet addresses and URLs kept the page-level Thai ratio at 0.37-0.42, so `single_page_lang_check_retry` re-translated the page 3 more times, and `untranslated_source_word` re-asked once per call for `Paypal`/`Patreon`.
+- Fix: on a page with 2+ verbatim URL/e-mail/domain/wallet lines (credit-page signal), the ratio check skips short Latin lines handed back verbatim; every other page is judged as before. Donation-platform names (PAYPAL/PATREON/DISCORD/KOFI) are exempt word by word in the untranslated-word guard. Two broader revisions were caught by independent review before merge. [ADR 035](docs/adr/035-mit-post-translation-guards-skip-untranslatable-text.md).
+- Measured live: credit page 4-8 LLM calls / 24-40 s -> 1 call / 8-11 s; real 14-page chapter 58.5-60.1 s -> 18.1-22.7 s, last-page gap 39-46 s -> 1.1-5.9 s. Replay over 586 logged page translations: only credit pages change verdict, none stricter.
+
+---
+
 ## MIT dual-GPU throughput — two transport bugs fixed, 5-worker layout (2026-10-25, #1119)
 
 Branch `fix/mit-worker-transport` (+ dispatch on `feat/mit-gpu-aware-dispatch`, stacked on #1118).
