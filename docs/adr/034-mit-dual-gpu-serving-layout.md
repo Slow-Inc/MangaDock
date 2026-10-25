@@ -44,3 +44,11 @@ plus 2.5–13 s lost moving the result from worker to front (`StreamingResponse(
   (10–11 %) because GPU work is short. "Full efficiency" means both cards serve pages concurrently.
 - Single-page latency is bounded by the LLM call; further gains need a faster model or the deferred overlaps.
 - Five workers leave ~0.8 GB VRAM on the display card.
+
+## Update (2026-10-25, later): one process per card with slots
+
+Measured after the fixes above (claude-haiku translation, 10-page Backend chapter path): 4 single-slot workers reach
+**38.1 GB** private memory after a run; **2 workers (one per card) × 5 slots** (`MIT_WORKERS=2`, `MIT_WORKER_GPUS=1,0`,
+`MIT_WORKER_SLOTS=5`, PR #1128) run the chapter in the same time with **22.4 GB**, and avoid same-card CUDA-context
+contention (3 workers on one card slowed detection 2.5×). A FIFO lock over detect/OCR inside a worker lets the first
+pages reach the LLM at ~2 s instead of ~12 s. This supersedes the "4–5 workers" layout in Decision 1 for this PC.
