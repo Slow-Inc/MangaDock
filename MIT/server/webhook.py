@@ -18,6 +18,8 @@ import time
 
 import httpx
 
+from manga_translator.tls import ssl_context   # #1119: a client per event, not an SSLContext per event
+
 # Per-attempt HTTP timeout (seconds). The webhook target is the co-located
 # Backend, so a healthy call returns quickly; keep this tight so a retry chain
 # does not stall the batch translation loop.
@@ -71,7 +73,7 @@ async def send_webhook(url: str, secret: str, payload: dict) -> None:
     backoff_ms = _int_env("MIT_WEBHOOK_RETRY_BACKOFF_MS", 500)
 
     last_reason = "unknown"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=ssl_context()) as client:
         for attempt in range(max_retries + 1):
             try:
                 resp = await client.post(url, content=data, headers=headers, timeout=_TIMEOUT_S)
@@ -112,7 +114,7 @@ async def send_progress(url: str, secret: str, payload: dict) -> None:
     if secret:
         headers["x-mit-signature"] = _sign(secret, data)
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=ssl_context()) as client:
             await client.post(url, content=data, headers=headers, timeout=_PROGRESS_TIMEOUT_S)
     except Exception:
         pass  # informational only — never disturb the translation pipeline
@@ -147,7 +149,7 @@ async def send_telemetry(parent_url: str, nonce: str, payload: dict) -> None:
     """POST one telemetry message to the parent's /internal/telemetry. Single attempt,
     short timeout, all failures swallowed."""
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=ssl_context()) as client:
             await client.post(f"{parent_url.rstrip('/')}/internal/telemetry", json=payload,
                               headers={"X-Nonce": nonce}, timeout=_PROGRESS_TIMEOUT_S)
     except Exception:

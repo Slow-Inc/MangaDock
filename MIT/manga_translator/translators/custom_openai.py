@@ -16,6 +16,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
+from ..tls import ssl_context
 from ..anthropic_messages import anthropic_endpoint, anthropic_model, post_messages, protocol_from_env, to_anthropic_payload
 
 
@@ -140,6 +141,8 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
         self._extra_headers = extra_headers or {}
         client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
+        # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
+        client_kwargs['http_client'] = openai.DefaultAsyncHttpxClient(verify=ssl_context())
         self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama", **client_kwargs) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
@@ -329,7 +332,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         """
         import httpx
         if getattr(self, '_anthropic_http', None) is None:
-            self._anthropic_http = httpx.AsyncClient(timeout=None)   # one connection pool per translator
+            self._anthropic_http = httpx.AsyncClient(timeout=None, verify=ssl_context())   # one pool per translator
         headers = {'Authorization': f'Bearer {self.client.api_key}', 'anthropic-version': '2023-06-01',
                    **self._extra_headers}
         return await post_messages(self._anthropic_http, anthropic_endpoint(str(self.client.base_url)), headers,
@@ -389,9 +392,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # not populate these fields; log 'n/a' rather than raise if absent.
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
+        reasoning_tokens = getattr(getattr(response.usage, 'completion_tokens_details', None), 'reasoning_tokens', None)
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
-            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
+            f'reasoning={reasoning_tokens if reasoning_tokens is not None else "n/a"} '
+            f'content_chars={len(response.choices[0].message.content or "")} '
+            f'finish={getattr(response.choices[0], "finish_reason", "?")}'
         )
 
         content = response.choices[0].message.content

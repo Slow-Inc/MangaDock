@@ -602,6 +602,46 @@ export class MangaDexService {
   }
 
   /**
+   * The titles among `ids` with nothing to read: MangaDex can still list a title as translated after its chapters
+   * were removed, and its own `availableTranslatedLanguage`/`hasAvailableChapters` filters keep it (#1112). One
+   * `limit=1` feed request per uncached title (the languages getMangaChapters reads, every rating), five at a time,
+   * each answer cached for a day. A failed check is neither reported nor cached.
+   */
+  async findUnreadable(ids: string[]): Promise<Set<string>> {
+    const unreadable = new Set<string>();
+    const unique = [...new Set(ids)];
+    const check = async (id: string) => {
+      const key = `manga:readable:v1:${id}`;
+      const hit = await this.cache.get<boolean>(key);
+      if (hit) {
+        if (!hit.data) unreadable.add(id);
+        return;
+      }
+      const params = new URLSearchParams();
+      params.append('translatedLanguage[]', this.getMangaLanguage());
+      params.append('translatedLanguage[]', 'en');
+      params.set('limit', '1');
+      for (const r of ['safe', 'suggestive', 'erotica', 'pornographic'])
+        params.append('contentRating[]', r);
+      try {
+        const res = await this.mangadexFetch(
+          `https://api.mangadex.org/manga/${id}/feed?${params.toString()}`,
+        );
+        if (!res.ok) return;
+        const { total } = (await res.json()) as { total?: number };
+        if (typeof total !== 'number') return;
+        await this.cache.set(key, total > 0, 24 * 60 * 60 * 1000);
+        if (total === 0) unreadable.add(id);
+      } catch {
+        // unknown: keep the title
+      }
+    };
+    for (let i = 0; i < unique.length; i += 5)
+      await Promise.all(unique.slice(i, i + 5).map(check));
+    return unreadable;
+  }
+
+  /**
    * The MangaDex content rating of titles known only by id (reading history), so their lists can respect the 18+
    * level (#1105). Cached per title for a day; one MangaDex request for the uncached ones (≤ 100 ids). An id
    * MangaDex does not return is left out — unknown, never guessed safe.

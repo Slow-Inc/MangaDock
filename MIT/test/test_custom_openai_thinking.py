@@ -71,3 +71,32 @@ def test_request_sends_thinking_off_body_by_default(monkeypatch):
 
 def test_request_sends_no_extra_body_when_thinking_enabled(monkeypatch):
     assert _extra_body_sent_by_request(monkeypatch, 'true') is None
+
+
+def test_translator_clients_share_the_tls_context():
+    """#1119: building the translator must not build a new SSLContext (~140 ms of CPU) for its client."""
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    assert t.client._client._transport._pool._ssl_context is tls.ssl_context()
+
+
+def test_the_anthropic_client_shares_the_tls_context(monkeypatch):
+    """#1119: the Anthropic-protocol client is built per translator (per page with worker slots) - no new SSLContext."""
+    import asyncio
+    import httpx
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    seen = []
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: seen.append(k.get("verify")) or real(*a, **k))
+
+    async def main():
+        try:
+            await t._request_anthropic([{"role": "user", "content": "x"}], "m", 8)
+        except Exception:
+            pass   # no gateway here; only the client construction matters
+
+    asyncio.run(main())
+    assert seen == [tls.ssl_context()]

@@ -16,6 +16,7 @@ function makeDeps(opts: {
   rowDefs?: Array<{ id: string; title: string; order: string; limit?: number }>;
   env?: Record<string, string>;
   imageCache?: Record<string, unknown>;
+  unreadable?: string[];
 }) {
   const cache = {
     get: jest.fn(async () =>
@@ -32,6 +33,7 @@ function makeDeps(opts: {
     ],
     fetchMangaForRow:
       opts.rowFetch ?? jest.fn().mockResolvedValue({ items: [] }),
+    findUnreadable: jest.fn().mockResolvedValue(new Set(opts.unreadable ?? [])),
   };
   const geminiCatalog = {
     getMangaModels: jest.fn().mockResolvedValue(['gemini-2.5-flash']),
@@ -105,6 +107,24 @@ describe('LandingService — landing assembly + description (#231)', () => {
     expect(out.hero).toEqual({ id: 'a', thumbnail: 't' });
     expect(out.apiOffline).toBeUndefined();
     expect(cache.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops titles with nothing to read, so the hero is a readable one (#1112)', async () => {
+    const { svc, mangaDex } = makeDeps({
+      rowFetch: jest.fn().mockResolvedValue({
+        items: [
+          { id: 'gone', thumbnail: 't' },
+          { id: 'a', thumbnail: 't' },
+        ],
+      }),
+      unreadable: ['gone'],
+    });
+
+    const out = await svc.getLandingBooks();
+
+    expect(mangaDex.findUnreadable).toHaveBeenCalledWith(['gone', 'a']);
+    expect(out.hero).toEqual({ id: 'a', thumbnail: 't' });
+    expect(out.rows[0].items.map((b) => b.id)).toEqual(['a']);
   });
 
   it('fills a row that came back empty from the stale landing, and caches only briefly (#865)', async () => {
