@@ -257,6 +257,10 @@ class MangaTranslatorShared:
         self.params = params
 
     async def start(self):
+        # #1119 (Strata-xeno serve/winjob.py): the worker opts itself out of EcoQoS; a hidden-window process on a
+        # hybrid CPU may otherwise be scheduled on the E-cores.
+        from server.win_process import no_throttle
+        no_throttle()
         import uvicorn
 
         global _translator
