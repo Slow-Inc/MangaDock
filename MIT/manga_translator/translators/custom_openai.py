@@ -17,6 +17,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
 from ..tls import ssl_context
+from ..anthropic_messages import anthropic_endpoint, anthropic_model, post_messages, protocol_from_env, to_anthropic_payload
 
 
 class EmptyContentError(Exception):
@@ -138,6 +139,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         extra_headers = parse_extra_headers(CUSTOM_OPENAI_EXTRA_HEADERS)
         if CUSTOM_OPENAI_EXTRA_HEADERS.strip() and not extra_headers:
             self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
+        self._extra_headers = extra_headers or {}
         client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
         # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
         client_kwargs['http_client'] = openai.DefaultAsyncHttpxClient(verify=ssl_context())
@@ -313,6 +315,29 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         return translations
 
+    async def aclose_clients(self):
+        """#1123: close this instance's HTTP clients (called at the end of a worker-slot request scope)."""
+        http = getattr(self, '_anthropic_http', None)
+        if http is not None:
+            await http.aclose()
+            self._anthropic_http = None
+        await self.client.close()
+
+    async def _request_anthropic(self, messages, model, max_tokens):
+        """#1119: the same request on the Anthropic Messages protocol (CUSTOM_OPENAI_PROTOCOL=anthropic).
+
+        Errors map onto the retry loop's existing paths (see anthropic_messages.post_messages); timeouts stay with
+        the outer watchdog, so the client has none. extra_body knobs (thinking, reasoning_effort) are OpenAI-only and
+        are not sent here.
+        """
+        import httpx
+        if getattr(self, '_anthropic_http', None) is None:
+            self._anthropic_http = httpx.AsyncClient(timeout=None, verify=ssl_context())   # one pool per translator
+        headers = {'Authorization': f'Bearer {self.client.api_key}', 'anthropic-version': '2023-06-01',
+                   **self._extra_headers}
+        return await post_messages(self._anthropic_http, anthropic_endpoint(str(self.client.base_url)), headers,
+                                   to_anthropic_payload(messages, model, max_tokens))
+
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
         messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
@@ -346,7 +371,11 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             _extra['reasoning_effort'] = _effort
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
-        response = await self.client.chat.completions.create(**create_kwargs)
+        if protocol_from_env() == 'anthropic':
+            response = await self._request_anthropic(messages, anthropic_model(create_kwargs['model']),
+                                                     create_kwargs['max_tokens'])
+        else:
+            response = await self.client.chat.completions.create(**create_kwargs)
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
