@@ -39,3 +39,49 @@ def test_response_is_shaped_like_the_openai_fields_the_translator_reads():
 def test_response_without_text_has_none_content():
     r = from_anthropic_response({"content": [], "stop_reason": "max_tokens", "usage": {}})
     assert r.choices[0].message.content is None and r.usage.total_tokens == 0
+
+
+# --- review fixes: transport/status errors map onto the translator's existing retry paths -------------------------
+
+import asyncio
+
+import httpx
+import openai
+
+from manga_translator.anthropic_messages import post_messages
+
+OK_BODY = {"content": [{"type": "text", "text": "<|1|>x"}], "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}}
+
+
+def _post(handler):
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await post_messages(c, "https://x/anthropic/v1/messages", {}, {"model": "m"})
+    return asyncio.run(go())
+
+
+def test_ok_response_is_mapped():
+    r = _post(lambda req: httpx.Response(200, json=OK_BODY))
+    assert r.choices[0].message.content == "<|1|>x"
+
+
+def test_429_is_a_rate_limit_error():
+    with pytest.raises(openai.RateLimitError):
+        _post(lambda req: httpx.Response(429, json={"error": "slow down"}))
+
+
+def test_5xx_is_an_api_error_the_server_retry_catches():
+    with pytest.raises(openai.APIError):
+        _post(lambda req: httpx.Response(502, text="bad gateway"))
+
+
+def test_200_that_is_not_json_is_an_api_error():
+    with pytest.raises(openai.APIError):
+        _post(lambda req: httpx.Response(200, text="<html>oops</html>"))
+
+
+def test_transport_failure_is_an_api_connection_error():
+    def boom(req):
+        raise httpx.ConnectError("refused", request=req)
+    with pytest.raises(openai.APIConnectionError):
+        _post(boom)
