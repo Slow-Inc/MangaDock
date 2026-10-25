@@ -90,8 +90,8 @@ def merge_empty_balloons(ctx, result, device):
         if polygons is None:
             polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda')) or []
             ctx.bubble_polygons = polygons
-        if not polygons:
-            return result
+        # #1147: no early return when no balloon was found - the white-caption and ink-cluster rescues
+        # below do not need one, and narration-only pages lost them.
         img = ctx.img_rgb
 
         def _aabb(poly):

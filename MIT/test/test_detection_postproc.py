@@ -300,3 +300,17 @@ def test_empty_balloon_rescue_shares_the_pages_balloon_detection(monkeypatch):
     assert ctx.bubble_polygons == [[(100, 100), (300, 100), (300, 300), (100, 300)]]
     merge_empty_balloons(ctx, ([], None, None), 'cpu')        # a second consumer on the same page
     assert calls['n'] == 1
+
+
+def test_a_page_without_balloons_still_gets_caption_and_ink_rescue_1147(monkeypatch):
+    # merge_empty_balloons returned as soon as the balloon YOLO found nothing, skipping the white-caption
+    # and ink-cluster rescues below it - narration pages (no balloons at all) lost both.
+    import types
+    import numpy as np
+    import manga_translator.detection_postproc as dp
+    monkeypatch.setattr(dp, 'white_box_candidates', lambda gray: [(10, 10, 90, 40)])
+    monkeypatch.setattr(dp, 'empty_balloon_boxes', lambda balloons, existing, ink: list(balloons))
+    monkeypatch.setattr(dp, 'uncovered_text_clusters', lambda gray, covered: [(100, 100, 150, 130)])
+    ctx = types.SimpleNamespace(img_rgb=np.full((200, 200, 3), 255, np.uint8), bubble_polygons=[])
+    textlines, _raw, _mask = dp.merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert len(textlines) == 2 and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
