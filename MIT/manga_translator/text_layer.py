@@ -76,6 +76,22 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
     return out
 
 
+#: #1144: a page whose source was echoed back for this many lines failed to translate; one or two kept lines
+#: (a sign, a name) are legitimate.
+ECHO_FAILURE_MIN = 3
+
+
+def page_failure(dropped: Iterable, failed_stages) -> str:
+    """Why a page that renders nothing FAILED, or '' when it simply has no text (#1144). A failed page must
+    be reported as an error: an empty success is cached by the Backend for 7 days. Pure."""
+    if failed_stages:
+        return 'stage failed: ' + ', '.join(failed_stages)
+    echoed = sum(1 for _r, reason in dropped or [] if reason == 'Translation identical to original')
+    if echoed >= ECHO_FAILURE_MIN:
+        return f'translation echoed the source for {echoed} lines'
+    return ''
+
+
 def empty_patch_result(img_w: int, img_h: int, dropped: Optional[Iterable]) -> Dict:
     """The /patches result for a page that renders nothing — still listing what was dropped and
     why, so "no text" and "every region dropped" are distinguishable (2026-10-20 quality loop)."""

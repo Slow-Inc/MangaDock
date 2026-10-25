@@ -123,3 +123,15 @@ def test_translate_patches_early_returns_report_drops():
     src = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
     fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', src, re.S).group(0)
     assert "'patches': [], 'regions': []}" not in fn
+
+
+def test_page_failure_tells_a_failed_page_from_an_empty_one_1144():
+    from types import SimpleNamespace as NS
+    from manga_translator.text_layer import page_failure
+    echo = [(NS(text=f'LINE {i}'), 'Translation identical to original') for i in range(5)]
+    assert page_failure(echo, [])                                   # the whole page echoed the source
+    assert page_failure([], ['textline_merge'])                      # a stage crashed
+    assert not page_failure([], [])                                  # a page with no text
+    assert not page_failure(echo[:2], [])                            # two kept-as-is lines (a sign, a name)
+    mixed = echo[:3] + [(NS(text='ー'), 'speculative box read as junk')]
+    assert page_failure(mixed, [])

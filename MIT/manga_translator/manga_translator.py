@@ -1630,6 +1630,18 @@ class MangaTranslator:
         """
         self._translation_memory.reset()
 
+    def _empty_or_failed(self, ctx, img_w, img_h, extra_failed=()):
+        """The empty /patches result for a page with no text - or an error for a page that FAILED (#1144): a stage
+        crashed and fell back, or the translator echoed the source so every line dropped. Returned empty, the
+        Backend cached the untranslated page for 7 days (Haimiya ch. 6 p2)."""
+        from .stage_runner import failed_stages
+        from .text_layer import page_failure
+        dropped = getattr(ctx, 'dropped_regions', None)
+        why = page_failure(dropped, failed_stages() + list(extra_failed))
+        if why:
+            raise RuntimeError(f'page translation failed: {why}')
+        return empty_patch_result(img_w, img_h, dropped)
+
     async def translate_patches(self, image: Image.Image, config: Config) -> dict:
         """Translate image and return per-region rendered PNG patches.
 
@@ -1638,6 +1650,8 @@ class MangaTranslator:
         Nearby regions are grouped into a single crop to avoid overlapping patches.
         """
         self.reset_page_context()
+        from .stage_runner import begin_page
+        begin_page()   # #1144: stage failures of this page are counted from here
         # Carry the source page's ICC profile into every patch PNG — manga
         # scans often embed non-sRGB profiles (e.g. "Dot Gain 20%"); an
         # untagged patch renders darker than the color-managed page (#156).
@@ -1646,9 +1660,10 @@ class MangaTranslator:
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h)
 
         await self._report_progress('translating')
+        translate_failed = []
         try:
             ctx.text_regions = await self._run_text_translation(config, ctx)
         except Exception:
@@ -1656,10 +1671,11 @@ class MangaTranslator:
             if not self.ignore_errors:
                 raise
             ctx.text_regions = []
+            translate_failed = ['translating']
 
         await self._report_progress('after-translating')
         if not ctx.text_regions or ctx.text_regions == 'cancel':
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h, translate_failed)
 
 
         # #980 follow-up (opt-in MIT_SERIES_GLOSSARY=1): the single-page production path has no batch context, so
@@ -1749,7 +1765,7 @@ class MangaTranslator:
             # between the front stage and this point.
             print(f'[region-filter] before={_n_before_filter} after={len(regions or [])}', flush=True)
         if not regions:
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h)
 
         # Bubble segmentation (#170): tag each region with its speech balloon so
         # grouping stays within balloons (no cross-balloon clumps). Opt-in via
