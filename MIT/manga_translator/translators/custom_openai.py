@@ -240,8 +240,10 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                 request_task = asyncio.create_task(self._request_translation(to_lang, prompt))
                 started = time.time()
                 while not request_task.done():
-                    await asyncio.sleep(0.1)
-                    if time.time() - started > self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2):
+                    # #1119: wake when the answer arrives (was a 0.1 s poll: up to 100 ms added to every call)
+                    limit = self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2)
+                    await asyncio.wait({request_task}, timeout=max(0.0, started + limit - time.time()))
+                    if not request_task.done() and time.time() - started > limit:
                         # Server takes too long to respond
                         if timeout_attempt >= self._TIMEOUT_RETRY_ATTEMPTS:
                             # Surface a structured, actionable failure (PRD #279, slice 1e)
