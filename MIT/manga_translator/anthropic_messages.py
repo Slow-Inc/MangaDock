@@ -10,12 +10,23 @@ from types import SimpleNamespace
 
 ENV_PROTOCOL = "CUSTOM_OPENAI_PROTOCOL"
 ENV_ANTHROPIC_BASE = "CUSTOM_OPENAI_ANTHROPIC_BASE"
+ENV_ANTHROPIC_MODEL = "CUSTOM_OPENAI_ANTHROPIC_MODEL"
 
 
 def protocol_from_env(env=None) -> str:
     env = env if env is not None else os.environ
     value = str(env.get(ENV_PROTOCOL, "") or "").strip().lower()
     return "anthropic" if value == "anthropic" else "openai"
+
+
+def anthropic_model(default: str, env=None) -> str:
+    """The translator's model on the Anthropic path: CUSTOM_OPENAI_ANTHROPIC_MODEL, else ``default``.
+
+    Separate from CUSTOM_OPENAI_MODEL because the VLM SFX rescue and the omission verifier keep calling that model on
+    the OpenAI /chat/completions endpoint, where an Anthropic-only model would be rejected.
+    """
+    env = env if env is not None else os.environ
+    return str(env.get(ENV_ANTHROPIC_MODEL, "") or "").strip() or default
 
 
 def anthropic_endpoint(openai_base: str, env=None) -> str:

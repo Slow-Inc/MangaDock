@@ -16,7 +16,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
-from ..anthropic_messages import anthropic_endpoint, post_messages, protocol_from_env, to_anthropic_payload
+from ..anthropic_messages import anthropic_endpoint, anthropic_model, post_messages, protocol_from_env, to_anthropic_payload
 
 
 class EmptyContentError(Exception):
@@ -361,7 +361,8 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
         if protocol_from_env() == 'anthropic':
-            response = await self._request_anthropic(messages, create_kwargs['model'], create_kwargs['max_tokens'])
+            response = await self._request_anthropic(messages, anthropic_model(create_kwargs['model']),
+                                                     create_kwargs['max_tokens'])
         else:
             response = await self.client.chat.completions.create(**create_kwargs)
 

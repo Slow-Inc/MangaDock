@@ -85,3 +85,11 @@ def test_transport_failure_is_an_api_connection_error():
         raise httpx.ConnectError("refused", request=req)
     with pytest.raises(openai.APIConnectionError):
         _post(boom)
+
+
+def test_anthropic_model_is_separate_from_the_openai_model():
+    # The VLM SFX rescue and the omission verifier keep calling CUSTOM_OPENAI_MODEL on /chat/completions,
+    # so the Anthropic translator takes its own model name and falls back to the shared one.
+    from manga_translator.anthropic_messages import anthropic_model
+    assert anthropic_model("deepseek-v4.1-flash", {"CUSTOM_OPENAI_ANTHROPIC_MODEL": "claude-haiku-5-5"}) == "claude-haiku-5-5"
+    assert anthropic_model("claude-haiku-5-5", {}) == "claude-haiku-5-5"
