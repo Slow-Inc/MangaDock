@@ -71,3 +71,11 @@ def test_request_sends_thinking_off_body_by_default(monkeypatch):
 
 def test_request_sends_no_extra_body_when_thinking_enabled(monkeypatch):
     assert _extra_body_sent_by_request(monkeypatch, 'true') is None
+
+
+def test_translator_clients_share_the_tls_context():
+    """#1119: building the translator must not build a new SSLContext (~140 ms of CPU) for its client."""
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    assert t.client._client._transport._pool._ssl_context is tls.ssl_context()
