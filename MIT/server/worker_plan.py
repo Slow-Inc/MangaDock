@@ -1,4 +1,4 @@
-"""Plan extra translation workers (Strata-style batch slots), pure and torch-free.
+"""Plan extra translation workers and pick one per request (Strata-style batch slots), pure and torch-free.
 
 The front server (--start-instance) always starts one worker on front_port + 1. Operators can
 ask for more workers so concurrent page requests are served in parallel, and can pin each worker
@@ -66,3 +66,8 @@ def pick_free_worker(workers):
     load = Counter(gpu for busy, gpu in workers if busy)
     free = (i for i, (busy, _) in enumerate(workers) if not busy)
     return min(free, key=lambda i: load[workers[i][1]], default=None)
+
+
+def card_key(ip, device):
+    """The load key of one GPU: a worker with no CUDA_VISIBLE_DEVICES runs on CUDA device 0 (#1119)."""
+    return (ip, device or '0')
