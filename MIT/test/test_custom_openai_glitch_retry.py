@@ -247,3 +247,50 @@ def test_consider_as_please_is_reasked_1040():
     assert not t._is_glitched(src, 'ลองพิจารณาซื้อฉบับทางการ', 'THA')
     assert not t._is_glitched('PLEASE CONSIDER BUYING IT', 'กรุณาซื้อมันด้วย', 'THA')
 
+
+
+def test_a_fast_answer_is_not_held_by_a_polling_interval():
+    """#1119: the request was awaited with `while not done: sleep(0.1)`, adding up to 100 ms to every LLM call on the
+    page's critical path. A 10 ms answer must come back without that wait."""
+    import time
+    t = CustomOpenAiTranslator()
+
+    async def quick(**kwargs):
+        await asyncio.sleep(0.01)
+        return _reply('<|1|>สวัสดี')
+    t.client.chat.completions.create = quick
+
+    async def main():
+        start = time.perf_counter()
+        out = await t._translate('ENG', 'THA', ['HELLO'])
+        return out, time.perf_counter() - start
+
+    out, took = asyncio.run(main())
+    assert out == ['สวัสดี']
+    assert took < 0.08, took
+
+
+def test_a_slow_answer_still_times_out_restarts_and_then_fails():
+    """The timeout path is unchanged: restart after _TIMEOUT, give up after _TIMEOUT_RETRY_ATTEMPTS."""
+    import time
+    t = CustomOpenAiTranslator()
+    t._TIMEOUT, t._TIMEOUT_RETRY_ATTEMPTS = 0.05, 1
+    calls = []
+
+    async def slow(**kwargs):
+        calls.append(time.perf_counter())
+        await asyncio.sleep(5)
+        return _reply('<|1|>x')
+    t.client.chat.completions.create = slow
+
+    async def main():
+        start = time.perf_counter()
+        try:
+            await t._translate('ENG', 'THA', ['HELLO'])
+        except Exception as e:
+            return str(e), time.perf_counter() - start
+        return None, time.perf_counter() - start
+
+    err, took = asyncio.run(main())
+    assert err and 'timeout' in err
+    assert len(calls) == 2 and took < 1.0, (len(calls), took)
