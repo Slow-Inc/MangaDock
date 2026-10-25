@@ -314,3 +314,20 @@ def test_a_page_without_balloons_still_gets_caption_and_ink_rescue_1147(monkeypa
     ctx = types.SimpleNamespace(img_rgb=np.full((200, 200, 3), 255, np.uint8), bubble_polygons=[])
     textlines, _raw, _mask = dp.merge_empty_balloons(ctx, ([], None, None), 'cpu')
     assert len(textlines) == 2 and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146():
+    # ch. 6 p2: DBNet boxed `AND I DON'T` (left balloon) and `HOME AFTER` (right balloon) as ONE line,
+    # so OCR read "AND I DONT HOME AFTER" and the two speeches interleaved.
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]
+    straddle = Quadrilateral(np.array(poly(99, 331, 353, 350)), '', 1.0)
+    inside = Quadrilateral(np.array(poly(101, 356, 200, 373)), '', 1.0)
+    out = split_cross_balloon_lines([straddle, inside], balloons)
+    boxes = sorted(tuple(int(v) for v in t.xyxy) for t in out)
+    assert len(out) == 3
+    assert boxes[0][0] == 99 and boxes[0][2] <= 253          # left part ends inside the left balloon
+    assert boxes[-1][2] == 353 and boxes[-1][0] >= 208        # right part starts inside the right balloon
+    assert split_cross_balloon_lines([inside], balloons)[0] is inside

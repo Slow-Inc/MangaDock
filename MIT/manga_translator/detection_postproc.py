@@ -76,6 +76,51 @@ def _placeholder_quad(box):
     return q
 
 
+def split_cross_balloon_lines(textlines, polygons):
+    """#1146: split a horizontal textline that runs across two balloons at the point it leaves the first one.
+
+    DBNet can box words of two neighbouring balloons as ONE line when their rows align (Haimiya ch. 6 p2:
+    `AND I DON'T` + `HOME AFTER` read as one line), and every later stage then interleaves the two speeches.
+    The cut sits in the middle of the stretch where the line's centre row is in both balloons, or in neither.
+    Pure geometry; lines inside one balloon are returned unchanged."""
+    import cv2
+    from .utils.generic import Quadrilateral
+    if not polygons:
+        return textlines
+    polys = [np.asarray(p, dtype=np.float32).reshape(-1, 1, 2) for p in polygons]
+
+    def inside(i, x, y):
+        return cv2.pointPolygonTest(polys[i], (float(x), float(y)), False) >= 0
+
+    out = []
+    for t in textlines:
+        x1, y1, x2, y2 = (float(v) for v in t.xyxy)
+        h = y2 - y1
+        if getattr(t, 'direction', 'h') != 'h' or x2 - x1 < 4 * h:
+            out.append(t)
+            continue
+        cy = (y1 + y2) / 2
+        left = [i for i in range(len(polys)) if inside(i, x1 + 1, cy)]
+        right = [i for i in range(len(polys)) if inside(i, x2 - 1, cy)]
+        pairs = [(a, b) for a in left for b in right if a != b and not inside(a, x2 - 1, cy) and not inside(b, x1 + 1, cy)]
+        if not pairs:
+            out.append(t)
+            continue
+        a, b = pairs[0]
+        xs = np.arange(x1, x2, 2.0)
+        mixed = [x for x in xs if inside(a, x, cy) == inside(b, x, cy)]   # in both, or in neither
+        cut = float(np.median(mixed)) if mixed else (x1 + x2) / 2
+        if cut - x1 < h or x2 - cut < h:
+            out.append(t)
+            continue
+        for lx1, lx2 in ((x1, cut), (cut, x2)):
+            q = Quadrilateral(np.array([[lx1, y1], [lx2, y1], [lx2, y2], [lx1, y2]]).astype(np.int64), t.text, t.prob)
+            q.is_sfx = getattr(t, 'is_sfx', False)
+            q.rescue_placeholder = getattr(t, 'rescue_placeholder', False)
+            out.append(q)
+    return out
+
+
 def merge_empty_balloons(ctx, result, device):
     """#535: append an empty textline for every inked balloon DBNet left uncovered —
     it then flows OCR → vlm_rescue → translate → render exactly like a rescued SFX.
@@ -92,6 +137,7 @@ def merge_empty_balloons(ctx, result, device):
             ctx.bubble_polygons = polygons
         # #1147: no early return when no balloon was found - the white-caption and ink-cluster rescues
         # below do not need one, and narration-only pages lost them.
+        textlines = split_cross_balloon_lines(textlines, polygons)   # #1146
         img = ctx.img_rgb
 
         def _aabb(poly):
