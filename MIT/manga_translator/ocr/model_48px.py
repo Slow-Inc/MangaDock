@@ -776,9 +776,12 @@ class OCR(nn.Module):
                     torch.exp(batch_log_probs[best_beam_idx]).item(), \
                     cached_activations[idx * beams_k + best_beam_idx] 
 
+            # #1119: one host read of the finished set and one index tensor (was a GPU membership test per row and
+            # six host->device copies of the same index list per step in which a line finished)
+            finished_set = set(finished_batch_indices.tolist())
             remaining_indexs = []
             for i in range(N_remaining):
-                if i not in finished_batch_indices:
+                if i not in finished_set:
                     for j in range(beams_k):
                         remaining_indexs.append(i * beams_k + j)
 
@@ -786,12 +789,13 @@ class OCR(nn.Module):
                 break
 
             N_remaining = int(len(remaining_indexs) / beams_k)
-            out_idx = out_idx.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            log_probs = log_probs.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            memory = memory.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            cached_activations = cached_activations.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            input_mask = input_mask.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            batch_index = batch_index.index_select(0, torch.tensor(remaining_indexs, device=img.device))
+            keep = torch.tensor(remaining_indexs, device=img.device)
+            out_idx = out_idx.index_select(0, keep)
+            log_probs = log_probs.index_select(0, keep)
+            memory = memory.index_select(0, keep)
+            cached_activations = cached_activations.index_select(0, keep)
+            input_mask = input_mask.index_select(0, keep)
+            batch_index = batch_index.index_select(0, keep)
 
         # Ensure we have the correct number of finished hypotheses for each sample
         if len(finished_hypos) < N: # Fallback if not enough finished hypos
