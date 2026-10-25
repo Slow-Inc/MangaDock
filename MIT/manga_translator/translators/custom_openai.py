@@ -16,7 +16,7 @@ from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_
                    CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
 from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
-from ..anthropic_messages import anthropic_endpoint, from_anthropic_response, protocol_from_env, to_anthropic_payload
+from ..anthropic_messages import anthropic_endpoint, post_messages, protocol_from_env, to_anthropic_payload
 
 
 class EmptyContentError(Exception):
@@ -315,17 +315,17 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
     async def _request_anthropic(self, messages, model, max_tokens):
         """#1119: the same request on the Anthropic Messages protocol (CUSTOM_OPENAI_PROTOCOL=anthropic).
 
-        Non-200 answers raise openai.APIError so the existing server-error retry loop handles them.
+        Errors map onto the retry loop's existing paths (see anthropic_messages.post_messages); timeouts stay with
+        the outer watchdog, so the client has none. extra_body knobs (thinking, reasoning_effort) are OpenAI-only and
+        are not sent here.
         """
         import httpx
-        url = anthropic_endpoint(str(self.client.base_url))
+        if getattr(self, '_anthropic_http', None) is None:
+            self._anthropic_http = httpx.AsyncClient(timeout=None)   # one connection pool per translator
         headers = {'Authorization': f'Bearer {self.client.api_key}', 'anthropic-version': '2023-06-01',
                    **self._extra_headers}
-        async with httpx.AsyncClient(timeout=self._TIMEOUT * 2) as http:
-            r = await http.post(url, headers=headers, json=to_anthropic_payload(messages, model, max_tokens))
-        if r.status_code != 200:
-            raise openai.APIError(f'Anthropic endpoint {r.status_code}: {r.text[:300]}', request=r.request, body=None)
-        return from_anthropic_response(r.json())
+        return await post_messages(self._anthropic_http, anthropic_endpoint(str(self.client.base_url)), headers,
+                                   to_anthropic_payload(messages, model, max_tokens))
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
         messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]

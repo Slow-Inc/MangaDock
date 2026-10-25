@@ -48,3 +48,27 @@ def from_anthropic_response(data: dict):
     return SimpleNamespace(choices=[choice],
                            usage=SimpleNamespace(prompt_tokens=prompt, completion_tokens=completion,
                                                  total_tokens=prompt + completion, completion_tokens_details=None))
+
+
+async def post_messages(client, url: str, headers: dict, payload: dict):
+    """POST one Messages request; failures map onto the translator's existing retry paths.
+
+    429 -> openai.RateLimitError, any other non-200 or a non-JSON 200 -> openai.APIError, a transport failure
+    (connect/read/protocol) -> openai.APIConnectionError, so the custom_openai retry loop treats them exactly as it
+    treats the OpenAI SDK's own errors. Timeouts are left to the translator's outer watchdog.
+    """
+    import httpx
+    import openai
+    try:
+        r = await client.post(url, headers=headers, json=payload)
+    except httpx.HTTPError as e:
+        raise openai.APIConnectionError(message=f"Anthropic endpoint unreachable: {e!r}", request=e.request) from e
+    if r.status_code == 429:
+        raise openai.RateLimitError(f"Anthropic endpoint 429: {r.text[:300]}", response=r, body=None)
+    if r.status_code != 200:
+        raise openai.APIError(f"Anthropic endpoint {r.status_code}: {r.text[:300]}", request=r.request, body=None)
+    try:
+        data = r.json()
+    except ValueError as e:
+        raise openai.APIError(f"Anthropic endpoint returned non-JSON: {r.text[:120]!r}", request=r.request, body=None) from e
+    return from_anthropic_response(data)
