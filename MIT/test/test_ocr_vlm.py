@@ -228,7 +228,10 @@ def test_rescue_NOT_for_ascii_reads_even_with_provenance():
     # ASCII letter/digit is proof the OCR succeeded on real text, NOT a dropped glyph.
     # Rescuing those made the vision model hallucinate a phantom Thai SFX that merged INTO
     # and corrupted the real dialogue render (observed across 5 Gal Yome EN→Thai pages).
-    for ascii_read in ("W", "I", "THE", "M", "8", "1", "WHA"):
+    # #881: the rescue now TRANSCRIBES instead of inventing an SFX, so 1-2 mark reads from det_sfx
+    # are sent; a box over a bubble then comes back as that bubble's own text and is dropped by
+    # resolve_rescue (below). Real words ("THE", "WHA") still prove the OCR did its job.
+    for ascii_read in ("THE", "WHA"):
         assert not should_rescue_sfx(ascii_read, from_sfx_detection=True,
                                      box_w=400, box_h=370, vlm_rescue=True), ascii_read
 
@@ -592,3 +595,112 @@ def test_localize_candidates_runs_concurrently_and_preserves_order():
     assert out == ['sfx-a', 'sfx-b', 'sfx-c', 'sfx-d']
     assert sorted(calls) == ['a', 'b', 'c', 'd']
     assert elapsed < 0.45  # 4 sequential sleeps would be >= 0.6 s
+
+
+# ── #881: the rescue reaches the gateway and transcribes ─────────────────────
+def test_rescue_calls_send_the_gateway_headers(monkeypatch):
+    # OpenCode Go answers 400 MissingSessionID without x-opencode-session: every rescue failed
+    # silently since the move to that gateway (0 rescued in three session logs, 925 boxes dropped).
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setattr(v, '_gateway_headers', lambda: {'x-opencode-session': 's1'})
+    for call in (v.vlm_localize_sfx, v.vlm_transcribe):
+        post = _post_returning('BOOM')
+        v.reset_sfx_breaker()
+        call(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post)
+        assert post.calls['headers']['x-opencode-session'] == 's1'
+        assert post.calls['headers']['Authorization'] == 'Bearer k'
+
+
+def test_transcribe_returns_the_lettered_text_on_one_line():
+    from manga_translator.ocr_vlm import vlm_transcribe
+    post = _post_returning('Kurose\n-kun,\nyou...')
+    assert vlm_transcribe(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post) == 'Kurose -kun, you...'
+    assert 'Transcribe' in post.calls['json']['messages'][0]['content'][0]['text']
+
+
+def test_transcription_parse_drops_markers_and_refusals():
+    from manga_translator.ocr_vlm import parse_transcription
+    assert parse_transcription("I'm glad.") == "I'm glad."
+    assert parse_transcription('SFX: ドキドキ') == 'ドキドキ'
+    assert parse_transcription('NONE') == ''
+    assert parse_transcription('  ') == ''
+    assert parse_transcription(None) == ''
+
+
+def test_a_det_sfx_box_read_as_short_ascii_is_still_worth_a_transcription():
+    # the '-kun, you...' box read as '14' by the 48px OCR; a transcription cannot invent an SFX,
+    # it reads the box or answers NONE, so ASCII junk from det_sfx no longer blocks it
+    from manga_translator.ocr_vlm import should_rescue_sfx
+    assert should_rescue_sfx('14', True, 300, 460, True)
+    assert should_rescue_sfx('T', True, 300, 460, True)
+    assert not should_rescue_sfx('HUH?', False, 300, 460, True)     # dialogue read, not det_sfx: unchanged
+    assert not should_rescue_sfx('KUROSE', True, 300, 460, True)    # a real word read: OCR did its job
+
+
+def test_a_container_takes_over_only_the_dialogue_its_transcription_repeats():
+    from manga_translator.ocr_vlm import transcription_covers
+    assert transcription_covers('Kurose -kun, you...', ['Kurose'])
+    assert transcription_covers("KUROSE-KUN, YOU...", ['kurose'])
+    assert not transcription_covers('NO WAY', ['Kurose'])
+    assert not transcription_covers('Kurose -kun', [])
+
+
+def test_resolve_rescue_keeps_new_text_and_drops_what_repeats_a_bubble():
+    from manga_translator.ocr_vlm import resolve_rescue
+    dialogue = [((100, 100, 300, 160), 'Kurose', 'r1'), ((600, 600, 800, 700), 'WHAT DO YOU MEAN?!', 'r2')]
+    # nothing underneath: a hand-lettered line the OCR lost -> keep it
+    assert resolve_rescue((0, 0, 90, 90), "I'm glad.", dialogue) == ('keep', [])
+    # a box over a bubble that transcribes that bubble's own text: the #278 phantom -> drop
+    assert resolve_rescue((620, 610, 700, 650), 'WHAT DO YOU MEAN', dialogue) == ('drop', [])
+    # a container swallowing a line it repeats AND extends: it replaces that line (#881 Kurose case)
+    assert resolve_rescue((80, 80, 400, 500), 'Kurose -kun, you...', dialogue) == ('takeover', ['r1'])
+    # a big ink cluster that only repeats the bubble it swallows adds nothing -> drop (live ch. 6 p10:
+    # the panel-sized 'T' box took over "JUST WHEN WE'D FINALLY GOTTEN CLOSER...")
+    assert resolve_rescue((80, 80, 400, 500), 'KUROSE!', dialogue) == ('drop', [])
+    # a container swallowing a line it does NOT repeat: leave the dialogue alone
+    assert resolve_rescue((80, 80, 400, 500), 'BOOM', dialogue) == ('drop', [])
+    assert resolve_rescue((0, 0, 90, 90), '', dialogue) == ('drop', [])
+
+
+def test_a_guessed_box_survives_a_failed_line_read_so_the_rescue_can_try():
+    # #881: 'I'm glad.' (hand-lettered, 70 px glyphs) was boxed by det_sfx, read below the prob floor
+    # by the 48px OCR and dropped before the rescue ever saw it. Guessed boxes are kept, as empty
+    # text; a normal dialogue line below the floor still drops.
+    from manga_translator.ocr_vlm import keep_ocr_line
+    sfx = SimpleNamespace(text='', is_sfx=True)
+    placeholder = SimpleNamespace(text='', rescue_placeholder=True)
+    dialogue = SimpleNamespace(text='')
+    assert keep_ocr_line(sfx, below_floor=True)
+    assert keep_ocr_line(placeholder, below_floor=True)
+    assert not keep_ocr_line(dialogue, below_floor=True)
+    assert keep_ocr_line(SimpleNamespace(text='HELLO'), below_floor=False)
+    assert not keep_ocr_line(SimpleNamespace(text='  '), below_floor=False)
+
+
+def test_placeholders_count_as_guessed_boxes_for_the_rescue():
+    from manga_translator.ocr_vlm import guessed_box
+    assert guessed_box(SimpleNamespace(from_sfx_detection=True))
+    assert guessed_box(SimpleNamespace(rescue_placeholder=True))
+    assert not guessed_box(SimpleNamespace())
+
+
+def test_a_placeholder_skips_the_sfx_ink_gate():
+    # an empty-balloon / ink-cluster placeholder already proved its ink when it was made; the #887
+    # contrast gate (tuned for SFX on art) rejected thin lettering in a big white balloon
+    # (`Kurose -kun, you...`: dark 5 %, std 54)
+    from manga_translator.ocr_vlm import vlm_transcribe
+    faint = np.full((200, 200, 3), 250, dtype=np.uint8)
+    faint[90:100, 40:160] = 30
+    post = _post_returning('Kurose -kun, you...')
+    assert vlm_transcribe(faint, api_base='http://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert vlm_transcribe(faint, api_base='http://gw/v1', api_key='k', model='m', post_fn=post,
+                          check_lettering=False) == 'Kurose -kun, you...'
+
+
+def test_a_read_of_only_dashes_or_rings_is_line_art_not_worth_a_call():
+    # 3 chapters live: 60 rescue calls on 'ー' / 'ーー' / '○' reads, 0 transcriptions - balloon arcs and lines
+    from manga_translator.ocr_vlm import should_rescue_sfx
+    for read in ('ー', 'ーー', '○', '—', '~'):
+        assert not should_rescue_sfx(read, True, 300, 300, True), read
+    assert should_rescue_sfx('', True, 300, 300, True)
+    assert should_rescue_sfx('ぬ', True, 300, 300, True)

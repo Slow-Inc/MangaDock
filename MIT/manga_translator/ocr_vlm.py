@@ -161,6 +161,9 @@ def sfx_false_positive(stripped_text: str, speculative: bool, box, dialogue_boxe
     return any(box_containment(box, d) > 0.5 for d in dialogue_boxes)
 
 
+_LINE_ART_READS = 'ーｰ-—―~〜・.○◯'
+
+
 def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float, box_h: float,
                       vlm_rescue: bool, area_min: int = 3600, side_min: int = 24) -> bool:
     """#278: gate the vision-gateway SFX rescue on det_sfx PROVENANCE, not a bare length heuristic.
@@ -174,11 +177,15 @@ def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float
     (area + min side) — a real SFX glyph, not a stray mark. Pure."""
     if not vlm_rescue:
         return False
-    # If the line-OCR read real ASCII text it did NOT drop a stylized glyph — rescuing it makes
-    # the vision model hallucinate a phantom target-language SFX over the dialogue (#278).
-    if ocr_read_real_text(stripped_text):
-        return False
     n = len(stripped_text.strip())
+    # #881: a read of only dashes / rings is a balloon arc or a line in the art; 60 live calls, 0 text
+    if n and not (set(stripped_text.strip()) - set(_LINE_ART_READS)):
+        return False
+    # If the line-OCR read real ASCII text it did NOT drop a stylized glyph (#278). A det_sfx box read
+    # as 1-2 ASCII marks ('14', 'T') is still junk: hand-lettered lines read that way (#881), and the
+    # rescue now transcribes - it answers NONE instead of inventing an SFX.
+    if ocr_read_real_text(stripped_text) and not (from_sfx_detection and n <= 2):
+        return False
     if n > (4 if from_sfx_detection else 2):
         return False
     if box_w * box_h < area_min or min(box_w, box_h) < side_min:
@@ -371,7 +378,7 @@ def vlm_localize_sfx(
         }
         resp = post_fn(
             api_base.rstrip('/') + "/chat/completions",
-            headers={"Authorization": "Bearer " + api_key},
+            headers={**_gateway_headers(), "Authorization": "Bearer " + api_key},
             json=body,
             timeout=timeout,
         )
@@ -396,6 +403,146 @@ def vlm_localize_sfx(
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         _breaker.fail(model)  # a failing call wastes the same page time as a truncated one
         return ''
+
+
+def _gateway_headers() -> dict:
+    """CUSTOM_OPENAI_EXTRA_HEADERS as a dict. OpenCode Go rejects a request without x-opencode-session
+    (400 MissingSessionID), which silently failed every rescue call (#881)."""
+    from .extra_headers import parse_extra_headers
+    from .translators.keys import CUSTOM_OPENAI_EXTRA_HEADERS
+    return parse_extra_headers(CUSTOM_OPENAI_EXTRA_HEADERS) or {}
+
+
+TRANSCRIBE_PROMPT = (
+    "Transcribe exactly the text lettered in this cropped manga region, in its original language, keeping "
+    "punctuation. If it is a sound effect, start the line with 'SFX: '. If there is no lettering, reply NONE. "
+    "Reply with the text only.")
+TRANSCRIBE_MAX_TOKENS = 512   # the gateway default is a thinking model (#881): leave room before the answer
+
+
+def parse_transcription(content) -> str:
+    """The vision model's transcription on one line; '' for NONE / a refusal / nothing. Pure."""
+    if not isinstance(content, str):
+        return ''
+    text = ' '.join(part.strip() for part in content.strip().splitlines() if part.strip())
+    text = re.sub(r'^SFX:\s*', '', text, flags=re.IGNORECASE).strip()
+    if text.upper().strip(' .') in _SFX_REFUSALS or text.strip(' .') in _SFX_REFUSALS:
+        return ''
+    return text
+
+
+def vlm_transcribe(crop_rgb: np.ndarray, *, api_base: str, api_key: str, model: str,
+                   timeout: float = 60.0, post_fn: Optional[Callable] = None, check_lettering: bool = True) -> str:
+    """One vision call: crop -> the source text lettered in it, or '' (no lettering / any failure).
+
+    #881: the rescue used to ask for a target-language onomatopoeia, so a hand-lettered DIALOGUE line
+    (`I'm glad.`) came back empty and dropped. Transcribing keeps it, and the translator - which sees the
+    page image - translates it like any other line, SFX included."""
+    if not (api_base and api_key and model):
+        return ''
+    if check_lettering and not crop_has_lettering(crop_rgb):
+        return ''
+    if not _breaker.allows():
+        return ''
+    try:
+        if post_fn is None:
+            import requests
+            post_fn = requests.post
+        body = {"model": model, "max_tokens": TRANSCRIBE_MAX_TOKENS, "temperature": 0,
+                "messages": [{"role": "user", "content": [
+                    {"type": "text", "text": TRANSCRIBE_PROMPT},
+                    {"type": "image_url", "image_url": {"url": _to_data_url(crop_rgb)}}]}]}
+        resp = post_fn(api_base.rstrip('/') + "/chat/completions",
+                       headers={**_gateway_headers(), "Authorization": "Bearer " + api_key},
+                       json=body, timeout=timeout)
+        choice = resp.json()["choices"][0]
+        content = choice["message"]["content"]
+        finish = choice.get("finish_reason")
+        if content is None or (finish is not None and finish != 'stop'):
+            logger.warning("[OcrVLM] transcription unusable: finish_reason=%s content=%r", finish, content)
+            _breaker.fail(model)
+            return ''
+        _breaker.ok()
+        return parse_transcription(content)
+    except Exception:
+        logger.warning("[OcrVLM] transcription failed - region will drop as before", exc_info=True)
+        _breaker.fail(model)
+        return ''
+
+
+async def transcribe_candidates(crops, *, api_base, api_key, model, check_lettering=None, worker=None):
+    """Transcribe independent crops concurrently (threads), preserving order. ``check_lettering`` is one flag
+    per crop (default all True): placeholders already proved their ink and skip the SFX ink gate."""
+    import asyncio
+    worker = worker or vlm_transcribe
+    checks = check_lettering or [True] * len(crops)
+    return list(await asyncio.gather(*[
+        asyncio.to_thread(worker, crop, api_base=api_base, api_key=api_key, model=model, check_lettering=check)
+        for crop, check in zip(crops, checks)]))
+
+
+def _norm(text: str) -> str:
+    return re.sub(r'[^0-9a-z\u0080-\uffff]', '', (text or '').lower())
+
+
+def transcription_covers(transcript: str, swallowed_texts) -> bool:
+    """True when a container's transcription repeats every dialogue line it swallows, so the container
+    can replace them (#881: `Kurose -kun, you...` swallowed the separately read `Kurose`). Pure."""
+    texts = [t for t in swallowed_texts if _norm(t)]
+    return bool(texts) and all(_norm(t) in _norm(transcript) for t in texts)
+
+
+def guessed_box(region) -> bool:
+    """A region a detector GUESSED rather than read: det_sfx provenance or an empty-balloon / ink-cluster
+    placeholder (#881: the `Kurose -kun, you...` lettering came in as an ink-cluster placeholder read '14').
+    Such boxes get the transcription rescue. Pure."""
+    return bool(getattr(region, 'from_sfx_detection', False) or getattr(region, 'rescue_placeholder', False))
+
+
+def keep_ocr_line(line, below_floor: bool) -> bool:
+    """Whether an OCR'd textline goes on to the merge (#881). A read line needs text; a box a detector only
+    GUESSED (det_sfx, empty-balloon / ink-cluster placeholder) is kept even when its line read failed, so
+    the transcription rescue can read it - the 48px OCR cannot read big hand-lettered or stylised text. Pure."""
+    if getattr(line, 'is_sfx', False) or getattr(line, 'rescue_placeholder', False):
+        return True
+    return not below_floor and bool(str(getattr(line, 'text', '') or '').strip())
+
+
+def _containment(inner, outer) -> float:
+    iw = min(inner[2], outer[2]) - max(inner[0], outer[0])
+    ih = min(inner[3], outer[3]) - max(inner[1], outer[1])
+    if iw <= 0 or ih <= 0:
+        return 0.0
+    return iw * ih / max(1.0, float((inner[2] - inner[0]) * (inner[3] - inner[1])))
+
+
+def resolve_rescue(box, transcript: str, dialogue):
+    """What to do with a transcribed rescue box (#881). ``dialogue`` is ``[(box, text, key), ...]`` of the
+    regions the OCR read normally. Returns ``('keep'|'takeover'|'drop', [keys to remove])``. Pure.
+
+    - nothing transcribed -> drop (as before);
+    - the box swallows dialogue lines (>=70 % inside it): it replaces them only when its transcription
+      repeats all of them and adds text (`Kurose -kun, you...` over a separately read `Kurose`), else drop
+      (#887 r3; a panel-sized ink cluster that just repeats a bubble);
+    - it overlaps a line and the two texts repeat each other -> the #278 phantom over a bubble, drop;
+    - otherwise it is text the OCR lost -> keep."""
+    if not _norm(transcript):
+        return 'drop', []
+    swallowed = [(t, k) for b, t, k in dialogue if _containment(b, box) >= 0.7]
+    if swallowed:
+        texts = [t for t, _ in swallowed]
+        # it must repeat them AND add text the OCR lost; a box that only repeats them adds nothing
+        adds = len(_norm(transcript)) >= sum(len(_norm(t)) for t in texts) + 3
+        if adds and transcription_covers(transcript, texts):
+            return 'takeover', [k for _, k in swallowed]
+        return 'drop', []
+    mine = _norm(transcript)
+    for b, t, _ in dialogue:
+        if _containment(box, b) > 0 or _containment(b, box) > 0:
+            theirs = _norm(t)
+            if theirs and (mine in theirs or theirs in mine):
+                return 'drop', []
+    return 'keep', []
 
 
 async def localize_candidates(crops, *, api_base, api_key, model, target_lang, worker=None):

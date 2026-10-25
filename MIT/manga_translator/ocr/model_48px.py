@@ -38,6 +38,7 @@ from .common import OfflineOCR
 from ..utils import TextBlock, Quadrilateral, chunks
 from ..utils.generic import AvgMeter
 from ..utils.bubble import is_ignore
+from ..ocr_vlm import keep_ocr_line
 
 # Roformer with Xpos
 
@@ -137,6 +138,12 @@ class Model48pxOCR(OfflineOCR):
                 ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < threshold:
+                    # #881: a guessed box (det_sfx / placeholder) stays, unread, for the transcription rescue
+                    cur_region = quadrilaterals[indices[i]][0]
+                    if isinstance(cur_region, Quadrilateral) and keep_ocr_line(cur_region, below_floor=True):
+                        cur_region.text = ''
+                        cur_region.prob = prob
+                        out_regions.append(cur_region)
                     continue
                 # #872: the beam search returns GPU tensors and the loop below reads them one value at
                 # a time (several device syncs per character) — bring them over once; the float32
