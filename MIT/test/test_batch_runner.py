@@ -286,3 +286,67 @@ def test_the_pipeline_path_is_opt_in(monkeypatch):
     assert batch_runner._pipeline_enabled() is False
     monkeypatch.setenv('MIT_BATCH_PIPELINE', '1')
     assert batch_runner._pipeline_enabled() is True
+
+
+# --- #1119: batch slots — independent pages run concurrently, one per worker ------------------
+
+
+def _concurrency_probe(monkeypatch, sent, delay=0.02):
+    state = {"now": 0, "max": 0}
+
+    async def translate(config_str, img_bytes, progress_meta=None, **kw):
+        state["now"] += 1
+        state["max"] = max(state["max"], state["now"])
+        await asyncio.sleep(delay)
+        state["now"] -= 1
+        return {"img_width": 100, "img_height": 200, "patches": []}
+
+    _stub_pipeline(monkeypatch, sent, translate=translate)
+    return state
+
+
+def test_slot_count_comes_from_workers_or_override():
+    assert batch_runner.batch_slots({}) == 1
+    assert batch_runner.batch_slots({"MIT_WORKERS": "4"}) == 4
+    assert batch_runner.batch_slots({"MIT_WORKERS": "4", "MIT_BATCH_CONCURRENCY": "2"}) == 2
+    assert batch_runner.batch_slots({"MIT_BATCH_CONCURRENCY": "0"}) == 1
+
+
+def test_independent_pages_run_one_per_slot(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "2")
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2, 3))
+    assert state["max"] == 2
+    assert sorted(sent) == [0, 1, 2, 3]
+
+
+def test_single_worker_keeps_pages_sequential(monkeypatch):
+    sent = []
+    monkeypatch.delenv("MIT_WORKERS", raising=False)
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2))
+    assert state["max"] == 1 and sent == [0, 1, 2]
+
+
+def test_rolling_context_keeps_pages_sequential_even_with_workers(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "4")
+    monkeypatch.setenv("MIT_CONTEXT_PAGES", "2")
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2))
+    assert state["max"] == 1 and sent == [0, 1, 2]
+
+
+def test_cancel_stops_pages_that_have_not_started(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "2")
+
+    async def translate(config_str, img_bytes, progress_meta=None, **kw):
+        await asyncio.sleep(0.02)
+        cancellation.mark_cancelled(TASK)  # cancel lands while the first two pages run
+        return {"img_width": 100, "img_height": 200, "patches": []}
+
+    _stub_pipeline(monkeypatch, sent, translate=translate)
+    _run_batch(pages=(0, 1, 2, 3))
+    assert sent == []  # in-flight results are dropped, pages 2-3 never start
