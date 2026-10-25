@@ -1,7 +1,10 @@
-"""#1119: TaskQueue.update_event must not drop a task enqueued while it awaits the disconnect checks.
+"""#1119: TaskQueue.update_event must not lose or resurrect tasks while it awaits the disconnect checks.
 
 Reproduces the instant HTTP 500s ("User is no longer connected", 0.03-0.08 s) seen when 10 pages are
-sent at once to 4 workers: a task added during update_event's awaits was overwritten out of the queue.
+sent at once to 4 workers: update_event iterated the live queue across awaits, a concurrent remove()
+(another request being dispatched) shifted the iterator, the next waiting task was skipped out of the
+rebuilt queue, and the removed task was written back. The add case passed before the fix too; it guards
+against a snapshot-only rewrite that would drop late arrivals.
 """
 import asyncio
 
@@ -54,3 +57,16 @@ def test_task_removed_during_update_event_stays_removed():
         await updating
         return [t.name for t in q.queue]
     assert asyncio.run(main()) == ['b']
+
+
+def test_waiting_task_is_not_skipped_when_another_is_dispatched():
+    # The production symptom: [a, b, c], a is dispatched mid-check -> b vanished before the fix ([a, c]).
+    async def main():
+        a, b, c = _Task('a'), _Task('b'), _Task('c')
+        q = _queue(a, b, c)
+        updating = asyncio.ensure_future(q.update_event())
+        await asyncio.sleep(0)
+        q.queue.remove(a)
+        await updating
+        return [t.name for t in q.queue]
+    assert asyncio.run(main()) == ['b', 'c']
