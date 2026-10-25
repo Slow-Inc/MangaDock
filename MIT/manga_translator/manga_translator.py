@@ -852,17 +852,18 @@ class MangaTranslator:
                                         [box for box, other in dialogue_regions if other is not region])
             if not swallows and should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
                                                   x2 - x1, y2 - y1, config.ocr.vlm_rescue):
-                from .ocr_vlm import vlm_localize_sfx
                 from .translators.keys import (CUSTOM_OPENAI_API_BASE,
                                                CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
                 crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
                 if crop.size:
                     rescued = prefetched_sfx.get(id(region))
                     if rescued is None:
-                        # Not prefetched (the text changed after the pre-pass): fall back to the blocking call.
-                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                                   target_lang=config.translator.target_lang)
+                        # Not prefetched (the text changed after the pre-pass): same call, in a thread (#1119) -
+                        # it is a 4-5 s blocking HTTP request, and with worker slots it stalled every page on the loop.
+                        from .ocr_vlm import localize_candidates
+                        rescued = (await localize_candidates([crop], api_base=CUSTOM_OPENAI_API_BASE,
+                                                             api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                                             target_lang=config.translator.target_lang))[0]
                     if rescued:
                         logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
                         # The rescue produced the FINAL SFX in the target language. Pre-setting
