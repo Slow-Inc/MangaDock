@@ -38,3 +38,25 @@ def test_env_settings():
     assert gpus == ["1", "0"]
     assert worker_settings_from_env({}) == (1, [])
     assert parse_worker_gpus("") == []
+
+
+# --- #1119 / #1118 review: a worker that dies after spawning leaves dispatch (Strata replica heal) ---
+
+from server.worker_plan import exited_worker_ports
+
+
+class _Proc:
+    def __init__(self, code):
+        self.code = code
+
+    def poll(self):
+        return self.code
+
+
+def test_exited_worker_ports_lists_only_dead_processes():
+    procs = {5004: _Proc(None), 5005: _Proc(1), 5006: _Proc(0), 5007: _Proc(None)}
+    assert exited_worker_ports(procs) == [5005, 5006]
+
+
+def test_exited_worker_ports_empty_when_all_alive():
+    assert exited_worker_ports({5004: _Proc(None)}) == []

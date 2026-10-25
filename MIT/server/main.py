@@ -38,7 +38,7 @@ from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
-from server.worker_plan import plan_extra_workers, worker_settings_from_env
+from server.worker_plan import exited_worker_ports, plan_extra_workers, worker_settings_from_env
 from server.path_utils import safe_result_folder
 from server import metrics, diagnostics, auth as dev_auth
 from server.status_snapshot import build_snapshot, to_messages
@@ -567,6 +567,7 @@ def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
 
 
 _WORKER_PROCS = []
+_WORKER_PORT_PROCS = {}   # port -> Popen, for the dead-worker watchdog
 _SIGNAL_HANDLERS_INSTALLED = False
 
 
@@ -584,10 +585,10 @@ def _install_worker_cleanup():
     overlap is safe.
     """
     global _SIGNAL_HANDLERS_INSTALLED
-    atexit.register(_terminate_all_workers)
     if _SIGNAL_HANDLERS_INSTALLED:
         return
     _SIGNAL_HANDLERS_INSTALLED = True
+    atexit.register(_terminate_all_workers)
 
     def handle_exit_signals(signum, frame):
         _terminate_all_workers()
@@ -611,12 +612,27 @@ def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=No
         env['CUDA_VISIBLE_DEVICES'] = str(device)
     proc = subprocess.Popen(cmds, cwd=parent, env=env)
     _WORKER_PROCS.append(proc)
+    _WORKER_PORT_PROCS[port] = proc
     where = f"GPU {device}" if device is not None else "front GPU"
     print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} ({where}; "
           f"front pid={os.getpid()} on {host}:{params.port})")
     executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
     _install_worker_cleanup()
     return proc
+
+
+@app.on_event("startup")
+async def _start_worker_watchdog():
+    asyncio.create_task(_worker_watchdog())
+
+
+async def _worker_watchdog(interval_s: float = 5.0):
+    """Stop dispatching to a front-spawned worker whose process exited (Strata replicas: no routing to a dead engine)."""
+    while True:
+        await asyncio.sleep(interval_s)
+        for port in exited_worker_ports(_WORKER_PORT_PROCS):
+            if executor_instances.unregister(port):
+                print(f"MIT worker on :{port} exited (code {_WORKER_PORT_PROCS[port].poll()}) - removed from dispatch")
 
 
 def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
