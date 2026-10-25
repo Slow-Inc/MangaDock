@@ -80,6 +80,15 @@ run-to-run variance. Removed rather than kept as a default-off knob (commit `deb
 | | gateway measured ~85–100 tok/s per stream, flat to 8 concurrent | measured here (`gw_probe`, real-page token logs) |
 | Memory | free RAM with the MIT stack up: **12.9 GB of 47.7 GB** (each worker ~4.6 GB private); Strata's fork peaks at a 23.7 GiB working set and Gyro-M places 6400 MiB of experts on the 4070 | free RAM measured here; Strata figures from its README/config |
 
+**Local Strata measurements on this PC** (from the engine's own logs, `D:/Github/Strata/strata-gyro-m-d2x.log` and
+`strata-swift-capacity.log`): Gyro-M D2x decodes **47.5–60 tok/s** with **46.8 GiB private commit**; the capacity profile
+(12 GiB RAM cache + NVMe) decodes **33.8 tok/s** with **35.6 GiB**. With MIT stopped and the developer's apps open the PC
+had **17.5 GB available and 72.4 of 90.5 GB committed** (measured 2026-10-25), so neither profile can start beside the
+current desktop, let alone beside MIT workers (D2x also fills both cards: 8000 MiB expert cache on the 5060 Ti, up to
+12288 MiB on the 4070). **Projection, not run:** at ~700–1000 completion tokens per page, translation would take ~12–20 s
+per page on Gyro-M against 8–11 s on the gateway, and a 10-page batch would decode serially (or +31–39 % with batch slots)
+instead of 4–5 pages in parallel. A live MIT-on-Strata run needs ~30 GB of RAM freed first.
+
 So on this 48 GB, 16 + 12 GB PC Strata cannot run beside a multi-worker MIT, and its single-stream decode is
 slower than the gateway MIT uses now. What transferred is its **serving layer**: replicas behind one front with a
 lowest-load router (`serve/replicas.py` → `pick_free_worker` and the 4–5-worker layout), batch slots
