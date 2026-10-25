@@ -1,3 +1,14 @@
+## MIT dual-GPU throughput — two transport bugs fixed, 5-worker layout (2026-10-25, #1119)
+
+Branch `fix/mit-worker-transport` (+ dispatch on `feat/mit-gpu-aware-dispatch`, stacked on #1118).
+- Traced where each page's time goes: GPU stages 2–3 s, the remote LLM call ~10 s, and **2.5–13 s lost moving the result from worker to front** (`StreamingResponse(BytesIO)` streams line by line: 30 s vs 0.05 s for 21.6 MB). Fixed with one `Response`.
+- **Front queue dropped waiting requests under concurrency** (instant HTTP 500, 2/10 pages on 4 workers): `update_event` iterated the live list across awaits. Fixed + post-mortem.
+- Results (10 pages, one run each): sequential 21.98 → 14.09 s/page; batch 4.36 s/page with 5 workers on 2 GPUs, 10/10. GPU util target (≥70 %) not met — GPU work is short; both cards now carry pages.
+- Rejected after measuring: hedged translation request (slower sequentially 2/2). Correction: `reasoning_effort=none` was being dropped by `resolve_reasoning_effort`; sent for real it gives 0 reasoning and ~2.3–4.8 s per call but loses a blind A/B 46:76 to `low` → opt-in only. The Backend's chapter path was sequential; PR #1122 → 94.9 s → 26.8–34.5 s for 10 pages on 4 workers. Strata-xeno studied as a reference design; its engine cannot run beside MIT on this PC (RAM) and decodes slower than the gateway.
+- Report: `docs/reports/benchmarks/2026-10-25-mit-dual-gpu-throughput.md`.
+
+---
+
 <!-- lang:en -->
 
 ## Native main integration validation — 2026-10-22

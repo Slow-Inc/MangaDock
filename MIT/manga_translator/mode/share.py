@@ -11,7 +11,6 @@ The web server (server/main.py) spawns this process, which:
 
 import contextlib
 import asyncio
-import io
 import logging
 import os
 import pickle
@@ -22,7 +21,7 @@ import aiohttp
 import numpy as np
 from PIL import Image
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
 from manga_translator.request_scope import request_scope
@@ -103,10 +102,7 @@ async def simple_execute_translate(request: Request):
         # translate() keeps per-image debug state and translation memory on the translator: alone on the worker
         async with _page_slot(config, alone=True):
             ctx = await _translator.translate(image, config)
-        return StreamingResponse(
-            io.BytesIO(pickle.dumps(ctx)),
-            media_type="application/octet-stream",
-        )
+        return Response(content=pickle.dumps(ctx), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
@@ -151,10 +147,7 @@ async def simple_execute_translate_patches(request: Request):
             report = _translator.vram_report()
             if report:
                 await send_telemetry(_PARENT["url"], _PARENT["nonce"], {"kind": "vram", **report})
-        return StreamingResponse(
-            io.BytesIO(pickle.dumps(patches)),
-            media_type="application/octet-stream",
-        )
+        return Response(content=pickle.dumps(patches), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
@@ -193,8 +186,7 @@ async def simple_execute_translate_batch_pipeline(request: Request):
             report = _translator.vram_report()
             if report:
                 await send_telemetry(_PARENT["url"], _PARENT["nonce"], {"kind": "vram", **report})
-        return StreamingResponse(io.BytesIO(pickle.dumps(results)),
-                                 media_type="application/octet-stream")
+        return Response(content=pickle.dumps(results), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Batch pipeline translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
@@ -254,10 +246,7 @@ async def simple_execute_translate_batch(request: Request):
         images_with_configs = [(img, config) for img in images]
         async with _whole_worker():
             results = await _translator.translate_batch(images_with_configs, batch_size)
-        return StreamingResponse(
-            io.BytesIO(pickle.dumps(results)),
-            media_type="application/octet-stream",
-        )
+        return Response(content=pickle.dumps(results), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Batch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))

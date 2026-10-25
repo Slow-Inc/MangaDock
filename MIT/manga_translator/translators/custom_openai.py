@@ -13,6 +13,7 @@ import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+from ..tls import ssl_context
 
 
 class EmptyContentError(Exception):
@@ -129,7 +130,9 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         ConfigGPT.__init__(self, config_key=_CONFIG_KEY)
         self.model = model
         CommonTranslator.__init__(self)
-        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama") # required, but unused for ollama
+        # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
+        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama",
+                                         http_client=openai.DefaultAsyncHttpxClient(verify=ssl_context())) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
         self.token_count_last = 0
@@ -346,9 +349,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # not populate these fields; log 'n/a' rather than raise if absent.
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
+        reasoning_tokens = getattr(getattr(response.usage, 'completion_tokens_details', None), 'reasoning_tokens', None)
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
-            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
+            f'reasoning={reasoning_tokens if reasoning_tokens is not None else "n/a"} '
+            f'content_chars={len(response.choices[0].message.content or "")} '
+            f'finish={getattr(response.choices[0], "finish_reason", "?")}'
         )
 
         content = response.choices[0].message.content
