@@ -100,3 +100,29 @@ def test_the_anthropic_client_shares_the_tls_context(monkeypatch):
 
     asyncio.run(main())
     assert seen == [tls.ssl_context()]
+
+
+def test_translators_on_one_loop_share_the_anthropic_connection_pool():
+    """#1119: with worker slots each page builds its own translator; a fresh connection to the gateway cost ~0.25-0.4 s
+    per request (TCP + TLS) against a warm one. Instances on one loop share the pool; closing an instance keeps it."""
+    import asyncio
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+
+    async def main():
+        a, b = CustomOpenAiTranslator(), CustomOpenAiTranslator()
+        ca, cb = a._anthropic_client(), b._anthropic_client()
+        await a.aclose_clients()
+        return ca, cb, ca.is_closed
+
+    ca, cb, closed = asyncio.run(main())
+    assert ca is cb and not closed
+
+
+def test_each_loop_gets_its_own_pool():
+    import asyncio
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+
+    async def grab():
+        return CustomOpenAiTranslator()._anthropic_client()
+
+    assert asyncio.run(grab()) is not asyncio.run(grab())
