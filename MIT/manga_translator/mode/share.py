@@ -26,7 +26,7 @@ from fastapi.responses import StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
 from manga_translator.request_scope import request_scope
-from server.worker_slots import SlotGate, effective_slots, slots_from_env
+from server.worker_slots import SlotGate, effective_slots, page_runs_alone, slots_from_env
 
 logger = logging.getLogger('shared')
 
@@ -58,9 +58,9 @@ _FRONT_STAGES = asyncio.Lock()   # #1123: FIFO through detect/OCR so the first p
 
 
 @contextlib.asynccontextmanager
-async def _page_slot(config, hooks=()):
+async def _page_slot(config, hooks=(), alone=False):
     """#1123: with MIT_WORKER_SLOTS > 1 a page runs in its own request scope (translator instance + progress hooks)
-    behind the slot gate - exclusive when it enables selective-Flux, which unloads shared models. One slot keeps the
+    behind the slot gate - exclusive (``alone``, selective-Flux, or an offline translator: see page_runs_alone). One slot keeps the
     previous behaviour: hooks are added to the shared translator for the duration of the request."""
     if _SLOTS == 1:
         for h in hooks:
@@ -72,7 +72,8 @@ async def _page_slot(config, hooks=()):
                 if h in _translator._progress_hooks:
                     _translator._progress_hooks.remove(h)
         return
-    exclusive = bool(getattr(getattr(config, 'inpainter', None), 'selective_flux', False))
+    from manga_translator.translators import OFFLINE_TRANSLATORS
+    exclusive = alone or page_runs_alone(config, OFFLINE_TRANSLATORS)
     async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks, stage_lock=_FRONT_STAGES):
         yield
 
@@ -99,7 +100,8 @@ async def simple_execute_translate(request: Request):
         raise HTTPException(422, detail="Missing 'image' in payload")
 
     try:
-        async with _page_slot(config):
+        # translate() keeps per-image debug state and translation memory on the translator: alone on the worker
+        async with _page_slot(config, alone=True):
             ctx = await _translator.translate(image, config)
         return StreamingResponse(
             io.BytesIO(pickle.dumps(ctx)),
@@ -318,7 +320,7 @@ class MangaTranslatorShared:
         # Create the translator engine
         _translator = MangaTranslator(params)
         global _SLOTS   # #1123: a worker that keeps rolling page context runs one page at a time
-        _SLOTS = effective_slots(os.environ, _translator.context_size)
+        _SLOTS = effective_slots(os.environ, _translator.context_size, _translator.models_ttl)
         import manga_translator.gpu_offload as gpu_offload   # #1123: free the loop during model forwards when pages share it
         gpu_offload.set_enabled(_SLOTS > 1)
 

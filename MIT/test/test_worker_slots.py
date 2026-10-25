@@ -1,7 +1,7 @@
 """#1123: batch slots inside one worker (Strata BATCHING.md) - the pure parts: slot count and the shared/exclusive gate."""
 import asyncio
 
-from server.worker_slots import SlotGate, slots_from_env
+from server.worker_slots import SlotGate, effective_slots, page_runs_alone, slots_from_env
 
 
 def test_slots_default_to_one():
@@ -47,3 +47,49 @@ def test_rolling_page_context_forces_one_slot():
     env = {"MIT_WORKER_SLOTS": "4", "MIT_PRELOAD": "1"}
     assert effective_slots(env, context_size=0) == 4
     assert effective_slots(env, context_size=2) == 1
+
+
+def test_a_cancelled_exclusive_waiter_does_not_block_later_pages():
+    """Scrutinize #1128: the waiting-exclusive count leaked when the waiter was cancelled (a client disconnecting from
+    /execute/translate while pages were in flight), and every later shared hold() then waited forever."""
+    async def main():
+        gate = SlotGate()
+        release = asyncio.Event()
+
+        async def page():
+            async with gate.hold(exclusive=False):
+                await release.wait()
+
+        p = asyncio.ensure_future(page()); await asyncio.sleep(0)
+        waiter = asyncio.ensure_future(gate.hold(exclusive=True).__aenter__()); await asyncio.sleep(0.01)
+        waiter.cancel()
+        try:
+            await waiter
+        except asyncio.CancelledError:
+            pass
+        release.set(); await p
+
+        async def later():
+            async with gate.hold(exclusive=False):
+                return "ran"
+        return await asyncio.wait_for(later(), 1)
+
+    assert asyncio.run(main()) == "ran"
+
+
+def test_a_worker_that_reaps_idle_models_keeps_one_slot():
+    """Scrutinize #1128: with models_ttl > 0 the reaper can unload a model while an offloaded forward waits on it."""
+    env = {"MIT_WORKER_SLOTS": "5", "MIT_PRELOAD": "1"}
+    assert effective_slots(env, 0, models_ttl=0) == 5
+    assert effective_slots(env, 0, models_ttl=60) == 1
+
+
+def test_offline_translators_and_selective_flux_run_alone():
+    """Scrutinize #1128: an offline translator is one shared instance with a GPU forward on the loop; selective-Flux
+    unloads shared models. Both take the whole worker."""
+    from types import SimpleNamespace as NS
+    cfg = lambda tr, flux=False: NS(translator=NS(translator=tr), inpainter=NS(selective_flux=flux))
+    offline = {"m2m100", "sugoi"}
+    assert page_runs_alone(cfg("custom_openai"), offline) is False
+    assert page_runs_alone(cfg("sugoi"), offline) is True
+    assert page_runs_alone(cfg("custom_openai", flux=True), offline) is True

@@ -9,6 +9,7 @@ Forwards still run one at a time: a process-wide lock keeps the GPU single-tenan
 around its forward and that flag is process-global (a concurrent LaMa forward would run without cuDNN, 3-12x slower;
 model_48px.py), and two inpainting forwards would double VRAM. Off by default; the worker enables it with slots > 1.
 Translators never offload (their _infer awaits HTTP clients bound to the main loop).
+Each forward runs on a fresh loop in the thread, so an offloaded ``_infer`` must not await objects of the main loop.
 """
 import asyncio
 import threading

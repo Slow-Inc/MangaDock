@@ -27,10 +27,21 @@ def slots_from_env(env=None) -> int:
     return min(slots, MAX_SLOTS)
 
 
-def effective_slots(env=None, context_size: int = 0) -> int:
+def effective_slots(env=None, context_size: int = 0, models_ttl: int = 0) -> int:
     """Slots for a worker: one when it keeps rolling page context (context_size > 0), because translate() shares that
-    translation memory across pages (#136 class); otherwise slots_from_env()."""
-    return 1 if context_size and context_size > 0 else slots_from_env(env)
+    translation memory across pages (#136 class), or when it unloads idle models (models_ttl > 0), because the reaper
+    could unload a model an offloaded forward is waiting on; otherwise slots_from_env()."""
+    if (context_size and context_size > 0) or (models_ttl and models_ttl > 0):
+        return 1
+    return slots_from_env(env)
+
+
+def page_runs_alone(config, offline_translators) -> bool:
+    """A page that must hold the whole worker: selective-Flux unloads shared models mid-page, and an offline translator
+    is one shared instance whose GPU forward runs on the loop."""
+    if getattr(getattr(config, 'inpainter', None), 'selective_flux', False):
+        return True
+    return str(getattr(getattr(config, 'translator', None), 'translator', '')) in {str(k) for k in offline_translators}
 
 
 class SlotGate:
@@ -51,8 +62,11 @@ class SlotGate:
         async with self._cond:
             if exclusive:
                 self._waiting_exclusive += 1
-                await self._cond.wait_for(lambda: not self._exclusive and self._shared == 0)
-                self._waiting_exclusive -= 1
+                try:
+                    await self._cond.wait_for(lambda: not self._exclusive and self._shared == 0)
+                finally:   # also on cancel - a leaked count would block every later shared holder
+                    self._waiting_exclusive -= 1
+                    self._cond.notify_all()
                 self._exclusive = True
             else:
                 await self._cond.wait_for(lambda: not self._exclusive and self._waiting_exclusive == 0)
