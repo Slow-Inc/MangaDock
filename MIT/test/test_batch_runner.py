@@ -17,7 +17,10 @@ TASK = "ch:ANY:THA"
 
 
 @pytest.fixture(autouse=True)
-def _clean_registry():
+def _clean_registry(monkeypatch):
+    # #1119: a shell with MIT_WORKERS>1 exported must not move the sequential-loop tests onto batch slots.
+    monkeypatch.delenv("MIT_WORKERS", raising=False)
+    monkeypatch.delenv("MIT_BATCH_CONCURRENCY", raising=False)
     cancellation._cancelled.clear()
     yield
     cancellation._cancelled.clear()
