@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from manga_translator import Config
 from server.sent_data_internal import fetch_batch_data, fetch_data_stream, NotifyType, fetch_data
-from server.worker_plan import pick_free_worker
+from server.worker_plan import card_key, pick_free_worker
 
 class ExecutorInstance(BaseModel):
     ip: str
@@ -59,7 +59,7 @@ class Executors:
     async def find_executor(self) -> ExecutorInstance:
         while True:
             async with self.lock:
-                index = pick_free_worker([(x.busy, (x.ip, x.device)) for x in self.list])
+                index = pick_free_worker([(x.busy, card_key(x.ip, x.device)) for x in self.list])
                 if index is not None:
                     instance = self.list[index]
                     instance.busy = True

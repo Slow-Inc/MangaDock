@@ -71,3 +71,10 @@ def test_pick_free_worker_counts_load_per_card_not_per_device_label():
     # Two hosts both report CUDA_VISIBLE_DEVICES=0: different cards, so host B's idle card wins.
     workers = [(True, ('10.0.0.1', '0')), (False, ('10.0.0.1', '0')), (False, ('10.0.0.2', '0'))]
     assert pick_free_worker(workers) == 2
+
+
+def test_card_key_treats_an_unset_device_as_cuda_default_card_0():
+    # A worker started without CUDA_VISIBLE_DEVICES runs on CUDA device 0, so it shares card '0's load.
+    from server.worker_plan import card_key
+    assert card_key('127.0.0.1', None) == card_key('127.0.0.1', '') == card_key('127.0.0.1', '0') == ('127.0.0.1', '0')
+    assert card_key('127.0.0.1', '1') == ('127.0.0.1', '1')
