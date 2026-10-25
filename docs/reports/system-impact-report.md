@@ -1,5 +1,40 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-25 — MIT worker transport fixes + dual-GPU worker layout (bugfix + perf) — #1119
+
+**Scope:** `MIT/server/myqueue.py`, `MIT/manga_translator/mode/share.py`, `MIT/server/main.py`,
+`MIT/manga_translator/translators/custom_openai.py`; dispatch (stacked on #1118): `MIT/server/worker_plan.py`,
+`MIT/server/instance.py` · **Type:** bug fix + latency fix + observability · **Tests:** torch-free suite 999
+passed / 4 skipped on this branch; torch-backed queue/custom_openai/guard tests 34 passed; 10-page E2E benchmark.
+**Severity:** medium (requests failed under concurrency; every page lost seconds in transport).
+
+**What & where:** `TaskQueue.update_event` awaits on a snapshot (was: iterated the live list across awaits);
+worker endpoints and the two PNG endpoints return one `Response` (were: `StreamingResponse(io.BytesIO(...))`);
+`Token split` log adds reasoning tokens, content size and finish reason. New guards: `test_queue_race.py`,
+`test_no_bytesio_streaming.py`.
+
+**Why:** goal to use both GPUs and cut batch and single-page time. Tracing showed the GPUs idle on a remote LLM
+call, results spending 2.5–13 s between worker and front, and batch pages failing instantly.
+
+**Before → After:** concurrent batch pages could get an instant HTTP 500 → none in 10-page batches on 4 and
+5 workers; a 21.6 MB result took 30 s to stream on localhost → 0.05 s.
+
+**Performance Δ:** 10-page corpus, one run per arm: sequential 19.87 → 14.09 s/page (Phase A 21.98);
+batch with 2 workers 13.57 → 7.98 s/page; with 5 workers (`MIT_WORKER_GPUS=1,1,1,0,0`) 4.36 s/page, 10/10.
+Report + PNG: `docs/reports/benchmarks/2026-10-25-mit-dual-gpu-throughput.md`.
+
+**Quality:** no prompt, model or render change; translation quality not re-judged.
+
+**Validation:** unit tests red before / green after (queue race; the guard named all six streaming sites);
+E2E benchmark above. Not run: repeated runs per arm; dispatch order in isolation.
+
+**Risk / rollback:** the two fixes are behaviour-preserving (same payloads, same queue semantics); revert the
+commits to roll back. Worker count is an env knob (default 1 worker).
+
+**Links:** #1119, post-mortem `docs/reports/2026-10-25-mit-queue-lost-request.md`, #1117/#1118, #1111.
+
+---
+
 ## 2026-10-22 — Native Phase 4 integration with current main
 
 [Integration evidence and resume point](../../Mobile/docs/2026-10-22-main-integration.md). Landing status is recorded by the integration PR. / หลักฐานและจุดทำต่ออยู่ในรายงาน สถานะ merge ให้ดู PR รวม
