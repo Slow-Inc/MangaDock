@@ -45,7 +45,7 @@ OpenCode Go, `reasoning_effort=low`, `MIT_PRELOAD=1`. GPU1 = RTX 5060 Ti 16 GB, 
 | **Results took 2.5–13 s to get from worker to front** | worker `translate()` 40.4 s vs front `get_ctx` 53.7 s on one page, 15.1 vs 17.6 s on another (temporary `[DBG-1119]` probes, removed) |
 | **Pages in a batch failed instantly with HTTP 500** | `batch_w4` v1: 2/10 pages at 0.07–0.08 s; front log `POST /translate/with-form/image 500` with no worker activity |
 | Slow pages are reasoning runaways | same page 5×: reasoning 334–2239 tokens for ~350 content chars, `finish=stop` (new `Token split` log fields) |
-| `reasoning_effort` does not bound reasoning on the real prompt | `none`: reasoning 800–2434 tokens; `minimal`: 822–1388; `low`: 522–1443 (3 pages × 2 runs each). The toy-prompt probe (`none` → 0 reasoning, 4.5 s vs 8.6 s) did not transfer |
+| ~~`reasoning_effort` does not bound reasoning~~ **corrected below** | the `none` runs never sent `none`: `resolve_reasoning_effort` dropped it (see Corrections) |
 
 ## Changes
 
@@ -69,6 +69,54 @@ first has not answered after N s, keep the first to finish. An offline simulatio
 −17 % mean / −29 % p90 at 12 s, but real sequential runs were slower in 2/2 pairs (230 vs 199 s at 12 s; 185 vs
 141 s at 15 s) and the worst page got worse (36.7 vs 27.9 s). One batch gain (43.6 → 38.7 s, 5 workers) is inside
 run-to-run variance. Removed rather than kept as a default-off knob (commit `debfbb8a` on the integration branch).
+
+## Corrections and later findings (same day)
+
+**`reasoning_effort=none` was never sent.** `MIT/manga_translator/runtime_options.py` allowed only
+minimal/low/medium/high, so `CUSTOM_OPENAI_REASONING_EFFORT=none` was dropped and the gateway used its default (heavier)
+reasoning — which is why the "none" arm above was slower. Replaying MIT's real request bodies through a recording proxy:
+`none` → **0 reasoning tokens, 2.3–4.8 s per call**; `low` → 36–3928 reasoning tokens, 1.6–49 s. A blind A/B on the
+10 corpus pages (same OCR input, 2 runs per arm, judged per segment): `low` wins **76**, `none` **46**, ties 37. So
+`none` is a real speed/quality tradeoff, opt-in; `low` stays the default. Fix: on PR #1111's branch (`none` passes
+through). Gateway thinking-budget parameters (`thinking.budget_tokens`, `reasoning.max_tokens`, `thinking_budget`)
+were ignored by the gateway (reasoning still 1182–2873 tokens).
+
+**The Backend's chapter path was sequential.** `server/batch_runner.run_batch_with_callbacks` (webhook mode, used by
+`Backend/src/books/mit-batch-stream.ts`) translated one page at a time, so the batch rows above (concurrent requests)
+did not describe real chapter translation. PR #1122 runs independent pages one per worker when rolling context is off.
+Backend path, 10 pages:
+
+| layout | run 1 | run 2 |
+|---|---:|---:|
+| 4 workers, before (sequential loop) | 94.9 s (9.49 s/page) | – |
+| 4 workers, PR #1122 | 34.5 s (3.45) | 26.8 s (2.68) |
+| 5 workers, PR #1122 | 35.4 s (3.54) | 29.9 s (2.99) |
+| 5 workers, `MIT_BATCH_CONCURRENCY=6` | 35.0 s (3.50) | 30.4 s (3.04) |
+
+5 workers and an extra pre-staged request do not beat 4 workers on this path: it is now bound by LLM latency and
+gateway variance, so 4 workers (less RAM) is the live layout.
+
+**Also tried and rejected:** OCR chunk 16 → 64 (OCR −12–17 %, ~0.1 s/page, but 66 OCR lines changed text).
+
+**Strata live attempt** (developer later clarified the intent was to adopt Strata's approaches, not run it): Gyro-M
+with a reduced config was started twice beside the desktop under a memory watchdog and killed both times at the commit
+limit (101.4 / 102.8 GB with a 10 GiB RAM cache; 93.7 / 94.4 GB with 2 GiB). Details in #1119.
+
+**Faster single page: claude-haiku-5-5 on the Anthropic protocol (PR #1125).** Strata treats short non-interactive
+requests as side requests that should barely think (`serve/think_budget.py`); the gateway ignores thinking budgets, so the
+equivalent is a model that answers directly. Blind A/B on MIT's real request bodies (10 pages × 2, judged per segment by
+deepseek): haiku **87**, deepseek@low **73**, ties 24; ~2.3–4 s per call (max 8.8 s) vs 1.7–36 s. E2E translation
+3.9–4.8 s per page; Backend chapter path on 4 workers 23.2–31.9 s vs 26.8–34.5 s. Opt-in
+(`CUSTOM_OPENAI_PROTOCOL=anthropic`, `CUSTOM_OPENAI_MODEL=claude-haiku-5-5`); the live `.env` is unchanged because
+pricing is the developer's call.
+
+**Workers die with the front (#1118).** Strata's `winjob.py` puts its engine in a kill-on-close job. MIT's front now
+joins such a job before spawning (`server/win_process.py`), so a force-killed front leaves no worker on its port
+(verified: killing only the front's pid left 0 worker processes). A first version that assigned only the venv launcher
+raced and left an orphan. EcoQoS impact is unmeasured (the first A/B opted out only the launcher).
+
+**In-worker batch slots** (one worker, N pages, one model copy — Strata's `BATCHING.md`) are blocked by a shared
+translator config (`custom_openai.py:138`, `parse_args`); parked as #1123.
 
 ## Strata-xeno as the engine
 
