@@ -65,3 +65,9 @@ def test_pick_free_worker_ties_go_to_registration_order():
     # Both GPUs have one busy worker -> first free worker in list order.
     workers = [(True, '1'), (False, '1'), (True, '0'), (False, '0')]
     assert pick_free_worker(workers) == 1
+
+
+def test_pick_free_worker_counts_load_per_card_not_per_device_label():
+    # Two hosts both report CUDA_VISIBLE_DEVICES=0: different cards, so host B's idle card wins.
+    workers = [(True, ('10.0.0.1', '0')), (False, ('10.0.0.1', '0')), (False, ('10.0.0.2', '0'))]
+    assert pick_free_worker(workers) == 2
