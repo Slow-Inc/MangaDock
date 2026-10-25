@@ -90,3 +90,29 @@ def test_a_per_request_openai_style_client_is_closed():
             reg.get("api")
     asyncio.run(main())
     assert _Client.closed
+
+
+def test_front_stages_run_one_page_at_a_time_in_arrival_order():
+    # #1123 convoy: without this, 5 pages round-robin through detection/OCR and all reach the LLM together.
+    from manga_translator.request_scope import front_stage_lock
+    log = []
+    lock = asyncio.Lock()
+
+    async def page(name):
+        async with request_scope(stage_lock=lock):
+            async with front_stage_lock():
+                log.append(f"+{name}"); await asyncio.sleep(0.01); log.append(f"-{name}")
+
+    async def main():
+        await asyncio.gather(page("a"), page("b"), page("c"))
+    asyncio.run(main())
+    assert log == ["+a", "-a", "+b", "-b", "+c", "-c"]
+
+
+def test_front_stage_lock_is_a_no_op_outside_a_slot_scope():
+    from manga_translator.request_scope import front_stage_lock
+
+    async def main():
+        async with front_stage_lock():
+            return True
+    assert asyncio.run(main())
