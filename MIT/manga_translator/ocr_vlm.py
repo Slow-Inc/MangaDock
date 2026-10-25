@@ -448,16 +448,30 @@ def vlm_transcribe(crop_rgb: np.ndarray, *, api_base: str, api_key: str, model: 
         if post_fn is None:
             import requests
             post_fn = requests.post
-        body = {"model": model, "max_tokens": TRANSCRIBE_MAX_TOKENS, "temperature": 0,
-                "messages": [{"role": "user", "content": [
-                    {"type": "text", "text": TRANSCRIBE_PROMPT},
-                    {"type": "image_url", "image_url": {"url": _to_data_url(crop_rgb)}}]}]}
-        resp = post_fn(api_base.rstrip('/') + "/chat/completions",
-                       headers={**_gateway_headers(), "Authorization": "Bearer " + api_key},
-                       json=body, timeout=timeout)
-        choice = resp.json()["choices"][0]
-        content = choice["message"]["content"]
-        finish = choice.get("finish_reason")
+        from .anthropic_messages import anthropic_endpoint, anthropic_model, protocol_from_env
+        headers = {**_gateway_headers(), "Authorization": "Bearer " + api_key}
+        data_url = _to_data_url(crop_rgb)
+        if protocol_from_env() == 'anthropic':
+            # Same transport and model as the translator: haiku does not think, so the answer is not lost
+            # to a reasoning budget (deepseek returned finish=length now and then, pausing the rescue).
+            body = {"model": anthropic_model(model), "max_tokens": TRANSCRIBE_MAX_TOKENS,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                     "data": data_url.split(',', 1)[1]}},
+                        {"type": "text", "text": TRANSCRIBE_PROMPT}]}]}
+            data = post_fn(anthropic_endpoint(api_base), headers={**headers, "anthropic-version": "2023-06-01"},
+                           json=body, timeout=timeout).json()
+            content = ''.join(b.get('text', '') for b in data.get('content') or [] if b.get('type') == 'text')
+            finish = {'end_turn': 'stop', 'stop_sequence': 'stop'}.get(data.get('stop_reason'), data.get('stop_reason'))
+        else:
+            body = {"model": model, "max_tokens": TRANSCRIBE_MAX_TOKENS, "temperature": 0,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": TRANSCRIBE_PROMPT},
+                        {"type": "image_url", "image_url": {"url": data_url}}]}]}
+            choice = post_fn(api_base.rstrip('/') + "/chat/completions", headers=headers,
+                             json=body, timeout=timeout).json()["choices"][0]
+            content = choice["message"]["content"]
+            finish = choice.get("finish_reason")
         if content is None or (finish is not None and finish != 'stop'):
             logger.warning("[OcrVLM] transcription unusable: finish_reason=%s content=%r", finish, content)
             _breaker.fail(model)

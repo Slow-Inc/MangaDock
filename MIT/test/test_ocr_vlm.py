@@ -704,3 +704,29 @@ def test_a_read_of_only_dashes_or_rings_is_line_art_not_worth_a_call():
         assert not should_rescue_sfx(read, True, 300, 300, True), read
     assert should_rescue_sfx('', True, 300, 300, True)
     assert should_rescue_sfx('ぬ', True, 300, 300, True)
+
+
+def test_transcription_follows_the_translator_onto_the_anthropic_protocol(monkeypatch):
+    # live: deepseek (thinking) spent all 512 tokens reasoning now and then -> finish=length, content '' ->
+    # three in a row paused the rescue for 300 s and every box in that window dropped. The translator already
+    # runs haiku on the Anthropic protocol, which does not think; the rescue now goes the same way.
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+    monkeypatch.setattr(v, '_gateway_headers', lambda: {'x-opencode-session': 's1'})
+    calls = {}
+
+    class R:
+        def json(self):
+            return {'content': [{'type': 'text', 'text': "I'm glad."}], 'stop_reason': 'end_turn'}
+
+    def post(url, headers=None, json=None, timeout=None):
+        calls.update(url=url, headers=headers, json=json)
+        return R()
+    v.reset_sfx_breaker()
+    out = v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='deepseek', post_fn=post)
+    assert out == "I'm glad."
+    assert calls['url'].endswith('/anthropic/v1/messages')
+    assert calls['json']['model'] == 'claude-haiku-5-5'
+    assert calls['json']['messages'][0]['content'][0]['type'] == 'image'
+    assert calls['headers']['x-opencode-session'] == 's1' and calls['headers']['anthropic-version']
