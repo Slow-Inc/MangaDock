@@ -12,7 +12,10 @@ import asyncio
 import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
-from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL,
+                   CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
+from ..extra_headers import parse_extra_headers
+from ..runtime_options import resolve_reasoning_effort
 from ..tls import ssl_context
 
 
@@ -130,9 +133,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         ConfigGPT.__init__(self, config_key=_CONFIG_KEY)
         self.model = model
         CommonTranslator.__init__(self)
+        # Optional gateway headers from CUSTOM_OPENAI_EXTRA_HEADERS (JSON object). OpenCode Go needs
+        # {"x-opencode-session": "<stable id>"} or it answers 400 MissingSessionID.
+        extra_headers = parse_extra_headers(CUSTOM_OPENAI_EXTRA_HEADERS)
+        if CUSTOM_OPENAI_EXTRA_HEADERS.strip() and not extra_headers:
+            self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
+        client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
         # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
-        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama",
-                                         http_client=openai.DefaultAsyncHttpxClient(verify=ssl_context())) # required, but unused for ollama
+        client_kwargs['http_client'] = openai.DefaultAsyncHttpxClient(verify=ssl_context())
+        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama", **client_kwargs) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
         self.token_count_last = 0
@@ -330,6 +339,11 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # burns the whole max_tokens budget on <think> and returns empty content on
         # dense pages (verified: dense group 2048-tok exhausted → None; thinking off → 86 tok).
         _extra = thinking_extra_body(resolve_enable_thinking())
+        # Optional reasoning budget for OpenAI-style reasoning models (OpenCode Go accepts it).
+        _effort = resolve_reasoning_effort()
+        if _effort:
+            _extra = dict(_extra or {})
+            _extra['reasoning_effort'] = _effort
         if _extra is not None:
             create_kwargs['extra_body'] = _extra
         response = await self.client.chat.completions.create(**create_kwargs)

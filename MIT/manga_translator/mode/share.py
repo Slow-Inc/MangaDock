@@ -323,6 +323,15 @@ class MangaTranslatorShared:
                     _t0 = _time.perf_counter()
                     try:
                         await _translator._model_lifecycle.preload(Config(), _translator.device, 0)
+                        # The bubble/SFX YOLOs are lazy globals outside the lifecycle table; warm them too so no
+                        # pipeline stage pays a first-page load. Best-effort, never a boot failure.
+                        try:
+                            from ..bubble_detector import preload as _preload_bubbles
+                            from ..sfx_detector import preload as _preload_sfx
+                            await asyncio.to_thread(_preload_bubbles, _translator.device)
+                            await asyncio.to_thread(_preload_sfx, _translator.device)
+                        except Exception as exc:
+                            print(f"[share] detector preload skipped: {exc}", flush=True)
                         print(f"[share] models preloaded in {(_time.perf_counter() - _t0) * 1000:.0f} ms", flush=True)
                     except Exception as exc:  # preload is an optimisation, never a boot failure
                         print(f"[share] model preload skipped: {exc}", flush=True)

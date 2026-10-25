@@ -9,6 +9,15 @@ Branch `fix/mit-worker-transport` (+ dispatch on `feat/mit-gpu-aware-dispatch`, 
 
 ---
 
+## MIT quality loop, post-merge — Strata inference-engine principles applied to MIT (2026-10-24)
+
+Branch `feat/opencode-extra-headers` (PR #1111).
+- Studied `D:/Github/Strata` and mapped its latency principles onto MIT. Already in place from this session: hot-model preload (idle VRAM ~4.9 GB, first-page detection 5.6 s cold -> 0.75 s warm), single-worker fits in ~5 GB, full stage telemetry.
+- Measured its **batch-slots** principle on MIT: two registered workers, two concurrent pages = **24.7 s vs 33.0 s** sequential on one GPU (1.34x) and **25.3 s vs 30.1 s** with one worker per card (1.19x). Gain is bounded by the remote translation gateway, not MIT. Documented as opt-in (`2026-10-24-strata-principles-in-mit.md` with the worker launch commands).
+- Not applicable yet: MTP/speculative decode and prompt caching (they need MIT to translate through a local engine; Strata's current API is agent-oriented, not OpenAI-compatible).
+
+---
+
 <!-- lang:en -->
 
 ## Native main integration validation — 2026-10-22
