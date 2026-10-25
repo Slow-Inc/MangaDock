@@ -54,6 +54,7 @@ async def health():
 
 _SLOTS = slots_from_env()
 _GATE = SlotGate()
+_FRONT_STAGES = asyncio.Lock()   # #1123: FIFO through detect/OCR so the first pages reach the LLM early
 
 
 @contextlib.asynccontextmanager
@@ -72,7 +73,7 @@ async def _page_slot(config, hooks=()):
                     _translator._progress_hooks.remove(h)
         return
     exclusive = bool(getattr(getattr(config, 'inpainter', None), 'selective_flux', False))
-    async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks):
+    async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks, stage_lock=_FRONT_STAGES):
         yield
 
 
