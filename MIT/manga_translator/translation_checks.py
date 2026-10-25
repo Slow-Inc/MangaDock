@@ -13,6 +13,20 @@ from typing import Callable, List
 logger = logging.getLogger('manga_translator')
 
 
+_PLAIN_WORD = re.compile(r"^[A-Za-z][A-Za-z'’-]+[!?.,…]*$")
+
+
+def _kept_untranslatable(text: str, translation: str, in_target: float) -> bool:
+    """A short non-sentence line with no target-script letter (coin name, wallet address, URL, handle) that the
+    model handed back verbatim (#1139).
+
+    No answer can put Thai script into it, so counting it fails a scanlator credit page on every retry. A sentence
+    left in English (4+ plain words) still counts, so a page answered in English still fails."""
+    if in_target > 0 or not text or ''.join(text.split()).upper() != ''.join(translation.split()).upper():
+        return False
+    return sum(1 for word in text.split() if _PLAIN_WORD.match(word)) < 4
+
+
 def check_target_language_ratio(text_regions: List, target_lang: str,
                                 script_ratio: Callable[[str, str], float],
                                 min_ratio: float = 0.5) -> bool:
@@ -23,11 +37,11 @@ def check_target_language_ratio(text_regions: List, target_lang: str,
     if not text_regions:
         return True
 
-    all_translations = []
-    for region in text_regions:
-        translation = getattr(region, 'translation', '')
-        if translation and translation.strip():
-            all_translations.append(translation.strip())
+    answered = [r for r in text_regions if getattr(r, 'translation', '') and r.translation.strip()]
+    judged = [r for r in answered
+              if not _kept_untranslatable(getattr(r, 'text', ''), r.translation, script_ratio(r.translation, target_lang))]
+    # a page where every line came back verbatim was not translated at all: judge it whole (#1139)
+    all_translations = [r.translation.strip() for r in (judged or answered)]
 
     if not all_translations:
         logger.debug('No valid translation texts for language ratio check')

@@ -7,6 +7,7 @@ Pulling them into `translation_checks` gives a unit-testable seam where *new*
 validators attach — instead of growing the god object (feedback_core_boundary).
 Behaviour is preserved verbatim.
 """
+from manga_translator.utils.lang_ratio import target_script_ratio
 from manga_translator.translation_checks import (
     check_repetition_hallucination,
     check_target_language_ratio,
@@ -64,3 +65,45 @@ def test_threshold_is_honoured():
     # 'aaa' (len 3) only trips char-repetition once threshold drops to 3
     assert check_repetition_hallucination("aaa", threshold=3, silent=True) is True
     assert check_repetition_hallucination("aaa", threshold=5, silent=True) is False  # len < threshold
+
+
+class _Pair:
+    def __init__(self, text, translation):
+        self.text, self.translation = text, translation
+
+
+def _credit_page(kept_line):
+    """A scanlator donation page as the live gateway answered it (#1139): coin names, wallet addresses and URLs
+    come back verbatim, the sentences come back Thai."""
+    return [_Pair("O DOGE COIN", "O DOGE COIN"),
+            _Pair("DAU6i4t5Sy1WKCBKyn7 ufaJKoUGo2MiMnQ", "DAU6i4t5Sy1WKCBKyn7 ufaJKoUGo2MiMnQ"),
+            _Pair("OBITCOIN CASH", "OBITCOIN CASH"),
+            _Pair("qrfcrlpe3tttcr6s9plmlv zcvh3ne9u87guh3qqy6s", "qrfcrlpe3tttcr6s9plmlv zcvh3ne9u87guh3qqy6s"),
+            _Pair("PLEASE SUPPORT US FOR SPEEDY RELEASES-", kept_line),
+            _Pair("Contact -Setsuscans@gmail.com", "ติดต่อ -Setsuscans@gmail.com"),
+            _Pair("OLITE COIN", "OLITE COIN"),
+            _Pair("ltclqzq7kf3a5w84dmeezw eg8xynxckfv0xlt29qx7m", "ltclqzq7kf3a5w84dmeezw eg8xynxckfv0xlt29qx7m"),
+            _Pair("SETSUSCANS.COM/PAYPAL SSJ10,B00TH,PM DISCORD - SETSUSCANS,COM/DISCORD",
+                  "SETSUSCANS. COM/PAYPAL SSJ10, B00TH, PM DISCORD - SETSUSCANS,COM/DISCORD")]
+
+
+def test_untranslatable_lines_kept_verbatim_do_not_fail_the_page_1139():
+    # measured: 0.37 Thai -> the page was re-translated 3x and every retry failed the same way
+    page = _credit_page("โปรดสนับสนุนพวกเราเพื่อให้ออกตอนใหม่ได้เร็วขึ้น")
+    assert check_target_language_ratio(page, "THA", target_script_ratio) is True
+
+
+def test_a_sentence_left_in_english_still_fails_the_page_1139():
+    page = _credit_page("PLEASE SUPPORT US FOR SPEEDY RELEASES-")
+    assert check_target_language_ratio(page, "THA", target_script_ratio) is False
+
+
+def test_a_page_answered_in_english_still_fails_1139():
+    lines = ["WELL NO... BEING THAT CLOSE", "THINK OF THE SIGHTSEEING SPOTS", "COULD YOU PLEASE KEEP IT DOWN",
+             "HEY, WE AGREED WE DIDN'T", "RIGHT...", "HUH?!"]
+    assert check_target_language_ratio([_Pair(l, l) for l in lines], "THA", target_script_ratio) is False
+
+
+def test_a_page_of_short_lines_all_left_in_english_still_fails_1139():
+    lines = ["HUH?!", "NO WAY!", "RIGHT...", "WHAT?", "STOP IT!", "OKAY"]
+    assert check_target_language_ratio([_Pair(l, l) for l in lines], "THA", target_script_ratio) is False

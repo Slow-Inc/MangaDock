@@ -414,3 +414,15 @@ def test_segment_retry_policy_1055():
     assert not use_segment_retry(1, 20, env=subset_last)
     assert use_segment_retry(2, 20, env=subset_last)
     assert not use_segment_retry(0, 20, seg_on)
+
+
+def test_a_capitalised_brand_inside_a_sentence_case_line_is_a_name_1139():
+    from manga_translator.translation_quality import untranslated_source_word as u
+    # live credit page: each of these re-asked the gateway once per translate call
+    assert not u('Need Donations Guyz. Plz Paypal.', 'ต้องการเงินบริจาคนะทุกคน ช่วยโอนผ่าน Paypal หน่อยนะ')
+    assert not u('Need Donations Guyz. Plz Paypal.', 'พวกเราต้องการการบริจาคนะ ช่วยโอนผ่าน PayPal ด้วย')
+    assert not u('Check if Patreon is available? we usually put these links on top of the site.',
+                 'ลองเช็กดูว่า Patreon ใช้ได้ไหม? เรามักจะใส่ลิงก์พวกนี้ไว้ด้านบนของเว็บ')
+    # a sentence-initial word is not a name, and all-caps lettering keeps the #1057 behaviour
+    assert u('Materials are on the desk.', 'Materials อยู่บนโต๊ะนะ ไปหยิบมาสิ')
+    assert u('PLZ SEND IT THROUGH PAYPAL', 'ช่วยส่งมาทาง PAYPAL หน่อยนะทุกคนขอบคุณมากเลยจ้า')
