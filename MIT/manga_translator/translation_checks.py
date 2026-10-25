@@ -18,7 +18,7 @@ _PLAIN_WORD = re.compile(r"^[A-Za-z][A-Za-z'’-]+[!?.,…]*$")
 #: `WAIT...WHAT`, `MR.SMITH`, a grawlix `@#%!` and a short ID like `ab12cd34ef` stay outside.
 _UNTRANSLATABLE_TOKEN = re.compile(
     r'https?://\S+|www\.\S+|\w@\w+\.\w'
-    r'|\b[A-Za-z0-9-]+\.(?:com|net|org|io|gg|me|co|xyz|to|pm|tv)\b'
+    r'|\b[A-Za-z0-9-]+\.(?:com|net|org|io|gg|xyz|pm|tv)\b'
     r'|\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{16,}\b', re.I)
 
 

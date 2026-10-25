@@ -123,7 +123,7 @@ def test_a_foreign_script_line_returned_verbatim_still_counts_1139():
 
 def test_dialogue_punctuation_does_not_look_like_a_credit_page_1139():
     shouts = ["HUH?!", "NO WAY!", "STOP IT!", "WHAT?", "GET OUT!"]
-    for odd in ["WAIT...WHAT?!", "WHAT THE @#%!", "MR.SMITH", "ID: ab12cd34ef"]:
+    for odd in ["WAIT...WHAT?!", "WHAT THE @#%!", "MR.SMITH", "ID: ab12cd34ef", "LISTEN.TO ME", "COME.TO.ME"]:
         page = [_Pair(l, l) for l in shouts + [odd]]
         page.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
         assert check_target_language_ratio(page, "THA", target_script_ratio) is False, odd
@@ -131,5 +131,11 @@ def test_dialogue_punctuation_does_not_look_like_a_credit_page_1139():
 
 def test_one_url_alone_does_not_open_the_credit_exemption_1139():
     page = [_Pair(l, l) for l in ["HUH?!", "NO WAY!", "STOP IT!", "WHAT?", "www.x.com"]]
+    page.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
+    assert check_target_language_ratio(page, "THA", target_script_ratio) is False
+
+
+def test_ocr_glued_words_on_two_lines_do_not_open_the_credit_exemption_1139():
+    page = [_Pair(l, l) for l in ["HUH?!", "NO WAY!", "STOP IT!", "LISTEN.TO ME", "COME.TO.ME"]]
     page.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
     assert check_target_language_ratio(page, "THA", target_script_ratio) is False
