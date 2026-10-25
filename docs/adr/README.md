@@ -32,7 +32,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [029](029-frontend-strata-design-system-and-mascots.md) | Frontend design system: Strata tokens, dark default + 3 modes, no purple, one loader family, bot-avatars mascots as profile identity, on-demand ECharts in Studio | Frontend | Accepted — **implementing** (#764) |
 | [022](022-mit-detection-completeness-and-overlap-safe-patches.md) | MIT detection-completeness nets (empty-balloon / white-caption / ink-cluster rescue) + overlap-safe patch alpha + index-based numbered-contract; the Otome-p10 8-defect sweep | MIT | Accepted |
 | [034](034-mit-dual-gpu-serving-layout.md) | MIT dual-GPU serving: 4–5 workers over both cards with least-busy-GPU dispatch; Strata-xeno as reference design, not runtime; hedging rejected | MIT | Accepted (#1119) |
-| [035](035-mit-post-translation-guards-skip-untranslatable-text.md) | MIT post-translation guards skip text no translation can change (verbatim non-sentence lines, mid-sentence names): credit pages stop re-translating 3-8x | MIT | Accepted (#1139) |
+| [035](035-mit-post-translation-guards-skip-untranslatable-text.md) | MIT post-translation guards skip text no translation can change (verbatim Latin lines on pages with a URL/e-mail/wallet line; donation-platform credit lines): credit pages stop re-translating 3-8x | MIT | Accepted (#1139) |
 
 ## Conventions
 

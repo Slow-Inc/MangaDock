@@ -107,3 +107,15 @@ def test_a_page_answered_in_english_still_fails_1139():
 def test_a_page_of_short_lines_all_left_in_english_still_fails_1139():
     lines = ["HUH?!", "NO WAY!", "RIGHT...", "WHAT?", "STOP IT!", "OKAY"]
     assert check_target_language_ratio([_Pair(l, l) for l in lines], "THA", target_script_ratio) is False
+
+
+def test_short_english_lines_hidden_behind_one_thai_line_still_fail_1139():
+    lines = [_Pair(l, l) for l in ["HUH?!", "NO WAY!", "STOP IT!", "WHAT?", "GET OUT!"]]
+    lines.append(_Pair("I SAID GET OUT OF MY ROOM", "ฉันบอกให้ออกไปจากห้องฉัน"))
+    assert check_target_language_ratio(lines, "THA", target_script_ratio) is False
+
+
+def test_a_foreign_script_line_returned_verbatim_still_counts_1139():
+    page = [_Pair("今日はいい天気ですね", "今日はいい天気ですね"), _Pair("明日も晴れるといいな", "明日も晴れるといいな"),
+            _Pair("SEE YOU", "แล้วเจอกัน"), _Pair("https://discord.gg/x8sjNQP", "https://discord.gg/x8sjNQP")]
+    assert check_target_language_ratio(page, "THA", target_script_ratio) is False

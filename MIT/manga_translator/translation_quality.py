@@ -514,7 +514,9 @@ def dropped_question(src: str, dst: str, to_lang: str = '') -> bool:
 _LATIN_WORD = re.compile(r'[A-Za-z]{4,}')
 _THAI_CHAR = re.compile('[\u0E00-\u0E7F]')
 _CREDIT_SRC = re.compile(
-    r'(TRANSLAT|TRANSLATED BY|WRIT|DRAW|DESIGN|LETTER|EDITING|EDITOR|AUTHOR|STORY|THANKS|SPECIAL|CREDIT|CLEAN|TYPESET|PUBLISH|ART BY)',
+    # #1139: donation lines on scanlator credit pages name the platform, which stays Latin (`Plz Paypal.`)
+    r'(TRANSLAT|TRANSLATED BY|WRIT|DRAW|DESIGN|LETTER|EDITING|EDITOR|AUTHOR|STORY|THANKS|SPECIAL|CREDIT|CLEAN|TYPESET|PUBLISH|ART BY'
+    r'|PAYPAL|PATREON|DISCORD|KO-?FI|DONAT)',
     re.I)
 _VOWELS = set('AEIOUaeiou')
 
@@ -528,20 +530,6 @@ def _url_words(text):
     for match in _URLISH.finditer(text or ''):
         words.update(w.upper() for w in _LATIN_WORD.findall(match.group(0)))
     return words
-
-
-_CAPITALISED = re.compile(r'(?<![.!?]\s)(?<!^)\b[A-Z][a-z]{3,}\b')
-
-
-def _sentence_case_names(src):
-    """Capitalised words inside a sentence-case source (`Plz Paypal.`, `Check if Patreon is ...`) (#1139).
-
-    Mid-sentence capitals there mark a name the prompt lets stay Latin; re-asking for them failed on every retry of
-    a credit page. All-caps lettering has no such signal, so it returns nothing and #1057 is unchanged."""
-    src = (src or '').split(chr(10) + chr(10) + '[note:')[0].strip()
-    if not re.search('[a-z]', src):
-        return set()
-    return {w.upper() for w in _CAPITALISED.findall(src)}
 
 
 def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
@@ -570,7 +558,6 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
     # URLs / domains in the source or answer are legitimate Latin: `READ MORE CHAPTERS AT KDTSCANS.COM`
     # ships as `อ่านต่อได้ที่ KDTSCANS.COM`, not a lost translation (measured on unseen pages).
     url_words = _url_words(src) | _url_words(dst)
-    names = _sentence_case_names(src)
     for word in _LATIN_WORD.findall(dst):
         upper = word.upper()
         # exact source word, or a partial copy glued into the Thai (observed: MATERIALS -> 'ATERIALS' after the
@@ -581,8 +568,6 @@ def untranslated_source_word(src: str, dst: str, to_lang: str = '') -> bool:
         if not matched:
             continue
         if upper in url_words:
-            continue
-        if upper in names:
             continue
         if not (set(word) & _VOWELS):
             continue
