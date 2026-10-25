@@ -34,6 +34,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [034](034-mit-dual-gpu-serving-layout.md) | MIT dual-GPU serving: 4–5 workers over both cards with least-busy-GPU dispatch; Strata-xeno as reference design, not runtime; hedging rejected | MIT | Accepted (#1119) |
 | [035](035-mit-post-translation-guards-skip-untranslatable-text.md) | MIT post-translation guards skip text no translation can change (verbatim Latin lines on pages with 2+ URL/e-mail/wallet lines; donation-platform names): credit pages stop re-translating 3-8x | MIT | Accepted (#1139) |
 | [036](036-mit-translator-sees-the-page-image.md) | MIT gateway translator gets the page image with every request (blind A/B 163:97 votes, 19:8 pages); contextvar per page; on by default, text-only fallback on 400 | MIT | Accepted (#1141) |
+| [037](037-mit-ocr-rescue-transcribes.md) | MIT's OCR rescue transcribes the crop instead of localising an SFX (on the translator's Anthropic transport); guessed boxes survive OCR; `resolve_rescue` keeps / takes over / drops; a failed page raises instead of caching empty | MIT | Accepted (#881, #1144) |
 
 ## Conventions
 
