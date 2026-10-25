@@ -13,6 +13,7 @@ import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+from ..tls import ssl_context
 
 
 class EmptyContentError(Exception):
@@ -129,7 +130,9 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         ConfigGPT.__init__(self, config_key=_CONFIG_KEY)
         self.model = model
         CommonTranslator.__init__(self)
-        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama") # required, but unused for ollama
+        # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
+        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama",
+                                         http_client=openai.DefaultAsyncHttpxClient(verify=ssl_context())) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
         self.token_count_last = 0
