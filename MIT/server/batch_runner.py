@@ -182,7 +182,10 @@ async def run_batch_with_callbacks(
                     await _deliver_page(img_bytes, page_idx, config_str, taskId,
                                         callback_url, callback_secret, rolling)
 
-            await asyncio.gather(*(one(b, i) for b, i in pages))
+            # return_exceptions: every page settles before `finally` discards the taskId.
+            for err in await asyncio.gather(*(one(b, i) for b, i in pages), return_exceptions=True):
+                if isinstance(err, BaseException):
+                    print(f"[batch] task {taskId} page task failed: {err!r}")
             return
         for img_bytes, page_idx in pages:
             # Stop before starting a new page if the Batch Job was cancelled.
