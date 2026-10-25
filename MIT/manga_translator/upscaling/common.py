@@ -37,6 +37,7 @@ class CommonUpscaler(InfererModule):
         pass
 
 class OfflineUpscaler(CommonUpscaler, ModelWrapper):
+    _OFFLOAD = True   # #1123: forward may run in a thread under the GPU lock (worker slots)
     _MODEL_SUB_DIR = 'upscaling'
 
     async def _upscale(self, *args, **kwargs):

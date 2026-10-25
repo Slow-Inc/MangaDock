@@ -14,6 +14,7 @@ class CommonColorizer(InfererModule):
         pass
 
 class OfflineColorizer(CommonColorizer, ModelWrapper):
+    _OFFLOAD = True   # #1123: forward may run in a thread under the GPU lock (worker slots)
     _MODEL_SUB_DIR = 'colorization'
 
     async def _colorize(self, *args, **kwargs):

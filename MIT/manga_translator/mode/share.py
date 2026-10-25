@@ -308,6 +308,8 @@ class MangaTranslatorShared:
         _translator = MangaTranslator(params)
         global _SLOTS   # #1123: a worker that keeps rolling page context runs one page at a time
         _SLOTS = effective_slots(os.environ, _translator.context_size)
+        import manga_translator.gpu_offload as gpu_offload   # #1123: free the loop during model forwards when pages share it
+        gpu_offload.set_enabled(_SLOTS > 1)
 
         # #1047 (opt-in MIT_PRELOAD=1): load the heavy models while uvicorn boots so the first page does not
         # pay the model-load time. Off by default (costs GPU/RAM while idle, slows boot).
