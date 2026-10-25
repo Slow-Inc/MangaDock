@@ -1675,7 +1675,9 @@ class MangaTranslator:
         try:
             from .omission_guard import enabled as omission_verify_enabled
             if omission_verify_enabled():
-                await self._verify_omissions(config, ctx)
+                from .page_image import page_image_scope
+                with page_image_scope(getattr(ctx, 'img_rgb', None)):   # #1141: re-asks see the page like the first pass
+                    await self._verify_omissions(config, ctx)
         except Exception:
             logger.warning(f'[omission-verify] skipped:\n{traceback.format_exc()}')
 

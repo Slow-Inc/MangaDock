@@ -18,8 +18,11 @@ they were written. MangaTranslator's default quality path sends the image with t
 2. **The image rides a contextvar** that `_run_text_translation` sets for the page (`page_image_scope`). Retries of
    that page carry it too. The pages one worker runs at once (#1123 slots) each send their own image, because asyncio
    copies the context into every task.
-3. **On by default**; `MIT_TRANSLATE_PAGE_IMAGE=0` turns it off. A model that answers an image request with a 400 gets
-   the text request instead, and is sent text only for the rest of the process.
+3. **On by default**; `MIT_TRANSLATE_PAGE_IMAGE=0` turns it off. A request the gateway refuses with the image (400 or
+   422) is sent again as text. Only a refusal whose message names the image (image, vision or multimodal) stops the
+   model getting images for the rest of the process. Any other refusal, such as context length, is one-off.
+4. **The JPEG is encoded once per page, in a thread**, so the other pages a worker runs at once keep the event loop.
+   The opt-in omission re-ask (`MIT_OMISSION_VERIFY`) sees the page too.
 
 ## Alternatives considered
 
@@ -37,5 +40,6 @@ they were written. MangaTranslator's default quality path sends the image with t
   and speaker gender (ผม/ครับ for a male speaker). It is not a guarantee: a run can still pick ฉัน, and one run
   misspelt a name.
 - Input tokens per page rise about 3× (median 1,111 → 3,346), and the translation call takes ~1.1 s longer (median
-  2.05 → 3.15 s). A real 14-page chapter took 20.1–23.7 s, against 18.1–22.7 s without the image.
-- A text-only model costs one rejected request per process before the fallback takes over.
+  2.05 → 3.15 s). A real 14-page chapter took 16.6–23.7 s over 5 runs, against 18.1–22.7 s without the image.
+- A text-only model costs one rejected request per process before the fallback takes over. The multi-page batch
+  driver translates several pages per request, so it stays text-only: one image cannot describe them all.

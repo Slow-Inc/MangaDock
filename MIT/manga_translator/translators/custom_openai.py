@@ -112,8 +112,9 @@ def parse_numbered_translations(response: str, query_size: int):
     return parts
 
 
-#: #1141: models that answered a page-image request with a 400 get text-only requests for the rest of the process
+#: #1141: models that refused the page image get text-only requests for the rest of the process
 _TEXT_ONLY_MODELS = set()
+_IMAGE_REFUSAL = re.compile(r'image|vision|multimodal|multi-modal', re.I)
 
 
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
@@ -366,7 +367,8 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         from ..page_image import current_page_image, with_page_image
         anthropic = protocol_from_env() == 'anthropic'
         sent_model = anthropic_model(self.model or CUSTOM_OPENAI_MODEL) if anthropic else (self.model or CUSTOM_OPENAI_MODEL)
-        page = current_page_image() if sent_model not in _TEXT_ONLY_MODELS else None
+        # the first call of a page encodes it; a thread keeps the JPEG encode off the slots' shared event loop
+        page = await asyncio.to_thread(current_page_image) if sent_model not in _TEXT_ONLY_MODELS else None
         messages.append({'role': 'user', 'content': with_page_image(prompt, page, protocol_from_env()) if page else prompt})
 
         create_kwargs = dict(
@@ -398,11 +400,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         try:
             response = await send()
         except openai.APIError as e:
-            # #1141: a text-only model rejects the image with a 400; send the text and stop attaching for this model
-            if not page or not (isinstance(e, openai.BadRequestError) or str(e).startswith('Anthropic endpoint 400')):
+            # #1141: a request the gateway refuses (400/422) with the image goes again as text. Only a refusal that
+            # names the image stops attaching it for this model; any other 400 (e.g. context length) is one-off.
+            refused = isinstance(e, (openai.BadRequestError, openai.UnprocessableEntityError)) or                 str(e).startswith(('Anthropic endpoint 400', 'Anthropic endpoint 422'))
+            if not page or not refused:
                 raise
-            _TEXT_ONLY_MODELS.add(sent_model)
-            self.logger.warning(f'{sent_model} rejected the page image ({e}); sending text only from now on')
+            if _IMAGE_REFUSAL.search(str(e)):
+                _TEXT_ONLY_MODELS.add(sent_model)
+                self.logger.warning(f'{sent_model} rejected the page image ({e}); sending text only from now on')
+            else:
+                self.logger.warning(f'request with the page image refused ({e}); retrying this one as text')
             messages[-1]['content'] = prompt
             response = await send()
 
