@@ -70,7 +70,8 @@ class TaskQueue:
         # across awaits let a concurrent remove() shift the iterator: a queued task vanished (its request
         # got an instant 500 "User is no longer connected") and the removed one came back.
         gone = [task for task in list(self.queue) if await task.is_client_disconnected()]
-        self.queue = [task for task in self.queue if task not in gone]
+        if gone:
+            self.queue = [task for task in self.queue if task not in gone]
         self.queue_event.set()
         self.queue_event.clear()
 

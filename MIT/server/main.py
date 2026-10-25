@@ -282,17 +282,15 @@ async def translate_json(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
     return to_translation(ctx)
 
-@app.post("/translate/bytes", response_class=StreamingResponse, tags=["api", "json"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
+@app.post("/translate/bytes", response_class=Response, tags=["api", "json"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def translate_bytes(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return Response(content=to_translation(ctx).to_bytes(), media_type="application/octet-stream")
 
-@app.post("/translate/image", response_description="the result image", tags=["api", "json"],response_class=StreamingResponse)
-async def image(req: Request, data: TranslateRequest) -> StreamingResponse:
+@app.post("/translate/image", response_description="the result image", tags=["api", "json"], response_class=Response)
+async def image(req: Request, data: TranslateRequest) -> Response:
     ctx = await get_ctx(req, data.config, data.image)
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
-    return Response(content=img_byte_arr.getvalue(), media_type="image/png")
+    return Response(content=transform_to_image(ctx), media_type="image/png")
 
 @app.post("/translate/json/stream", response_class=StreamingResponse,tags=["api", "json"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_json(req: Request, data: TranslateRequest) -> StreamingResponse:
@@ -313,21 +311,19 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     ctx = await get_ctx(req, conf, img)
     return to_translation(ctx)
 
-@app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
+@app.post("/translate/with-form/bytes", response_class=Response, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
     img = await image.read()
     conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return Response(content=to_translation(ctx).to_bytes(), media_type="application/octet-stream")
 
-@app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"],response_class=StreamingResponse)
-async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+@app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"], response_class=Response)
+async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> Response:
     img = await image.read()
     conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
-    return Response(content=img_byte_arr.getvalue(), media_type="image/png")
+    return Response(content=transform_to_image(ctx), media_type="image/png")
 
 
 @app.post("/translate/with-form/patches", response_description="JSON with per-region patch data", tags=["api", "form"])
