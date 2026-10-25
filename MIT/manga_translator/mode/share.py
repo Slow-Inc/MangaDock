@@ -25,7 +25,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
 from manga_translator.request_scope import request_scope
-from server.worker_slots import SlotGate, slots_from_env
+from server.worker_slots import SlotGate, effective_slots, slots_from_env
 
 logger = logging.getLogger('shared')
 
@@ -73,6 +73,12 @@ async def _page_slot(config, hooks=()):
     exclusive = bool(getattr(getattr(config, 'inpainter', None), 'selective_flux', False))
     async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks):
         yield
+
+
+def _whole_worker():
+    """#1123: the batch/stream endpoints keep using the shared translator and its hooks, so with slots they run
+    exclusively (alone on the worker); with one slot this is a no-op."""
+    return _GATE.hold(exclusive=True) if _SLOTS > 1 else contextlib.nullcontext()
 
 
 @app.post("/simple_execute/translate")
@@ -170,7 +176,8 @@ async def simple_execute_translate_batch_pipeline(request: Request):
         _translator.add_progress_hook(telemetry_hook)
 
     try:
-        results = await _translator.translate_batch_pipelined(images, config)
+        async with _whole_worker():
+            results = await _translator.translate_batch_pipelined(images, config)
         if _PARENT["url"]:
             from server.webhook import send_telemetry
             report = _translator.vram_report()
@@ -201,7 +208,8 @@ async def execute_translate(request: Request):
 
     async def generate():
         try:
-            ctx = await _translator.translate(image, config)
+            async with _whole_worker():
+                ctx = await _translator.translate(image, config)
             result_bytes = pickle.dumps(ctx)
             # status 0 = result data
             header = struct.pack(">BI", 0, len(result_bytes))
@@ -233,7 +241,8 @@ async def simple_execute_translate_batch(request: Request):
 
     try:
         images_with_configs = [(img, config) for img in images]
-        results = await _translator.translate_batch(images_with_configs, batch_size)
+        async with _whole_worker():
+            results = await _translator.translate_batch(images_with_configs, batch_size)
         return Response(content=pickle.dumps(results), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Batch translation error: {e}\n{traceback.format_exc()}")
@@ -296,6 +305,8 @@ class MangaTranslatorShared:
 
         # Create the translator engine
         _translator = MangaTranslator(params)
+        global _SLOTS   # #1123: a worker that keeps rolling page context runs one page at a time
+        _SLOTS = effective_slots(os.environ, _translator.context_size)
 
         # #1047 (opt-in MIT_PRELOAD=1): load the heavy models while uvicorn boots so the first page does not
         # pay the model-load time. Off by default (costs GPU/RAM while idle, slows boot).

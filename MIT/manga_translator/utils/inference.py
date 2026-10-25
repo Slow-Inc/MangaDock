@@ -1,3 +1,4 @@
+import asyncio
 import os
 import stat
 import sys
@@ -329,11 +330,14 @@ class ModelWrapper(ABC):
         '''
         Loads models into memory. Has to be called before `forward`.
         '''
-        if not self.is_downloaded():
-            await self.download()
-        if not self.is_loaded():
-            await self._load(*args, **kwargs, device=device)
-            self._loaded = True
+        # #1123: worker slots run pages concurrently; two first-time loads of one model must not both run _load.
+        lock = self.__dict__.setdefault('_load_lock', asyncio.Lock())
+        async with lock:
+            if not self.is_downloaded():
+                await self.download()
+            if not self.is_loaded():
+                await self._load(*args, **kwargs, device=device)
+                self._loaded = True
 
     async def unload(self):
         if self.is_loaded():

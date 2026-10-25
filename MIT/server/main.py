@@ -84,7 +84,8 @@ if RESULT_ROOT.exists():
 async def health():
     """Returns service status. Use this for liveness/readiness probes."""
     worker_count = len(executor_instances.list)
-    free_worker_count = executor_instances.free_executors()
+    # #1123: count workers, not slots (free_executors() counts free slots for the queue).
+    free_worker_count = sum(1 for x in executor_instances.list if x.in_flight == 0)
     return {
         "status": "ok" if worker_count > 0 else "starting",
         "workers": worker_count,
