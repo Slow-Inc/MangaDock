@@ -1119,7 +1119,8 @@ class MangaTranslator:
         self._progress_hooks.append(ph)
 
     async def _report_progress(self, state: str, finished: bool = False):
-        for ph in self._progress_hooks:
+        from .request_scope import request_hooks
+        for ph in (*self._progress_hooks, *request_hooks()):   # #1123: + this request's hooks (worker slots)
             await ph(state, finished)
 
     async def _run_stage(self, name, fn, fallback):

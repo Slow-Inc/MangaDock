@@ -14,16 +14,25 @@ quirk and the ``','.join(registry)`` choice list in the error message.
 
 
 class DispatchRegistry:
-    def __init__(self, registry, kind):
+    def __init__(self, registry, kind, scoped=None):
         """`registry`: {key: factory} (the module's `DETECTORS` / `OCRS` / …).
-        `kind`: the noun used in the not-found message ("detector", "OCR", …)."""
+        `kind`: the noun used in the not-found message ("detector", "OCR", …).
+        `scoped(key)`: #1123 — keys that get one instance per request inside ``request_scope()``."""
         self._registry = registry
         self._kind = kind
         self._cache = {}
+        self._scoped = scoped
 
     def get(self, key, *args, **kwargs):
         if key not in self._registry:
             raise ValueError(f'Could not find {self._kind} for: "{key}". Choose from the following: %s' % ','.join(self._registry))
+        if self._scoped is not None and self._scoped(key):
+            from .request_scope import scoped_instances
+            per_request = scoped_instances()
+            if per_request is not None:
+                if key not in per_request:
+                    per_request[key] = self._registry[key](*args, **kwargs)
+                return per_request[key]
         if not self._cache.get(key):
             factory = self._registry[key]
             self._cache[key] = factory(*args, **kwargs)
