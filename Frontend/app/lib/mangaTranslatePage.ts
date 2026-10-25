@@ -207,3 +207,37 @@ export async function translateMangaChapterBatchPatches(
     }
   }
 }
+
+/**
+ * Translate ONE page through the batch SSE stream so the caller receives MIT's live stage events (#1137).
+ *
+ * The single-page endpoint answers with the final JSON only, so the Reader could never show which pipeline step a
+ * single page was on. Same request options as {@link translateMangaPagePatches}; a page error (or a stream that ends
+ * without the page) is thrown, as that request did.
+ */
+export async function translatePageWithProgress(
+  chapterId: string,
+  pageIndex: number,
+  pageUrl: string,
+  options: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver"; mangaId?: string },
+  onStage: (stage: string) => void,
+  signal?: AbortSignal,
+): Promise<PatchData[]> {
+  let result: { patches: PatchData[]; error?: string } | null = null;
+  await translateMangaChapterBatchPatches(
+    chapterId,
+    [{ pageIndex, pageUrl }],
+    (i, patches, error) => {
+      if (i === pageIndex) result = { patches, error };
+    },
+    signal,
+    options,
+    (i, stage) => {
+      if (i === pageIndex) onStage(stage);
+    },
+  );
+  const done = result as { patches: PatchData[]; error?: string } | null;
+  if (!done) throw new Error(`Manga page patch translation failed: the stream ended without page ${pageIndex}`);
+  if (done.error) throw new Error(`Manga page patch translation failed: ${done.error}`);
+  return done.patches;
+}
