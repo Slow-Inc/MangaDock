@@ -353,3 +353,10 @@ def test_cancel_stops_pages_that_have_not_started(monkeypatch):
     _stub_pipeline(monkeypatch, sent, translate=translate)
     _run_batch(pages=(0, 1, 2, 3))
     assert sent == []  # in-flight results are dropped, pages 2-3 never start
+
+
+def test_slot_count_multiplies_worker_slots():
+    # #1123: 2 workers x 3 slots each -> 6 pages in flight (worker slots need preload).
+    env = {"MIT_WORKERS": "2", "MIT_WORKER_SLOTS": "3", "MIT_PRELOAD": "1"}
+    assert batch_runner.batch_slots(env) == 6
+    assert batch_runner.batch_slots({"MIT_WORKERS": "2", "MIT_WORKER_SLOTS": "3"}) == 2   # no preload -> 1 slot

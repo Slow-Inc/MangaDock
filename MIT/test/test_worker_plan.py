@@ -100,3 +100,26 @@ def test_exited_worker_ports_lists_only_dead_processes():
 
 def test_exited_worker_ports_empty_when_all_alive():
     assert exited_worker_ports({5004: _Proc(None)}) == []
+
+
+# --- #1123: workers with several slots ------------------------------------------------------------------------------
+
+from server.worker_plan import pick_worker_slot
+
+
+def test_slots_fill_the_least_loaded_card_first():
+    # worker 0 on card A (3 slots, 1 in flight), worker 1 on card B (3 slots, 0 in flight) -> card B.
+    assert pick_worker_slot([(1, 3, "A"), (0, 3, "B")]) == 1
+    # both cards carry 1 -> registration order
+    assert pick_worker_slot([(1, 3, "A"), (1, 3, "B")]) == 0
+
+
+def test_a_full_worker_is_skipped_and_none_when_every_slot_is_taken():
+    assert pick_worker_slot([(3, 3, "A"), (2, 3, "B")]) == 1
+    assert pick_worker_slot([(3, 3, "A"), (3, 3, "B")]) is None
+
+
+def test_one_slot_workers_match_pick_free_worker():
+    workers = [(True, "1"), (False, "1"), (False, "1"), (False, "0")]
+    as_slots = [(1 if busy else 0, 1, gpu) for busy, gpu in workers]
+    assert pick_worker_slot(as_slots) == pick_free_worker(workers) == 3

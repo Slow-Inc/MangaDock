@@ -9,6 +9,7 @@ The web server (server/main.py) spawns this process, which:
      so that the parent can forward translation work to this worker.
 """
 
+import contextlib
 import asyncio
 import logging
 import os
@@ -23,6 +24,8 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import Response, StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
+from manga_translator.request_scope import request_scope
+from server.worker_slots import SlotGate, effective_slots, page_runs_alone, slots_from_env
 
 logger = logging.getLogger('shared')
 
@@ -48,6 +51,38 @@ async def health():
     return {"ok": True}
 
 
+_SLOTS = slots_from_env()
+_GATE = SlotGate()
+_FRONT_STAGES = asyncio.Lock()   # #1123: FIFO through detect/OCR so the first pages reach the LLM early
+
+
+@contextlib.asynccontextmanager
+async def _page_slot(config, hooks=(), alone=False):
+    """#1123: with MIT_WORKER_SLOTS > 1 a page runs in its own request scope (translator instance + progress hooks)
+    behind the slot gate - exclusive (``alone``, selective-Flux, or an offline translator: see page_runs_alone). One slot keeps the
+    previous behaviour: hooks are added to the shared translator for the duration of the request."""
+    if _SLOTS == 1:
+        for h in hooks:
+            _translator.add_progress_hook(h)
+        try:
+            yield
+        finally:
+            for h in hooks:
+                if h in _translator._progress_hooks:
+                    _translator._progress_hooks.remove(h)
+        return
+    from manga_translator.translators import OFFLINE_TRANSLATORS
+    exclusive = alone or page_runs_alone(config, OFFLINE_TRANSLATORS)
+    async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks, stage_lock=_FRONT_STAGES):
+        yield
+
+
+def _whole_worker():
+    """#1123: the batch/stream endpoints keep using the shared translator and its hooks, so with slots they run
+    exclusively (alone on the worker); with one slot this is a no-op."""
+    return _GATE.hold(exclusive=True) if _SLOTS > 1 else contextlib.nullcontext()
+
+
 @app.post("/simple_execute/translate")
 async def simple_execute_translate(request: Request):
     """Accept a pickled {image, config} payload, translate, return pickled Context."""
@@ -64,7 +99,9 @@ async def simple_execute_translate(request: Request):
         raise HTTPException(422, detail="Missing 'image' in payload")
 
     try:
-        ctx = await _translator.translate(image, config)
+        # translate() keeps per-image debug state and translation memory on the translator: alone on the worker
+        async with _page_slot(config, alone=True):
+            ctx = await _translator.translate(image, config)
         return Response(content=pickle.dumps(ctx), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Translation error: {e}\n{traceback.format_exc()}")
@@ -87,24 +124,21 @@ async def simple_execute_translate_patches(request: Request):
     if image is None:
         raise HTTPException(422, detail="Missing 'image' in payload")
 
-    # Forward live pipeline-stage events to the Backend webhook (UX). The
-    # translator is a singleton serving one request at a time (parent gates via
-    # the busy flag), so a per-request hook is safe — removed in finally.
-    hook = None
-    telemetry_hook = None
+    # Forward live pipeline-stage events to the Backend webhook (UX), per request
+    # (see _page_slot: on the shared translator with one slot, in the request scope with more).
+    hooks = []
     if progress_meta:
         from server.webhook import make_progress_hook
-        hook = make_progress_hook(progress_meta)
-        _translator.add_progress_hook(hook)
+        hooks.append(make_progress_hook(progress_meta))
     # Dev-console stage timing (#279): report each stage's duration to the parent,
     # independent of the Backend progress webhook. No-op without a --report parent.
     if _PARENT["url"]:
         from server.webhook import make_telemetry_hook
-        telemetry_hook = make_telemetry_hook(_PARENT["url"], _PARENT["nonce"])
-        _translator.add_progress_hook(telemetry_hook)
+        hooks.append(make_telemetry_hook(_PARENT["url"], _PARENT["nonce"]))
 
     try:
-        patches = await _translator.translate_patches(image, config)
+        async with _page_slot(config, hooks):
+            patches = await _translator.translate_patches(image, config)
         # Dev console (#279): report the worker's VRAM (global torch alloc/reserved +
         # per-model footprint & leak flags) to the parent after each page — this is when
         # a non-releasing model shows up as bloat. Fire-and-forget.
@@ -117,10 +151,6 @@ async def simple_execute_translate_patches(request: Request):
     except Exception as e:
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
-    finally:
-        for _h in (hook, telemetry_hook):
-            if _h is not None and _h in _translator._progress_hooks:
-                _translator._progress_hooks.remove(_h)
 
 
 
@@ -149,7 +179,8 @@ async def simple_execute_translate_batch_pipeline(request: Request):
         _translator.add_progress_hook(telemetry_hook)
 
     try:
-        results = await _translator.translate_batch_pipelined(images, config)
+        async with _whole_worker():
+            results = await _translator.translate_batch_pipelined(images, config)
         if _PARENT["url"]:
             from server.webhook import send_telemetry
             report = _translator.vram_report()
@@ -180,7 +211,8 @@ async def execute_translate(request: Request):
 
     async def generate():
         try:
-            ctx = await _translator.translate(image, config)
+            async with _whole_worker():
+                ctx = await _translator.translate(image, config)
             result_bytes = pickle.dumps(ctx)
             # status 0 = result data
             header = struct.pack(">BI", 0, len(result_bytes))
@@ -212,7 +244,8 @@ async def simple_execute_translate_batch(request: Request):
 
     try:
         images_with_configs = [(img, config) for img in images]
-        results = await _translator.translate_batch(images_with_configs, batch_size)
+        async with _whole_worker():
+            results = await _translator.translate_batch(images_with_configs, batch_size)
         return Response(content=pickle.dumps(results), media_type="application/octet-stream")
     except Exception as e:
         logger.error(f"Batch translation error: {e}\n{traceback.format_exc()}")
@@ -226,7 +259,7 @@ async def simple_execute_translate_batch(request: Request):
 async def _register_with_parent(parent_url: str, host: str, port: int, nonce: str):
     """Tell the parent web-server that this worker is ready."""
     url = f"{parent_url}/register"
-    payload = {"ip": host, "port": port, "pid": os.getpid(),  # pid → Dev-console worker detail (#279)
+    payload = {"ip": host, "port": port, "pid": os.getpid(), "slots": _SLOTS,  # pid → Dev-console worker detail (#279)
                "device": os.environ.get("CUDA_VISIBLE_DEVICES")}  # #1119: GPU-aware dispatch
     headers = {"X-Nonce": nonce}
     try:
@@ -275,6 +308,10 @@ class MangaTranslatorShared:
 
         # Create the translator engine
         _translator = MangaTranslator(params)
+        global _SLOTS   # #1123: a worker that keeps rolling page context runs one page at a time
+        _SLOTS = effective_slots(os.environ, _translator.context_size, _translator.models_ttl)
+        import manga_translator.gpu_offload as gpu_offload   # #1123: free the loop during model forwards when pages share it
+        gpu_offload.set_enabled(_SLOTS > 1)
 
         # #1047 (opt-in MIT_PRELOAD=1): load the heavy models while uvicorn boots so the first page does not
         # pay the model-load time. Off by default (costs GPU/RAM while idle, slows boot).

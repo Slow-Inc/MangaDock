@@ -1119,7 +1119,8 @@ class MangaTranslator:
         self._progress_hooks.append(ph)
 
     async def _report_progress(self, state: str, finished: bool = False):
-        for ph in self._progress_hooks:
+        from .request_scope import request_hooks
+        for ph in (*self._progress_hooks, *request_hooks()):   # #1123: + this request's hooks (worker slots)
             await ph(state, finished)
 
     async def _run_stage(self, name, fn, fallback):
@@ -1626,7 +1627,9 @@ class MangaTranslator:
         # scans often embed non-sRGB profiles (e.g. "Dot Gain 20%"); an
         # untagged patch renders darker than the color-managed page (#156).
         source_icc = image.info.get('icc_profile')
-        ctx = await self._translate_until_translation(image, config)
+        from .request_scope import front_stage_lock
+        async with front_stage_lock():   # #1123: worker slots - one page at a time through detect/OCR
+            ctx = await self._translate_until_translation(image, config)
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:

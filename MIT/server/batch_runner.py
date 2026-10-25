@@ -18,7 +18,7 @@ from server.webhook import send_webhook
 def batch_slots(env=None) -> int:
     """#1119: pages translated at once when they do not depend on each other (Strata batch slots).
 
-    One per worker (MIT_WORKERS), or MIT_BATCH_CONCURRENCY when set; at least 1. A single worker
+    One per worker slot (MIT_WORKERS x MIT_WORKER_SLOTS), or MIT_BATCH_CONCURRENCY when set; at least 1. A single worker
     therefore keeps today's one-page-at-a-time loop.
     """
     from server.worker_plan import parse_worker_count
@@ -29,7 +29,8 @@ def batch_slots(env=None) -> int:
             return max(1, int(override))
         except ValueError:
             pass
-    return parse_worker_count(env.get('MIT_WORKERS'))
+    from server.worker_slots import slots_from_env
+    return parse_worker_count(env.get('MIT_WORKERS')) * slots_from_env(env)   # #1123: x pages per worker
 
 
 def _env_int(name: str, default: int) -> int:
