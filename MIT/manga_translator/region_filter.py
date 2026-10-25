@@ -25,6 +25,22 @@ def filter_translated_regions(text_regions: List, config) -> list:
     return kept
 
 
+_BRACKETS = {'(': ')', '[': ']', '（': '）', '【': '】', '［': '］'}
+
+
+def is_translator_note(src: str, dst: str) -> bool:
+    """True when the whole answer is wrapped in brackets but the source line is not (#1145): the
+    translator wrote a note about the line ('(ไม่มีข้อความ)', '[เสียงไม่ชัดเจน]') instead of a translation.
+    A line bracketed in the source (a thought, an aside) keeps its brackets and is kept. Pure."""
+    dst, src = (dst or '').strip(), (src or '').strip()
+    if len(dst) < 2 or _BRACKETS.get(dst[0]) != dst[-1]:
+        return False
+    inner = dst[1:-1]
+    if any(c in inner for c in '()[]（）【】［］'):
+        return False
+    return not (src[:1] in _BRACKETS)
+
+
 def filter_translated_regions_with_drops(text_regions: List, config):
     """#535 Phase-0a drop telemetry: like :func:`filter_translated_regions` but also
     returns ``dropped`` as ``[(region, reason), …]`` and logs EVERY drop — including
@@ -63,6 +79,10 @@ def filter_translated_regions_with_drops(text_regions: List, config):
             if region.translation.isnumeric():
                 should_filter = True
                 filter_reason = "Numeric translation"
+            elif is_translator_note(getattr(region, 'text', ''), region.translation):
+                # #1145: '(ไม่มีข้อความ)' / '(เสียงไม่ชัดเจน)' is a note about the line, not the line
+                should_filter = True
+                filter_reason = "Translator note, not a translation"
             elif config.filter_text and re.search(config.re_filter_text, region.translation):
                 should_filter = True
                 filter_reason = f"Matched filter text: {config.filter_text}"
