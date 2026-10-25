@@ -9,8 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, crop_has_lettering,
-                                       restore_sfx_translations, sanitize_sfx, swallows_dialogue,
-                                       vlm_localize_sfx)
+                                       restore_sfx_translations, sanitize_sfx, vlm_localize_sfx)
 
 
 def _crop():
@@ -559,21 +558,9 @@ def test_lettering_is_several_strokes_887():
     assert crop_has_lettering(_lettered_crop()) is True
 
 
-def test_a_container_that_swallows_a_dialogue_line_is_not_rescued_887():
-    """Akuyaku p1: the merge produced a big container region whose own OCR read was junk while it
-    fully contained the balloon's `NYA` line. The rescue turned it into a second `เหมียว`, so the
-    bubble showed two meows. A region that fully contains real dialogue must not be rescued."""
-    container = (969, 580, 1158, 812)
-    nya = (997, 678, 1074, 717)
-    assert swallows_dialogue(container, [nya]) is True
-
-
-def test_a_normal_sfx_box_does_not_swallow_dialogue_887():
-    sfx = (1084, 440, 1160, 477)
-    other = (997, 678, 1074, 717)
-    assert swallows_dialogue(sfx, [other]) is False
-    assert swallows_dialogue(sfx, []) is False
-
+# #881 review: `swallows_dialogue` was folded into `resolve_rescue` (`_containment`, same 70 % threshold), so
+# the #887 r3 container case is pinned by `test_resolve_rescue_keeps_new_text_and_drops_what_repeats_a_bubble`
+# below rather than by two tests of a helper the pipeline no longer calls.
 
 def test_localize_candidates_runs_concurrently_and_preserves_order():
     import asyncio
@@ -649,17 +636,22 @@ def test_resolve_rescue_keeps_new_text_and_drops_what_repeats_a_bubble():
     from manga_translator.ocr_vlm import resolve_rescue
     dialogue = [((100, 100, 300, 160), 'Kurose', 'r1'), ((600, 600, 800, 700), 'WHAT DO YOU MEAN?!', 'r2')]
     # nothing underneath: a hand-lettered line the OCR lost -> keep it
-    assert resolve_rescue((0, 0, 90, 90), "I'm glad.", dialogue) == ('keep', [])
+    assert resolve_rescue((0, 0, 90, 90), "I'm glad.", dialogue) == ('keep', [], 'transcribed')
     # a box over a bubble that transcribes that bubble's own text: the #278 phantom -> drop
-    assert resolve_rescue((620, 610, 700, 650), 'WHAT DO YOU MEAN', dialogue) == ('drop', [])
+    assert resolve_rescue((620, 610, 700, 650), 'WHAT DO YOU MEAN', dialogue) == (
+        'drop', [], 'repeats an overlapping line')
     # a container swallowing a line it repeats AND extends: it replaces that line (#881 Kurose case)
-    assert resolve_rescue((80, 80, 400, 500), 'Kurose -kun, you...', dialogue) == ('takeover', ['r1'])
+    assert resolve_rescue((80, 80, 400, 500), 'Kurose -kun, you...', dialogue) == (
+        'takeover', ['r1'], 'replaces the lines it swallows')
     # a big ink cluster that only repeats the bubble it swallows adds nothing -> drop (live ch. 6 p10:
     # the panel-sized 'T' box took over "JUST WHEN WE'D FINALLY GOTTEN CLOSER...")
-    assert resolve_rescue((80, 80, 400, 500), 'KUROSE!', dialogue) == ('drop', [])
+    assert resolve_rescue((80, 80, 400, 500), 'KUROSE!', dialogue) == (
+        'drop', [], 'swallows a dialogue line it does not repeat')
     # a container swallowing a line it does NOT repeat: leave the dialogue alone
-    assert resolve_rescue((80, 80, 400, 500), 'BOOM', dialogue) == ('drop', [])
-    assert resolve_rescue((0, 0, 90, 90), '', dialogue) == ('drop', [])
+    assert resolve_rescue((80, 80, 400, 500), 'BOOM', dialogue) == (
+        'drop', [], 'swallows a dialogue line it does not repeat')
+    # every drop says WHY it dropped - the log used to call all of them "repeats an overlapping line"
+    assert resolve_rescue((0, 0, 90, 90), '', dialogue) == ('drop', [], 'nothing read')
 
 
 def test_a_guessed_box_survives_a_failed_line_read_so_the_rescue_can_try():
@@ -730,3 +722,66 @@ def test_transcription_follows_the_translator_onto_the_anthropic_protocol(monkey
     assert calls['json']['model'] == 'claude-haiku-5-5'
     assert calls['json']['messages'][0]['content'][0]['type'] == 'image'
     assert calls['headers']['x-opencode-session'] == 's1' and calls['headers']['anthropic-version']
+
+
+# ── #881 review: the failure modes that made the original rescue silent ──────
+
+def test_the_rescue_sends_the_extra_headers_parsed_from_the_env(monkeypatch):
+    """#881 root cause: the rescue never sent CUSTOM_OPENAI_EXTRA_HEADERS, so every call answered 400
+    MissingSessionID (0 of 925 boxes rescued). Pin the REAL parse, not a monkeypatched header dict."""
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_EXTRA_HEADERS', '{"x-opencode-session":"s1"}')
+    post = _post_returning('BOOM')
+    v.reset_sfx_breaker()
+    v.vlm_transcribe(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post)
+    assert post.calls['headers']['x-opencode-session'] == 's1'
+    assert post.calls['headers']['Authorization'] == 'Bearer k'
+
+
+def test_a_non_200_transcription_is_a_failure_not_a_silent_empty(monkeypatch):
+    """The status was never checked: a 400 body parsed to content='' and the rescue dropped the line while
+    telling the breaker everything was fine - #881 recurring silently."""
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+
+    class R:
+        status_code = 400
+        text = '{"error":{"message":"MissingSessionID"}}'
+
+        def json(self):
+            return {'content': []}
+
+    v.reset_sfx_breaker()
+    for _ in range(3):
+        assert v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='m',
+                                post_fn=lambda *a, **k: R()) == ''
+    assert not v._breaker.allows()   # three unusable answers still stop the rescue, as before
+
+
+def test_a_200_with_no_content_blocks_is_not_an_answer(monkeypatch):
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+
+    class R:
+        status_code = 200
+        text = ''
+
+        def json(self):
+            return {'content': [], 'stop_reason': 'end_turn'}
+
+    v.reset_sfx_breaker()
+    assert v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='m',
+                            post_fn=lambda *a, **k: R()) == ''
+    assert v._breaker.streak == 1
+
+
+def test_a_two_letter_sfx_clipping_a_bubble_is_not_dropped_as_a_phantom():
+    """The phantom check was any overlap + symmetric substring, so a real 2-letter Latin SFX over a bubble edge
+    ('HA' over 'WHAT?!') was dropped. The phantom sits INSIDE the line it repeats."""
+    from manga_translator.ocr_vlm import resolve_rescue
+    dialogue = [((100, 100, 300, 160), 'WHAT?!', 'r1')]
+    assert resolve_rescue((60, 120, 110, 150), 'HA', dialogue)[0] == 'keep'      # 20 % over the line
+    assert resolve_rescue((150, 110, 200, 150), 'WHAT', dialogue)[0] == 'drop'   # inside, repeats it
+

@@ -860,18 +860,19 @@ class MangaTranslator:
                     # #881: the rescue transcribes; the translate stage (which sees the page image) translates
                     # the result like any line. A box repeating a bubble it overlaps is the #278 phantom (drop);
                     # a container repeating the lines it swallows replaces them (#887 r3 otherwise).
-                    verdict, swallowed = resolve_rescue(
+                    verdict, swallowed, why = resolve_rescue(
                         (x1, y1, x2, y2), rescued or '',
                         [(box, other.text, id(other)) for box, other in dialogue_regions if other is not region])
                     if verdict in ('keep', 'takeover'):
-                        logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" ({verdict})')
+                        logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" '
+                                    f'({verdict}: {why})')
                         region.text = rescued
                         region.vlm_transcribed = True
                         _taken_over.update(swallowed)
                         new_text_regions.append(region)
                         continue
-                    logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" dropped '
-                                f'({"repeats an overlapping line" if rescued else "nothing read"})')
+                    logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" '
+                                f'dropped ({why})')
 
             # #754 (ADR 026 Addendum DROP): a det_sfx box the OCR read as one stray ASCII char, or as
             # real text over a dialogue line, is a detector false-positive — translated, it renders
@@ -1635,11 +1636,11 @@ class MangaTranslator:
         crashed and fell back, or the translator echoed the source so every line dropped. Returned empty, the
         Backend cached the untranslated page for 7 days (Haimiya ch. 6 p2)."""
         from .stage_runner import failed_stages
-        from .text_layer import page_failure
+        from .text_layer import PageTranslationFailed, page_failure
         dropped = getattr(ctx, 'dropped_regions', None)
         why = page_failure(dropped, failed_stages() + list(extra_failed))
         if why:
-            raise RuntimeError(f'page translation failed: {why}')
+            raise PageTranslationFailed(why)
         return empty_patch_result(img_w, img_h, dropped)
 
     async def translate_patches(self, image: Image.Image, config: Config) -> dict:
@@ -1941,16 +1942,23 @@ class MangaTranslator:
         prev_regions = None
 
         async def prepare_front(image):
+            from .stage_runner import begin_page, failed_stages
+            begin_page()   # #1144: the front stages of THIS page, in this phase task's own context
             cfg = copy.deepcopy(config)
             icc = image.info.get('icc_profile')
             ctx = await self._translate_until_translation(image, cfg)
-            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions)}
+            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions),
+                    'failed': failed_stages()}
 
         async def translate(front, prev_context):
-            ctx, cfg = front['ctx'], front['cfg']
             nonlocal prev_regions, glossary
+            from .stage_runner import begin_page, failed_stages
+            begin_page()   # #1144: this page's translation, in the pipeline task's own context
+            failed = []
+            ctx, cfg = front['ctx'], front['cfg']
             if not front['has_regions']:
-                return {'front': front, 'ok': False, 'block': rolling.render_block()}
+                return {'front': front, 'ok': False, 'block': rolling.render_block(),
+                        'failed': list(front.get('failed') or [])}
             if prev_context:
                 cfg.translator.prev_context = prev_context
             if glossary_enabled and prev_regions:
@@ -1969,7 +1977,9 @@ class MangaTranslator:
                 if not self.ignore_errors:
                     raise
                 ctx.text_regions = []
+                failed = ['translating']
             await self._report_progress('after-translating')
+            failed = failed + failed_stages()
             ok = bool(ctx.text_regions) and ctx.text_regions != 'cancel'
             if ok and glossary_enabled and enforced:
                 # Deterministic follow-up: prompt instructions are not reliable for exact spellings.
@@ -1980,13 +1990,23 @@ class MangaTranslator:
                 page_counts = count_candidates(ctx.text_regions)
                 for name, n in page_counts.items():
                     name_counts[name] = name_counts.get(name, 0) + n
-            return {'front': front, 'ok': ok, 'block': rolling.render_block()}
+            return {'front': front, 'ok': ok, 'block': rolling.render_block(), 'failed': failed}
 
         async def finish_back(image, front, translated):
             ctx, cfg, icc = front['ctx'], front['cfg'], front['icc']
             if not translated['ok']:
                 img_h, img_w = ctx.img_rgb.shape[:2]
-                return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+                # #1144 review: the batch path must not hand back an empty success either — this is the path whose
+                # results the Backend caches for 7 days. The error rides the page's own payload so the rest of the
+                # chapter still lands; batch_runner forwards it and the Backend treats a page error as no result.
+                from .text_layer import PageTranslationFailed
+                try:
+                    return self._empty_or_failed(ctx, img_w, img_h,
+                                                 list(front.get('failed') or []) + list(translated.get('failed') or []))
+                except PageTranslationFailed as exc:
+                    result = empty_patch_result(img_w, img_h, None)
+                    result['error'] = str(exc)
+                    return result
             return await self._finish_patches(ctx, cfg, icc)
 
         return await run_pipelined(list(images), prepare_front=prepare_front, translate=translate,

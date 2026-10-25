@@ -27,18 +27,27 @@ def filter_translated_regions(text_regions: List, config) -> list:
 
 _BRACKETS = {'(': ')', '[': ']', '（': '）', '【': '】', '［': '］'}
 
+#: #1145: what a note ABOUT the line says - that there is nothing to translate, or nothing readable. Requiring a
+#: phrase is what keeps a real parenthesised translation alive: '(BAM!)' for ドン and '(sigh)' for はぁ… are the
+#: line, not a note (independent review, 2026-10-26: the shape test alone dropped all four).
+_NOTE_MARKERS = ('ไม่มีข้อความ', 'ไม่มีตัวอักษร', 'ไม่ชัดเจน', 'อ่านไม่ออก', 'มองไม่เห็น', 'ไม่ทราบ',
+                 'no text', 'no lettering', 'illegible', 'unclear', 'cannot read', "can't read", 'unreadable')
+
 
 def is_translator_note(src: str, dst: str) -> bool:
-    """True when the whole answer is wrapped in brackets but the source line is not (#1145): the
-    translator wrote a note about the line ('(ไม่มีข้อความ)', '[เสียงไม่ชัดเจน]') instead of a translation.
-    A line bracketed in the source (a thought, an aside) keeps its brackets and is kept. Pure."""
+    """True when the answer is a bracketed NOTE about the line (#1145): it says the line has no text or is
+    unreadable, and the source line is not itself bracketed. A bracketed translation of a bracketed source
+    ('(Myopia)' -> '(สายตาสั้น)') and a bracketed SFX ('(BAM!)', '(sigh)') are the line and are kept. Pure."""
     dst, src = (dst or '').strip(), (src or '').strip()
     if len(dst) < 2 or _BRACKETS.get(dst[0]) != dst[-1]:
+        return False
+    if src[:1] in _BRACKETS:
         return False
     inner = dst[1:-1]
     if any(c in inner for c in '()[]（）【】［］'):
         return False
-    return not (src[:1] in _BRACKETS)
+    lowered = inner.lower()
+    return any(marker in lowered for marker in _NOTE_MARKERS)
 
 
 def filter_translated_regions_with_drops(text_regions: List, config):
@@ -57,7 +66,9 @@ def filter_translated_regions_with_drops(text_regions: List, config):
         # onomatopoeia, e.g. "LOOM"), which would trip the identical-to-source drop
         # below. Keep it as long as it has something to render, so the localized SFX
         # survives and its detection mask inpaints the original art.
-        if getattr(region, 'sfx_rescued', False):
+        # #881 review: a transcribed rescue is the same case as a rescued SFX — the line came from the vision
+        # model, so a translation identical to the source (TH "BOOM" for EN "BOOM") must not drop it.
+        if getattr(region, 'sfx_rescued', False) or getattr(region, 'vlm_transcribed', False):
             if region.translation.strip():
                 new_text_regions.append(region)
             else:
@@ -70,7 +81,8 @@ def filter_translated_regions_with_drops(text_regions: List, config):
             should_filter = True
             filter_reason = "Translation contain blank areas"
         elif is_oversized_art_glyph(getattr(region, 'text', ''), getattr(region, 'font_size', 0),
-                                     getattr(region, 'sfx_rescued', False)):
+                                     getattr(region, 'sfx_rescued', False)
+                                     or getattr(region, 'vlm_transcribed', False)):
             # #886: one or two CJK/Hangul glyphs at art scale are a piece of a logo/title, not
             # dialogue - replacing a single glyph mangles the artwork, so keep the art.
             should_filter = True

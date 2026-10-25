@@ -435,13 +435,7 @@ def test_merged_region_records_a_horizontal_source_direction_1006():
 
 
 
-def test_lines_in_two_balloons_never_merge_1146():
-    # Real ch. 6 p2 rows (after the straddling line is split): left balloon lines must not join the
-    # right balloon's lines even where their rows sit side by side.
-    import asyncio
-    left = [(99, 331, 215, 350), (101, 356, 220, 373), (90, 379, 230, 396), (106, 402, 216, 421)]
-    right = [(248, 308, 339, 327), (250, 331, 353, 350), (250, 355, 347, 374), (263, 379, 331, 398)]
-    lines = [Quadrilateral(np.array(_box(*b)), f'L{i}', 1) for i, b in enumerate(left)] +             [Quadrilateral(np.array(_box(*b)), f'R{i}', 1) for i, b in enumerate(right)]
-    split = asyncio.run(dispatch_merge(lines, 1000, 1500, containers=[0] * 4 + [1] * 4))
-    for r in split:
-        assert len({t[0] for t in r.texts}) == 1, r.texts
+# #881 review: this file used to carry a #1146 test that passed on `main` — it drove `dispatch_merge` with the
+# pre-existing `containers=` guard (#170), which already keeps two balloons apart, so it never exercised the new
+# splitter. The splitter has its own behavioural test in test_detection_postproc.py
+# (`test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146`).

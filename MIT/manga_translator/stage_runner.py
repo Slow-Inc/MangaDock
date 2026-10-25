@@ -16,8 +16,12 @@ import contextvars
 import traceback
 
 #: #1144: stages that failed and fell back on this page. A crashed stage's fallback ([]) made the page look
-#: like a page with no text; translate_patches reads this to report a failure instead. Per request context,
-#: so the pages one worker runs at once do not see each other's failures.
+#: like a page with no text; translate_patches reads this to report a failure instead.
+#:
+#: A ContextVar only copies the *reference* into a child task, so isolation comes from where begin_page() runs,
+#: not from the ContextVar itself: it must be called in the task that owns the page. translate_patches owns
+#: its page; translate_batch_pipelined runs each phase in its own task (front / translation / back) and calls
+#: begin_page() in the phase that runs the stages, reading failed_stages() before the phase returns.
 _failed = contextvars.ContextVar('mit_failed_stages', default=None)
 
 

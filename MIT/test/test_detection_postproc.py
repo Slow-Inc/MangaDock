@@ -331,3 +331,15 @@ def test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146():
     assert boxes[0][0] == 99 and boxes[0][2] <= 253          # left part ends inside the left balloon
     assert boxes[-1][2] == 353 and boxes[-1][0] >= 208        # right part starts inside the right balloon
     assert split_cross_balloon_lines([inside], balloons)[0] is inside
+
+
+def test_a_line_that_only_overhangs_its_own_balloon_is_not_split_1146():
+    """Independent review: with overlapping balloons, a line that pokes a few pixels past its OWN balloon (a
+    rotated line, an undersegmented mask) was cut and the tail of a real word became a line in the neighbour.
+    The overhang into the second balloon must be at least one line height."""
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]   # the ch. 6 p2 pair, overlapping
+    overhang = Quadrilateral(np.array(poly(99, 331, 260, 350)), '', 1.0)   # 7 px past the left balloon
+    assert split_cross_balloon_lines([overhang], balloons) == [overhang]

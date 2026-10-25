@@ -51,6 +51,11 @@ Every run returned 14/14 pages with no page error. One of the three runs sits 1.
 that is run-to-run API noise, not a regression: the added work is one transcription call per guessed box, and
 those calls are prefetched concurrently.
 
+After the review pass (ADR 037), pages 10–11 were re-run twice on the fixed tree and the chapter benchmark twice
+more: `I'm glad.` and `Kurose -kun, you...` still come back, and the chapter path still returns 14/14 (the added
+work there is bookkeeping only — a page that fails now answers 422 instead of 500, so the Backend stops retrying
+it).
+
 The rescue is still the expensive part, and it is now measurable (panel B of the chart): on pages 10–11, 153
 transcription calls produced 31 usable answers (27 kept, 4 container takeovers), 24 were dropped as the #278
 phantom over a bubble they just repeat, and **98 read nothing at all** (single kana, `I`, `O`, balloon arcs on

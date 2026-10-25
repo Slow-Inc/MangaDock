@@ -46,9 +46,12 @@ Phase 0 measured that design on a real chapter (Haimiya ch. 6, pages 10–11) an
 5. **Reads of only dashes and rings are not sent** (balloon arcs: 60 live calls, 0 text). Placeholders skip the SFX
    ink gate they already passed when they were created.
 6. **A failed page is an error, not an empty page** (#1144): `stage_runner` records the stages that failed and fell
-   back, per request; `text_layer.page_failure` calls a page failed when a stage failed or ≥3 lines came back
-   identical to the source; `translate_patches` raises, and both delivery paths turn that into a page error, so the
-   Backend never caches an empty page for 7 days.
+   back, per request; `text_layer.page_failure` calls a page failed when a stage failed or ≥2 lines came back
+   identical to the source (two is the live repro — ch. 6 p2 echoed twice, and the first cut-off of three missed
+   its own defect); `translate_patches` raises `PageTranslationFailed`, the worker answers **422** (not 500, which
+   the Backend retries 30 times as "MIT is still starting"), and the Backend never caches a page error. The
+   pipelined batch path records the same failure per page and hands it back with the page's own result instead of
+   raising for the whole chapter.
 
 ## Alternatives considered
 
@@ -78,3 +81,36 @@ Phase 0 measured that design on a real chapter (Haimiya ch. 6, pages 10–11) an
 - **The #693 real-text guard stays**, but it now applies only to non-guessed boxes: a det_sfx box read as 1–2 ASCII
   marks is still rescued (the transcription answers `NONE` instead of inventing an SFX), which is what recovered
   `Kurose -kun, you...` from an ink-cluster placeholder read as `14`.
+- **Known limits, stated rather than hidden:** the stage-crash half of the rule only records stages when
+  `ignore_errors` is on (with it off the pipeline raises anyway); a page whose only `n` lines legitimately
+  translate to themselves and produce no render now reports a failure instead of an empty page; and with the
+  balloon-less pages now reaching the ink-cluster rescue (#1147), a bright panel with line art can become a
+  placeholder — it is transcribed and kept like any other guessed box.
+
+## Review (2026-10-26) — what two independent reviewers changed before merge
+
+The branch was reviewed by two agents that traced the call paths rather than the diff. Six changes came out of it:
+
+1. **The batch path was unfixed** — `translate_batch_pipelined` never began a page, and its back phase returned an
+   empty success. It is the path whose results the Backend caches, so the #1144 bug survived there. Each phase now
+   owns its page (`begin_page` / `failed_stages` per phase task, since a ContextVar copies the list reference, not
+   the list) and a failed page rides its own result as `error`.
+2. **500 vs 422** — a settled page failure raised `RuntimeError`, became HTTP 500, and the Backend retried it 31
+   times, re-running the whole GPU pipeline. It is now `PageTranslationFailed` → 422, and the front server keeps the
+   worker's status instead of collapsing every failure to 500.
+3. **`is_translator_note` dropped real translations** — "wholly in brackets" also matched `(BAM!)`, `(sigh)`,
+   `(DING DONG)`: ordinary translated asides and SFX that `main` rendered. It now requires a phrase that says the
+   line is empty or unreadable.
+4. **A guessed box could blank the line it merged with** — the rescue keeps an unread box with `text=''`, and
+   `TextBlock` took `texts[0]` verbatim; the first non-empty text is the line now.
+5. **The splitter cut a line that merely overhung its own balloon** into an overlapping neighbour. It now requires
+   at least one line height of the line to lie outside the first balloon.
+6. **The transcription call never checked its HTTP status** — a 400 body parsed to "no text" and the breaker stayed
+   closed: the original #881 failure, silently. Non-200 now fails the breaker and logs; a 200 with no content blocks
+   is not an answer; and an Anthropic protocol with no Anthropic model set says so once instead of 400-ing for ever.
+
+Smaller: `resolve_rescue`'s phantom check now requires the box to be half inside the line it repeats (a real
+two-letter SFX clipping a bubble survives), the drop log carries the verdict's reason instead of calling every drop
+"repeats an overlapping line", the dead `swallows_dialogue` helper and a #1146 test that passed on `main` were
+deleted, and the rescue's gateway headers are read per call (torch-free — importing `translators.keys` would have
+dragged torch into the CI logic gate).

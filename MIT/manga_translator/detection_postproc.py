@@ -106,8 +106,22 @@ def split_cross_balloon_lines(textlines, polygons):
         if not pairs:
             out.append(t)
             continue
-        a, b = pairs[0]
         xs = np.arange(x1, x2, 2.0)
+
+        def overhang(pair):
+            """How much of the line lies beyond the first balloon of ``pair`` — the stretch that is really the
+            neighbour's text. A line that merely clips an overlapping balloon measures a few pixels here."""
+            inside_a = [x for x in xs if inside(pair[0], x, cy)]
+            return (x2 - max(inside_a)) if inside_a else (x2 - x1)
+
+        # #881 review: without this, a line that overhangs its OWN balloon by a few pixels (rotated text, an
+        # undersegmented balloon mask) was cut, and the last pixels of a real word became a line in the
+        # neighbour. Requiring a full line height outside the first balloon covers the ch. 6 p2 shape (100 px)
+        # and rejects the overhang case (8 px). The pair with the most outside text wins when 3+ balloons touch.
+        a, b = max(pairs, key=overhang)
+        if overhang((a, b)) < h:
+            out.append(t)
+            continue
         mixed = [x for x in xs if inside(a, x, cy) == inside(b, x, cy)]   # in both, or in neither
         cut = float(np.median(mixed)) if mixed else (x1 + x2) / 2
         if cut - x1 < h or x2 - cut < h:

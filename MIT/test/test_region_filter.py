@@ -154,3 +154,11 @@ def test_a_bracketed_line_that_was_bracketed_in_the_source_is_kept_1145():
     keep = [_r('(I SHOULD SAY SOMETHING...)', '(ควรพูดอะไรสักอย่าง...)'),
             _r('HUH (WHAT)?', 'หา (อะไรนะ)?')]
     assert filter_translated_regions(keep, _cfg()) == keep
+
+
+def test_a_real_parenthesised_translation_is_not_mistaken_for_a_note_1145():
+    """Independent review: the shape test alone (answer wholly in brackets) dropped ordinary translated
+    asides and SFX, which main rendered. Only a note that SAYS the line is empty/unreadable is a note."""
+    keep = [_r('ドン', '(BAM!)'), _r('はぁ…', '(sigh)'), _r('HELLO', '(HELLO)'),
+            _r('ピンポン', '(DING DONG)'), _r('……', '(…')]
+    assert filter_translated_regions(keep, _cfg()) == keep

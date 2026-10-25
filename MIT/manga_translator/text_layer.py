@@ -76,9 +76,18 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
     return out
 
 
-#: #1144: a page whose source was echoed back for this many lines failed to translate; one or two kept lines
-#: (a sign, a name) are legitimate.
-ECHO_FAILURE_MIN = 3
+#: #1144: a page whose source was echoed back for this many lines FAILED to translate. Two, because the live
+#: repro echoed two lines (Haimiya ch. 6 p2) and the branch's first cut-off of three missed its own defect; this
+#: branch only runs when the page already rendered nothing, so one kept line (a sign, a name) still means "empty
+#: page", not "failed page" (independent review, 2026-10-26).
+ECHO_FAILURE_MIN = 2
+
+
+#: #1144: a page that failed to translate. Its own exception, so the worker can answer 422 (a settled
+#: failure) instead of 500 — the Backend retries every 500 as "MIT is still starting", 30 times, re-running
+#: the whole GPU pipeline for a page that will fail the same way (#1144 review).
+class PageTranslationFailed(RuntimeError):
+    """A page failed to translate: a stage crashed and fell back, or the translator echoed the source."""
 
 
 def page_failure(dropped: Iterable, failed_stages) -> str:
