@@ -457,29 +457,33 @@ class MangaTranslator:
 
         ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
 
-        # -- Detection
-        ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_stage(
-            'detection',
-            lambda: self._run_detection(config, ctx),
-            lambda: ([], None, None))
+        # #1123: worker slots - one page at a time through the GPU front stages (detect, OCR); the CPU stages after
+        # them (textline merge with panel sort, pre-dict) run outside the lock and overlap the next page's detection.
+        from .request_scope import front_stage_lock
+        async with front_stage_lock():
+            # -- Detection
+            ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_stage(
+                'detection',
+                lambda: self._run_detection(config, ctx),
+                lambda: ([], None, None))
 
-        if self.verbose and ctx.mask_raw is not None:
-            save_mask_raw(ctx.mask_raw, self._result_path)
+            if self.verbose and ctx.mask_raw is not None:
+                save_mask_raw(ctx.mask_raw, self._result_path)
 
-        if not ctx.textlines:
-            await self._report_progress('skip-no-regions', True)
-            # If no text was found result is intermediate image product
-            ctx.result = ctx.upscaled
-            return await self._revert_upscale(config, ctx), True
+            if not ctx.textlines:
+                await self._report_progress('skip-no-regions', True)
+                # If no text was found result is intermediate image product
+                ctx.result = ctx.upscaled
+                return await self._revert_upscale(config, ctx), True
 
-        if self.verbose:
-            save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
+            if self.verbose:
+                save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
 
-        # -- OCR
-        ctx.textlines = await self._run_stage(
-            'ocr',
-            lambda: self._run_ocr(config, ctx),
-            lambda: [])  # Fallback to empty textlines if OCR fails
+            # -- OCR
+            ctx.textlines = await self._run_stage(
+                'ocr',
+                lambda: self._run_ocr(config, ctx),
+                lambda: [])  # Fallback to empty textlines if OCR fails
 
         if not ctx.textlines:
             await self._report_progress('skip-no-text', True)
@@ -1627,9 +1631,7 @@ class MangaTranslator:
         # scans often embed non-sRGB profiles (e.g. "Dot Gain 20%"); an
         # untagged patch renders darker than the color-managed page (#156).
         source_icc = image.info.get('icc_profile')
-        from .request_scope import front_stage_lock
-        async with front_stage_lock():   # #1123: worker slots - one page at a time through detect/OCR
-            ctx = await self._translate_until_translation(image, config)
+        ctx = await self._translate_until_translation(image, config)
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
