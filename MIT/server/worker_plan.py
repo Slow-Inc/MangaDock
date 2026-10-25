@@ -1,0 +1,63 @@
+"""Plan extra translation workers (Strata-style batch slots), pure and torch-free.
+
+The front server (--start-instance) always starts one worker on front_port + 1. Operators can
+ask for more workers so concurrent page requests are served in parallel, and can pin each worker
+to a GPU. Both knobs are optional and default to today's single-worker behaviour:
+
+    MIT_WORKERS=2          total workers (1..8)
+    MIT_WORKER_GPUS=1,0    per-worker CUDA_VISIBLE_DEVICES, round-robin; worker 1 uses the
+                           front server's own CUDA_VISIBLE_DEVICES, extra workers take the rest
+
+Nothing here imports the ML stack, so the planning is unit-tested in milliseconds.
+"""
+import os
+
+MAX_WORKERS = 8
+ENV_WORKERS = 'MIT_WORKERS'
+ENV_GPUS = 'MIT_WORKER_GPUS'
+
+
+def parse_worker_count(raw):
+    """Total worker count from the env string; invalid or absent -> 1, clamped to 1..MAX_WORKERS."""
+    try:
+        count = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return 1
+    return max(1, min(count, MAX_WORKERS))
+
+
+def parse_worker_gpus(raw):
+    """Comma-separated CUDA device ids; empty/absent -> [] (every worker inherits the front's GPU)."""
+    if not raw:
+        return []
+    return [part.strip() for part in str(raw).split(',') if part.strip()]
+
+
+def plan_extra_workers(front_port, count, gpu_ids=None):
+    """Extra workers after the primary: port front_port + 1 + i, GPU round-robin over gpu_ids.
+
+    Returns [] for count <= 1, so the default path is byte-identical for callers.
+    """
+    count = parse_worker_count(count)
+    gpu_ids = list(gpu_ids or [])
+    specs = []
+    for index in range(1, count):
+        device = gpu_ids[index % len(gpu_ids)] if gpu_ids else None
+        specs.append({'port': int(front_port) + 1 + index, 'device': device})
+    return specs
+
+
+def worker_settings_from_env(env=None):
+    """(count, gpu_ids) for the current process environment."""
+    env = env if env is not None else os.environ
+    return parse_worker_count(env.get(ENV_WORKERS)), parse_worker_gpus(env.get(ENV_GPUS))
+
+
+def exited_worker_ports(procs_by_port):
+    """Ports whose worker process has exited (Popen.poll() is not None), in port order.
+
+    The front stops dispatching to them (Strata's replicas drop a dead engine instead of routing to it):
+    a worker that dies after spawning (OOM loading a second model set, a bad MIT_WORKER_GPUS id) would
+    otherwise keep receiving its share of pages and fail each one.
+    """
+    return sorted(port for port, proc in procs_by_port.items() if proc.poll() is not None)

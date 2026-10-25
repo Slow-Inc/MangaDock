@@ -45,6 +45,12 @@ class Executors:
         instance.registered_at = time.monotonic()
         self.list.append(instance)
 
+    def unregister(self, port: int) -> bool:
+        """Drop the worker on ``port`` from dispatch (#1118 review: it died); True when one was removed."""
+        before = len(self.list)
+        self.list = [x for x in self.list if x.port != port]
+        return len(self.list) != before
+
     def detail_raws(self) -> List[dict]:
         """Plain dicts for server.worker_view (keeps the pure transform import-light)."""
         return [{"ip": i.ip, "port": i.port, "pid": i.pid, "busy": i.busy,
