@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from manga_translator import Config
 from server.sent_data_internal import fetch_batch_data, fetch_data_stream, NotifyType, fetch_data
-from server.worker_plan import card_key, pick_free_worker
+from server.worker_plan import card_key, pick_worker_slot
 
 class ExecutorInstance(BaseModel):
     ip: str
@@ -19,9 +19,13 @@ class ExecutorInstance(BaseModel):
     registered_at: float | None = None
     # #1119: the worker's CUDA_VISIBLE_DEVICES, so dispatch can spread pages over GPUs.
     device: str | None = None
+    # #1123: pages this worker runs at once (MIT_WORKER_SLOTS) and how many are in flight; busy = no free slot.
+    slots: int = 1
+    in_flight: int = 0
 
     def free_executor(self):
-        self.busy = False
+        self.in_flight = max(0, self.in_flight - 1)
+        self.busy = self.in_flight >= self.slots
 
     async def sent(self, image: Image, config: Config):
         return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config)
@@ -60,15 +64,17 @@ class Executors:
                  "registered_at": i.registered_at, "device": i.device} for i in self.list]
 
     def free_executors(self) -> int:
-        return len([item for item in self.list if not item.busy])
+        """Free slots across workers (#1123; one per idle worker when every worker has one slot)."""
+        return sum(max(0, item.slots - item.in_flight) for item in self.list)
 
     async def find_executor(self) -> ExecutorInstance:
         while True:
             async with self.lock:
-                index = pick_free_worker([(x.busy, card_key(x.ip, x.device)) for x in self.list])
+                index = pick_worker_slot([(x.in_flight, x.slots, card_key(x.ip, x.device)) for x in self.list])
                 if index is not None:
                     instance = self.list[index]
-                    instance.busy = True
+                    instance.in_flight += 1
+                    instance.busy = instance.in_flight >= instance.slots
                     return instance
             # Release lock before waiting — concurrent callers must not
             # serialize on the lock while all executors are busy (#106).

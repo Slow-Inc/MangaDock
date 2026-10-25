@@ -9,6 +9,7 @@ The web server (server/main.py) spawns this process, which:
      so that the parent can forward translation work to this worker.
 """
 
+import contextlib
 import asyncio
 import io
 import logging
@@ -24,6 +25,8 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
+from manga_translator.request_scope import request_scope
+from server.worker_slots import SlotGate, slots_from_env
 
 logger = logging.getLogger('shared')
 
@@ -49,6 +52,30 @@ async def health():
     return {"ok": True}
 
 
+_SLOTS = slots_from_env()
+_GATE = SlotGate()
+
+
+@contextlib.asynccontextmanager
+async def _page_slot(config, hooks=()):
+    """#1123: with MIT_WORKER_SLOTS > 1 a page runs in its own request scope (translator instance + progress hooks)
+    behind the slot gate - exclusive when it enables selective-Flux, which unloads shared models. One slot keeps the
+    previous behaviour: hooks are added to the shared translator for the duration of the request."""
+    if _SLOTS == 1:
+        for h in hooks:
+            _translator.add_progress_hook(h)
+        try:
+            yield
+        finally:
+            for h in hooks:
+                if h in _translator._progress_hooks:
+                    _translator._progress_hooks.remove(h)
+        return
+    exclusive = bool(getattr(getattr(config, 'inpainter', None), 'selective_flux', False))
+    async with _GATE.hold(exclusive=exclusive), request_scope(hooks=hooks):
+        yield
+
+
 @app.post("/simple_execute/translate")
 async def simple_execute_translate(request: Request):
     """Accept a pickled {image, config} payload, translate, return pickled Context."""
@@ -65,7 +92,8 @@ async def simple_execute_translate(request: Request):
         raise HTTPException(422, detail="Missing 'image' in payload")
 
     try:
-        ctx = await _translator.translate(image, config)
+        async with _page_slot(config):
+            ctx = await _translator.translate(image, config)
         return StreamingResponse(
             io.BytesIO(pickle.dumps(ctx)),
             media_type="application/octet-stream",
@@ -91,24 +119,21 @@ async def simple_execute_translate_patches(request: Request):
     if image is None:
         raise HTTPException(422, detail="Missing 'image' in payload")
 
-    # Forward live pipeline-stage events to the Backend webhook (UX). The
-    # translator is a singleton serving one request at a time (parent gates via
-    # the busy flag), so a per-request hook is safe — removed in finally.
-    hook = None
-    telemetry_hook = None
+    # Forward live pipeline-stage events to the Backend webhook (UX), per request
+    # (see _page_slot: on the shared translator with one slot, in the request scope with more).
+    hooks = []
     if progress_meta:
         from server.webhook import make_progress_hook
-        hook = make_progress_hook(progress_meta)
-        _translator.add_progress_hook(hook)
+        hooks.append(make_progress_hook(progress_meta))
     # Dev-console stage timing (#279): report each stage's duration to the parent,
     # independent of the Backend progress webhook. No-op without a --report parent.
     if _PARENT["url"]:
         from server.webhook import make_telemetry_hook
-        telemetry_hook = make_telemetry_hook(_PARENT["url"], _PARENT["nonce"])
-        _translator.add_progress_hook(telemetry_hook)
+        hooks.append(make_telemetry_hook(_PARENT["url"], _PARENT["nonce"]))
 
     try:
-        patches = await _translator.translate_patches(image, config)
+        async with _page_slot(config, hooks):
+            patches = await _translator.translate_patches(image, config)
         # Dev console (#279): report the worker's VRAM (global torch alloc/reserved +
         # per-model footprint & leak flags) to the parent after each page — this is when
         # a non-releasing model shows up as bloat. Fire-and-forget.
@@ -124,10 +149,6 @@ async def simple_execute_translate_patches(request: Request):
     except Exception as e:
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
-    finally:
-        for _h in (hook, telemetry_hook):
-            if _h is not None and _h in _translator._progress_hooks:
-                _translator._progress_hooks.remove(_h)
 
 
 
@@ -237,7 +258,7 @@ async def simple_execute_translate_batch(request: Request):
 async def _register_with_parent(parent_url: str, host: str, port: int, nonce: str):
     """Tell the parent web-server that this worker is ready."""
     url = f"{parent_url}/register"
-    payload = {"ip": host, "port": port, "pid": os.getpid(),  # pid → Dev-console worker detail (#279)
+    payload = {"ip": host, "port": port, "pid": os.getpid(), "slots": _SLOTS,  # pid → Dev-console worker detail (#279)
                "device": os.environ.get("CUDA_VISIBLE_DEVICES")}  # #1119: GPU-aware dispatch
     headers = {"X-Nonce": nonce}
     try:

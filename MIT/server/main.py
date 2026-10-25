@@ -39,6 +39,7 @@ from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
 from server.win_process import contain_self
+from server.worker_slots import slots_from_env
 from server.worker_plan import exited_worker_ports, plan_extra_workers, worker_settings_from_env
 from server.path_utils import safe_result_folder
 from server import metrics, diagnostics, auth as dev_auth
@@ -618,7 +619,7 @@ def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=No
     print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} ({where}; "
           f"front pid={os.getpid()} on {host}:{params.port})")
     executor_instances.register(ExecutorInstance(
-        ip='127.0.0.1', port=port,
+        ip='127.0.0.1', port=port, slots=slots_from_env(),
         device=(env or os.environ).get('CUDA_VISIBLE_DEVICES')))
     _install_worker_cleanup()
     return proc

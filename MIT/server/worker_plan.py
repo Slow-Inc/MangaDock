@@ -63,9 +63,20 @@ def pick_free_worker(workers):
     cards instead of stacking on the first-registered one. Ties keep registration order, so a
     single-device setup dispatches exactly as before.
     """
-    load = Counter(gpu for busy, gpu in workers if busy)
-    free = (i for i, (busy, _) in enumerate(workers) if not busy)
-    return min(free, key=lambda i: load[workers[i][1]], default=None)
+    return pick_worker_slot([(1 if busy else 0, 1, gpu) for busy, gpu in workers])
+
+
+def pick_worker_slot(workers):
+    """#1123: like pick_free_worker for workers with several slots. ``workers`` = [(in_flight, slots, card), ...].
+
+    A worker with a free slot on the card carrying the fewest in-flight pages wins; then the worker with fewer pages
+    in flight; then registration order. With one slot per worker this is exactly pick_free_worker.
+    """
+    load = Counter()
+    for in_flight, _, card in workers:
+        load[card] += in_flight
+    free = (i for i, (in_flight, slots, _) in enumerate(workers) if in_flight < slots)
+    return min(free, key=lambda i: (load[workers[i][2]], workers[i][0]), default=None)
 
 
 def card_key(ip, device):
