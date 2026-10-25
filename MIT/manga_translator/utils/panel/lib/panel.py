@@ -390,17 +390,16 @@ class Panel:
 		Debug.draw_dots(extra_dots, Debug.colours['yellow'])
 		Debug.add_image(f"Composed polygon {self} ({len(polygon)} dots, {len(intermediary_dots)} intermediary)")
 
-		# Find dots nearby one another
+		# Find dots nearby one another (#1119: vectorised - same integer distances, same (i, j) order as the
+		# former Segment-per-pair loop over i < j - min_hops + 1)
 		nearby_dots = []
 
-		for i in range(len(polygon) - min_hops):
-			for j in range(i + min_hops, len(polygon)):
-				dot1 = polygon[i][0]
-				dot2 = polygon[j][0]
-				seg = Segment(dot1, dot2)
-
-				if seg.dist_x() <= max_dist_x and seg.dist_y() <= max_dist_y:
-					nearby_dots.append([i, j])
+		if len(polygon) > min_hops:
+			pts = polygon[:, 0, :].astype(np.int64)
+			dx = np.abs(pts[None, :, 0] - pts[:, None, 0])
+			dy = np.abs(pts[None, :, 1] - pts[:, None, 1])
+			ii, jj = np.nonzero(np.triu((dx <= max_dist_x) & (dy <= max_dist_y), k = min_hops))
+			nearby_dots = [[int(i), int(j)] for i, j in zip(ii, jj)]
 
 		if len(nearby_dots) == 0:
 			return None
@@ -421,14 +420,10 @@ class Panel:
 			poly1 = np.zeros(shape = (poly1len, 1, 2), dtype = int)
 			poly2 = np.zeros(shape = (poly2len, 1, 2), dtype = int)
 
-			x = y = 0
-			for i in range(len(polygon)):
-				if i <= dots[0] or i > dots[1]:
-					poly1[x][0] = polygon[i]
-					x += 1
-				else:
-					poly2[y][0] = polygon[i]
-					y += 1
+			# #1119: slices instead of a per-dot Python loop (same dots, same order, same int dtype)
+			poly1[:dots[0] + 1] = polygon[:dots[0] + 1]
+			poly1[dots[0] + 1:] = polygon[dots[1] + 1:]
+			poly2[:] = polygon[dots[0] + 1:dots[1] + 1]
 
 			panel1 = Panel(self.page, polygon = poly1)
 			panel2 = Panel(self.page, polygon = poly2)
