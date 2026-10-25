@@ -17,6 +17,7 @@ import {
 } from "../lib/mangaTranslateModel";
 import { useToast } from "../contexts/ToastContext";
 import { fallbackTarget } from "../lib/targetLangs";
+import { createStageTracker } from "../lib/translationStage";
 
 // Target options + source-guard live in lib/targetLangs (#163); re-exported
 // so existing consumers (MangaReader) keep their import path.
@@ -71,6 +72,8 @@ export function useChapterTranslation(
   const [avgPageSec, setAvgPageSec] = useState<number | null>(null);
   const [currentStage, setCurrentStage] = useState<{ pageIndex: number; stage: string } | null>(null);
   const pageStartRef = useRef<number | null>(null);
+  // #1126: concurrent pages (#1122) — the label follows the earliest in-flight page instead of the last event.
+  const stageTrackerRef = useRef(createStageTracker());
   const durationsRef = useRef<number[]>([]);
   const [translatedPages, setTranslatedPages] = useState<Map<number, string>>(new Map());
   const [patchedPages, setPatchedPages] = useState<Map<number, PatchData[]>>(new Map());
@@ -204,6 +207,7 @@ export function useChapterTranslation(
     durationsRef.current = [];
     setAvgPageSec(null);
     setPageElapsedSec(0);
+    stageTrackerRef.current.reset();
     setCurrentStage(null);
 
     // Build page list in priority order — visible page first for instant feedback
@@ -230,7 +234,7 @@ export function useChapterTranslation(
       }
       pageStartRef.current = Date.now();
       setPageElapsedSec(0);
-      setCurrentStage(null);
+      setCurrentStage(stageTrackerRef.current.done(pageIndex));
       if (error) {
         failedMap.set(pageIndex, error);
         setTransProgress({ done: doneSet.size, failed: failedMap.size, total });
@@ -246,7 +250,7 @@ export function useChapterTranslation(
     };
     const handleProgressEvent = (pageIndex: number, stage: string) => {
       if (controller.signal.aborted) return;
-      setCurrentStage({ pageIndex, stage });
+      setCurrentStage(stageTrackerRef.current.stage(pageIndex, stage));
     };
     // User-selected Gemini model (#87), gated on the deployment's translator (#134);
     // undefined = server default / non-Gemini deployment
@@ -318,6 +322,7 @@ export function useChapterTranslation(
       // a manual stop keeps the generation, so it still clears here (#1001 review)
       if (generation === generationRef.current) {
         pageStartRef.current = null;
+        stageTrackerRef.current.reset();
         setCurrentStage(null);
       }
       if (!controller.signal.aborted) {
