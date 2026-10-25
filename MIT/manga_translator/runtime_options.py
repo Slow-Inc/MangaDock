@@ -1,6 +1,6 @@
 """Runtime knobs resolved from the environment (pure, torch-free)."""
 
-_ALLOWED_REASONING_EFFORTS = ("minimal", "low", "medium", "high")
+_ALLOWED_REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high")
 
 
 def resolve_reasoning_effort(env=None):
