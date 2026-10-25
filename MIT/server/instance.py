@@ -59,7 +59,7 @@ class Executors:
     async def find_executor(self) -> ExecutorInstance:
         while True:
             async with self.lock:
-                index = pick_free_worker([(x.busy, x.device) for x in self.list])
+                index = pick_free_worker([(x.busy, (x.ip, x.device)) for x in self.list])
                 if index is not None:
                     instance = self.list[index]
                     instance.busy = True

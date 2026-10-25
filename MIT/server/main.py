@@ -608,7 +608,7 @@ def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=No
           f"front pid={os.getpid()} on {host}:{params.port})")
     executor_instances.register(ExecutorInstance(
         ip='127.0.0.1', port=port,
-        device=str(device) if device is not None else os.environ.get('CUDA_VISIBLE_DEVICES')))
+        device=(env or os.environ).get('CUDA_VISIBLE_DEVICES')))
     _install_worker_cleanup()
     return proc
 

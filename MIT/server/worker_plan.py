@@ -11,6 +11,7 @@ to a GPU. Both knobs are optional and default to today's single-worker behaviour
 Nothing here imports the ML stack, so the planning is unit-tested in milliseconds.
 """
 import os
+from collections import Counter
 
 MAX_WORKERS = 8
 ENV_WORKERS = 'MIT_WORKERS'
@@ -56,15 +57,12 @@ def worker_settings_from_env(env=None):
 def pick_free_worker(workers):
     """Index of the free worker to dispatch to, or None when all are busy (#1119).
 
-    ``workers`` = [(busy, device), ...] in registration order. Strata's replica router sends a
-    request to the lowest-load replica; here load = busy workers on the same GPU, so concurrent
-    pages spread over both cards instead of stacking on the first-registered one. Ties keep
-    registration order, so a single-device setup dispatches exactly as before.
+    ``workers`` = [(busy, gpu), ...] in registration order; ``gpu`` is any hashable that names one card
+    (the front passes ``(ip, CUDA_VISIBLE_DEVICES)``). Strata's replica router sends a request to the
+    lowest-load replica; here load = busy workers on the same card, so concurrent pages spread over both
+    cards instead of stacking on the first-registered one. Ties keep registration order, so a
+    single-device setup dispatches exactly as before.
     """
-    busy_per_device = {}
-    for busy, device in workers:
-        busy_per_device[device] = busy_per_device.get(device, 0) + (1 if busy else 0)
-    free = [i for i, (busy, _) in enumerate(workers) if not busy]
-    if not free:
-        return None
-    return min(free, key=lambda i: busy_per_device[workers[i][1]])
+    load = Counter(gpu for busy, gpu in workers if busy)
+    free = (i for i, (busy, _) in enumerate(workers) if not busy)
+    return min(free, key=lambda i: load[workers[i][1]], default=None)
