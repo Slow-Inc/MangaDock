@@ -45,16 +45,19 @@ Chapter wall time, same 14-page chapter, same script, three runs on the fixed br
 |---|---|---|
 | `main` (`e679c128`) | 5 | 16.6–23.7 s |
 | pre-fix branch (`09cc556c`) | 3 | 18.6–26.3 s |
-| **fixed (`5a86649b`)** | **3** | **17.6 / 23.2 / 27.4 s** (median 23.2) |
+| **fixed, before the review pass** (`5a86649b`) | 3 | 17.6 / 23.2 / 27.4 s |
+| **fixed, after the review pass** | 9 | 18.2 / 20.2 / 22.2 / 22.8 / 26.8 / 29.4 / 30.3 / 42.0 / 44.2 s (median 26.8) |
 
-Every run returned 14/14 pages with no page error. One of the three runs sits 1.1 s above the pre-fix maximum —
-that is run-to-run API noise, not a regression: the added work is one transcription call per guessed box, and
-those calls are prefetched concurrently.
+The spread is the gateway, not the pipeline: the long runs each contain one page whose translation window stalls
+(the bench timeline shows a 5–16 s gap on a single page), while the front GPU phases stay at 1.6–4.5 s per page in
+every run. The added work is one transcription call per guessed box, prefetched concurrently with the rest of
+textline_merge.
 
-After the review pass (ADR 037), pages 10–11 were re-run twice on the fixed tree and the chapter benchmark twice
-more: `I'm glad.` and `Kurose -kun, you...` still come back, and the chapter path still returns 14/14 (the added
-work there is bookkeeping only — a page that fails now answers 422 instead of 500, so the Backend stops retrying
-it).
+**One run delivered 13/14 pages**: the cover page (page 0, a title page whose text legitimately stays as it is)
+came back with every line echoing the source, so the new #1144 rule called it a failed page and the batch reported
+a page error for it. That is the known false-positive limit of the echo rule (ADR 037, Consequences): the page
+shows its original art, and the error is not cached, so the next request re-runs it — but a title page should
+probably be recognised as "nothing to translate" rather than "failed".
 
 The rescue is still the expensive part, and it is now measurable (panel B of the chart): on pages 10–11, 153
 transcription calls produced 31 usable answers (27 kept, 4 container takeovers), 24 were dropped as the #278
