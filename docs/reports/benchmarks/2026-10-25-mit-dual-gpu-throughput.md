@@ -102,6 +102,19 @@ gateway variance, so 4 workers (less RAM) is the live layout.
 with a reduced config was started twice beside the desktop under a memory watchdog and killed both times at the commit
 limit (101.4 / 102.8 GB with a 10 GiB RAM cache; 93.7 / 94.4 GB with 2 GiB). Details in #1119.
 
+**Faster single page: claude-haiku-5-5 on the Anthropic protocol (PR #1125).** Strata treats short non-interactive
+requests as side requests that should barely think (`serve/think_budget.py`); the gateway ignores thinking budgets, so the
+equivalent is a model that answers directly. Blind A/B on MIT's real request bodies (10 pages × 2, judged per segment by
+deepseek): haiku **87**, deepseek@low **73**, ties 24; ~2.3–4 s per call (max 8.8 s) vs 1.7–36 s. E2E translation
+3.9–4.8 s per page; Backend chapter path on 4 workers 23.2–31.9 s vs 26.8–34.5 s. Opt-in
+(`CUSTOM_OPENAI_PROTOCOL=anthropic`, `CUSTOM_OPENAI_MODEL=claude-haiku-5-5`); the live `.env` is unchanged because
+pricing is the developer's call.
+
+**Workers die with the front (#1118).** Strata's `winjob.py` puts its engine in a kill-on-close job. MIT's front now
+joins such a job before spawning (`server/win_process.py`), so a force-killed front leaves no worker on its port
+(verified: killing only the front's pid left 0 worker processes). A first version that assigned only the venv launcher
+raced and left an orphan. EcoQoS impact is unmeasured (the first A/B opted out only the launcher).
+
 **In-worker batch slots** (one worker, N pages, one model copy — Strata's `BATCHING.md`) are blocked by a shared
 translator config (`custom_openai.py:138`, `parse_args`); parked as #1123.
 
