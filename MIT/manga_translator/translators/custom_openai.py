@@ -312,6 +312,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         return translations
 
+    async def aclose_clients(self):
+        """#1123: close this instance's HTTP clients (called at the end of a worker-slot request scope)."""
+        http = getattr(self, '_anthropic_http', None)
+        if http is not None:
+            await http.aclose()
+            self._anthropic_http = None
+        await self.client.close()
+
     async def _request_anthropic(self, messages, model, max_tokens):
         """#1119: the same request on the Anthropic Messages protocol (CUSTOM_OPENAI_PROTOCOL=anthropic).
 
