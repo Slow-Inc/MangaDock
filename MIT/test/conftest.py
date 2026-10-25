@@ -28,6 +28,7 @@ _HEAVY_TESTS = [
     'test_custom_openai_glitch_retry.py',  # imports translators.custom_openai (torch)
     'test_custom_openai_parse.py',
     'test_custom_openai_thinking.py',
+    'test_offline_model_load_lock.py',  # imports utils.inference (torch) (#1123)
     'test_name_glossary_prompt.py',  # imports translators (torch) for the prompt seam (#980)
     'test_numbered_contract.py',     # imports translators.numbered_contract -> translators/__init__ (torch)
     'test_det_forward_default.py',

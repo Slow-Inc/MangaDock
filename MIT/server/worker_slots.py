@@ -27,6 +27,12 @@ def slots_from_env(env=None) -> int:
     return min(slots, MAX_SLOTS)
 
 
+def effective_slots(env=None, context_size: int = 0) -> int:
+    """Slots for a worker: one when it keeps rolling page context (context_size > 0), because translate() shares that
+    translation memory across pages (#136 class); otherwise slots_from_env()."""
+    return 1 if context_size and context_size > 0 else slots_from_env(env)
+
+
 class SlotGate:
     """Shared holders run together; an exclusive holder waits for them and blocks new ones until it is done.
 

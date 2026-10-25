@@ -39,3 +39,11 @@ def test_shared_holders_run_together_and_exclusive_waits_for_them():
     assert log[:2] == ["+a", "+b"]
     assert log.index("+x") > log.index("-a") and log.index("+x") > log.index("-b")
     assert log.index("+c") > log.index("-x")
+
+
+def test_rolling_page_context_forces_one_slot():
+    # translate() shares the worker's translation memory when context_size > 0 (#136 class) - no slots then.
+    from server.worker_slots import effective_slots
+    env = {"MIT_WORKER_SLOTS": "4", "MIT_PRELOAD": "1"}
+    assert effective_slots(env, context_size=0) == 4
+    assert effective_slots(env, context_size=2) == 1
