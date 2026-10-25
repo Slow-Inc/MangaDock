@@ -6,12 +6,30 @@ are unit-testable without importing the ML stack — same rationale as
 translation pipeline) sits behind ``_translate_page``, whose imports are
 deferred to call time.
 """
+import asyncio
 import os
 
 from server.cancellation import is_cancelled, discard
 from server.patch_payload import normalize_patch_result
 from server.rolling_context import RollingContext
 from server.webhook import send_webhook
+
+
+def batch_slots(env=None) -> int:
+    """#1119: pages translated at once when they do not depend on each other (Strata batch slots).
+
+    One per worker (MIT_WORKERS), or MIT_BATCH_CONCURRENCY when set; at least 1. A single worker
+    therefore keeps today's one-page-at-a-time loop.
+    """
+    from server.worker_plan import parse_worker_count
+    env = env if env is not None else os.environ
+    override = str(env.get('MIT_BATCH_CONCURRENCY', '') or '').strip()
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            pass
+    return parse_worker_count(env.get('MIT_WORKERS'))
 
 
 def _env_int(name: str, default: int) -> int:
@@ -150,53 +168,77 @@ async def run_batch_with_callbacks(
             await _run_batch_pipelined(index_list, images_data, config_str, taskId,
                                        callback_url, callback_secret)
             return
-        for img_bytes, page_idx in zip(images_data, index_list):
+        pages = list(zip(images_data, index_list))
+        slots = batch_slots()
+        if slots > 1 and rolling.max_pages == 0:
+            # #1119: no cross-page context -> pages are independent; run one per worker and deliver
+            # each webhook as it completes (the Backend keys results by pageIndex).
+            gate = asyncio.Semaphore(slots)
+
+            async def one(img_bytes, page_idx):
+                async with gate:
+                    if is_cancelled(taskId):
+                        return
+                    await _deliver_page(img_bytes, page_idx, config_str, taskId,
+                                        callback_url, callback_secret, rolling)
+
+            await asyncio.gather(*(one(b, i) for b, i in pages))
+            return
+        for img_bytes, page_idx in pages:
             # Stop before starting a new page if the Batch Job was cancelled.
             if is_cancelled(taskId):
                 print(f"[batch] task {taskId} cancelled - stopping before page {page_idx}")
                 break
-            try:
-                # The worker forwards live pipeline-stage events for this page
-                # straight to the Backend webhook (UX) — see server.webhook.
-                progress_meta = {
-                    "url": callback_url,
-                    "secret": callback_secret,
-                    "taskId": taskId,
-                    "pageIndex": page_idx,
-                }
-                # Seed with prior pages' dialogue (empty/absent when disabled, so the
-                # call is byte-identical to before).
-                prev_block = rolling.render_block()
-                extra = {"prev_context": prev_block} if prev_block else {}
-                patch_result = await _translate_page(config_str, img_bytes, progress_meta, **extra)
-                normalized = normalize_patch_result(patch_result)
-                payload = {
-                    "taskId": taskId,
-                    "pageIndex": page_idx,
-                    "imgWidth": normalized["img_width"],
-                    "imgHeight": normalized["img_height"],
-                    "patches": normalized["patches"],
-                    # Text layer (#158): what this page said — the enabler for
-                    # rolling context (#159) and translation memory (#160).
-                    "regions": normalized["regions"],
-                    "error": None,
-                }
-                # Remember this page's translated dialogue for the next page's context.
-                rolling.add_page(r.get("dst", "") for r in normalized["regions"])
-            except Exception as exc:
-                payload = {
-                    "taskId": taskId,
-                    "pageIndex": page_idx,
-                    "imgWidth": 0,
-                    "imgHeight": 0,
-                    "patches": [],
-                    "error": str(exc),
-                }
-
-            # If cancelled while this page was translating, drop its now-unwanted result.
-            if is_cancelled(taskId):
-                print(f"[batch] task {taskId} cancelled - dropping page {page_idx} result")
+            if not await _deliver_page(img_bytes, page_idx, config_str, taskId,
+                                       callback_url, callback_secret, rolling):
                 break
-            await send_webhook(callback_url, callback_secret, payload)
     finally:
         discard(taskId)
+
+
+async def _deliver_page(img_bytes, page_idx, config_str, taskId, callback_url, callback_secret, rolling) -> bool:
+    """Translate one page and send its webhook; False when the Batch Job was cancelled meanwhile."""
+    try:
+        # The worker forwards live pipeline-stage events for this page
+        # straight to the Backend webhook (UX) — see server.webhook.
+        progress_meta = {
+            "url": callback_url,
+            "secret": callback_secret,
+            "taskId": taskId,
+            "pageIndex": page_idx,
+        }
+        # Seed with prior pages' dialogue (empty/absent when disabled, so the
+        # call is byte-identical to before).
+        prev_block = rolling.render_block()
+        extra = {"prev_context": prev_block} if prev_block else {}
+        patch_result = await _translate_page(config_str, img_bytes, progress_meta, **extra)
+        normalized = normalize_patch_result(patch_result)
+        payload = {
+            "taskId": taskId,
+            "pageIndex": page_idx,
+            "imgWidth": normalized["img_width"],
+            "imgHeight": normalized["img_height"],
+            "patches": normalized["patches"],
+            # Text layer (#158): what this page said — the enabler for
+            # rolling context (#159) and translation memory (#160).
+            "regions": normalized["regions"],
+            "error": None,
+        }
+        # Remember this page's translated dialogue for the next page's context.
+        rolling.add_page(r.get("dst", "") for r in normalized["regions"])
+    except Exception as exc:
+        payload = {
+            "taskId": taskId,
+            "pageIndex": page_idx,
+            "imgWidth": 0,
+            "imgHeight": 0,
+            "patches": [],
+            "error": str(exc),
+        }
+
+    # If cancelled while this page was translating, drop its now-unwanted result.
+    if is_cancelled(taskId):
+        print(f"[batch] task {taskId} cancelled - dropping page {page_idx} result")
+        return False
+    await send_webhook(callback_url, callback_secret, payload)
+    return True
