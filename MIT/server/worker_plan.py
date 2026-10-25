@@ -71,3 +71,13 @@ def pick_free_worker(workers):
 def card_key(ip, device):
     """The load key of one GPU: a worker with no CUDA_VISIBLE_DEVICES runs on CUDA device 0 (#1119)."""
     return (ip, device or '0')
+
+
+def exited_worker_ports(procs_by_port):
+    """Ports whose worker process has exited (Popen.poll() is not None), in port order.
+
+    The front stops dispatching to them (Strata's replicas drop a dead engine instead of routing to it):
+    a worker that dies after spawning (OOM loading a second model set, a bad MIT_WORKER_GPUS id) would
+    otherwise keep receiving its share of pages and fail each one.
+    """
+    return sorted(port for port, proc in procs_by_port.items() if proc.poll() is not None)
