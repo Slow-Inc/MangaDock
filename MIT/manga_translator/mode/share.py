@@ -226,7 +226,8 @@ async def simple_execute_translate_batch(request: Request):
 async def _register_with_parent(parent_url: str, host: str, port: int, nonce: str):
     """Tell the parent web-server that this worker is ready."""
     url = f"{parent_url}/register"
-    payload = {"ip": host, "port": port, "pid": os.getpid()}  # pid → Dev-console worker detail (#279)
+    payload = {"ip": host, "port": port, "pid": os.getpid(),  # pid → Dev-console worker detail (#279)
+               "device": os.environ.get("CUDA_VISIBLE_DEVICES")}  # #1119: GPU-aware dispatch
     headers = {"X-Nonce": nonce}
     try:
         async with aiohttp.ClientSession() as session:

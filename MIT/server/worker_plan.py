@@ -1,4 +1,4 @@
-"""Plan extra translation workers (Strata-style batch slots), pure and torch-free.
+"""Plan extra translation workers and pick one per request (Strata-style batch slots), pure and torch-free.
 
 The front server (--start-instance) always starts one worker on front_port + 1. Operators can
 ask for more workers so concurrent page requests are served in parallel, and can pin each worker
@@ -11,6 +11,7 @@ to a GPU. Both knobs are optional and default to today's single-worker behaviour
 Nothing here imports the ML stack, so the planning is unit-tested in milliseconds.
 """
 import os
+from collections import Counter
 
 MAX_WORKERS = 8
 ENV_WORKERS = 'MIT_WORKERS'
@@ -51,6 +52,25 @@ def worker_settings_from_env(env=None):
     """(count, gpu_ids) for the current process environment."""
     env = env if env is not None else os.environ
     return parse_worker_count(env.get(ENV_WORKERS)), parse_worker_gpus(env.get(ENV_GPUS))
+
+
+def pick_free_worker(workers):
+    """Index of the free worker to dispatch to, or None when all are busy (#1119).
+
+    ``workers`` = [(busy, gpu), ...] in registration order; ``gpu`` is any hashable that names one card
+    (the front passes ``(ip, CUDA_VISIBLE_DEVICES)``). Strata's replica router sends a request to the
+    lowest-load replica; here load = busy workers on the same card, so concurrent pages spread over both
+    cards instead of stacking on the first-registered one. Ties keep registration order, so a
+    single-device setup dispatches exactly as before.
+    """
+    load = Counter(gpu for busy, gpu in workers if busy)
+    free = (i for i, (busy, _) in enumerate(workers) if not busy)
+    return min(free, key=lambda i: load[workers[i][1]], default=None)
+
+
+def card_key(ip, device):
+    """The load key of one GPU: a worker with no CUDA_VISIBLE_DEVICES runs on CUDA device 0 (#1119)."""
+    return (ip, device or '0')
 
 
 def exited_worker_ports(procs_by_port):

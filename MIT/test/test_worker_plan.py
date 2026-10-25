@@ -40,6 +40,46 @@ def test_env_settings():
     assert parse_worker_gpus("") == []
 
 
+# --- #1119: GPU-aware dispatch (Strata replicas.Router: lowest load wins) -----------------
+
+from server.worker_plan import pick_free_worker
+
+
+def test_pick_free_worker_returns_none_when_every_worker_is_busy():
+    assert pick_free_worker([(True, '1'), (True, '0')]) is None
+
+
+def test_pick_free_worker_keeps_registration_order_on_one_device():
+    # Same device everywhere (or unknown) -> first free worker, exactly as before #1119.
+    assert pick_free_worker([(True, None), (False, None), (False, None)]) == 1
+    assert pick_free_worker([(False, '1'), (False, '1')]) == 0
+
+
+def test_pick_free_worker_prefers_the_gpu_with_fewest_busy_workers():
+    # Workers 0-2 on GPU1, worker 3 on GPU0; worker 0 is busy -> GPU0 is idle, so worker 3.
+    workers = [(True, '1'), (False, '1'), (False, '1'), (False, '0')]
+    assert pick_free_worker(workers) == 3
+
+
+def test_pick_free_worker_ties_go_to_registration_order():
+    # Both GPUs have one busy worker -> first free worker in list order.
+    workers = [(True, '1'), (False, '1'), (True, '0'), (False, '0')]
+    assert pick_free_worker(workers) == 1
+
+
+def test_pick_free_worker_counts_load_per_card_not_per_device_label():
+    # Two hosts both report CUDA_VISIBLE_DEVICES=0: different cards, so host B's idle card wins.
+    workers = [(True, ('10.0.0.1', '0')), (False, ('10.0.0.1', '0')), (False, ('10.0.0.2', '0'))]
+    assert pick_free_worker(workers) == 2
+
+
+def test_card_key_treats_an_unset_device_as_cuda_default_card_0():
+    # A worker started without CUDA_VISIBLE_DEVICES runs on CUDA device 0, so it shares card '0's load.
+    from server.worker_plan import card_key
+    assert card_key('127.0.0.1', None) == card_key('127.0.0.1', '') == card_key('127.0.0.1', '0') == ('127.0.0.1', '0')
+    assert card_key('127.0.0.1', '1') == ('127.0.0.1', '1')
+
+
 # --- #1119 / #1118 review: a worker that dies after spawning leaves dispatch (Strata replica heal) ---
 
 from server.worker_plan import exited_worker_ports
