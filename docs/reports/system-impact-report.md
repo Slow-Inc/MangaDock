@@ -3,9 +3,9 @@
 ## 2026-10-25 — MIT worker transport fixes + dual-GPU worker layout (bugfix + perf) — #1119
 
 **Scope:** `MIT/server/myqueue.py`, `MIT/manga_translator/mode/share.py`, `MIT/server/main.py`,
-`MIT/manga_translator/translators/custom_openai.py`; dispatch (stacked on #1118): `MIT/server/worker_plan.py`,
-`MIT/server/instance.py` · **Type:** bug fix + latency fix + observability · **Tests:** torch-free suite 999
-passed / 4 skipped on this branch; torch-backed queue/custom_openai/guard tests 34 passed; 10-page E2E benchmark.
+`MIT/manga_translator/translators/custom_openai.py` (PR #1120); dispatch is PR #1121, stacked on #1118 · **Type:** bug fix
++ latency fix + observability · **Tests:** torch-free suite 1000 passed / 4 skipped; torch-backed
+queue/custom_openai/guard tests 36 passed; 10-page E2E benchmark.
 **Severity:** medium (requests failed under concurrency; every page lost seconds in transport).
 
 **What & where:** `TaskQueue.update_event` awaits on a snapshot (was: iterated the live list across awaits);
@@ -25,11 +25,13 @@ Report + PNG: `docs/reports/benchmarks/2026-10-25-mit-dual-gpu-throughput.md`.
 
 **Quality:** no prompt, model or render change; translation quality not re-judged.
 
-**Validation:** unit tests red before / green after (queue race; the guard named all six streaming sites);
+**Validation:** unit tests red before / green after (queue race; the guard named the six buffer sites, then the
+two `bytes` sites);
 E2E benchmark above. Not run: repeated runs per arm; dispatch order in isolation.
 
-**Risk / rollback:** the two fixes are behaviour-preserving (same payloads, same queue semantics); revert the
-commits to roll back. Worker count is an env knob (default 1 worker).
+**Risk / rollback:** same payloads on the worker and PNG endpoints; `/translate/bytes` and
+`/translate/with-form/bytes` now return their payload (they answered 200 with an empty body) with
+`application/octet-stream`; the queue no longer drops or resurrects tasks. Revert the commits to roll back. Worker count is an env knob (default 1 worker).
 
 **Links:** #1119, post-mortem `docs/reports/2026-10-25-mit-queue-lost-request.md`, #1117/#1118, #1111.
 
