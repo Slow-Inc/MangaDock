@@ -22,7 +22,11 @@ plus 2.5–13 s lost moving the result from worker to front (`StreamingResponse(
    (12.9 GB RAM free with MIT up vs Strata's ~23.7 GiB working set, per its README) and decodes slower than the
    current gateway (51–72 tok/s per Strata's README vs ~85–100 tok/s measured). MIT adopts its serving ideas:
    replicas behind one front, lowest-load routing, several requests in flight.
-3. **No translation hedging and no `reasoning_effort=none` default.** Both were measured and rejected (report).
+3. **No translation hedging; `reasoning_effort=none` opt-in only.** Hedging was measured and rejected. `none` was first
+   misjudged (the value never reached the gateway); once it did: 0 reasoning tokens and ~2.3–4.8 s per call, but a blind
+   A/B prefers `low` 76:46, so `low` stays the default (report, Corrections).
+4. **Chapter batches run one page per worker** when pages are independent (rolling context off) — Strata's batch-slot
+   rule; 4 workers is the live layout because 5 did not beat it on the Backend's chapter path.
 
 ## Alternatives considered
 
