@@ -4,6 +4,7 @@ One-Punch benchmark narration group: 6502 chars of reasoning → completion=2048
 cap hit → empty content → translate 500s the whole page). The fix disables the
 model's native thinking via `chat_template_kwargs.enable_thinking=false`, gated
 by `CUSTOM_OPENAI_ENABLE_THINKING` (.env, default OFF)."""
+import asyncio
 from manga_translator.translators.custom_openai import (
     resolve_enable_thinking,
     thinking_extra_body,
@@ -71,3 +72,24 @@ def test_request_sends_thinking_off_body_by_default(monkeypatch):
 
 def test_request_sends_no_extra_body_when_thinking_enabled(monkeypatch):
     assert _extra_body_sent_by_request(monkeypatch, 'true') is None
+
+
+def test_translator_clients_share_the_tls_context(monkeypatch):
+    """#1119: a per-page translator (worker slots) must not build a new SSLContext (~140 ms) for each client."""
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    assert t.client._client._transport._pool._ssl_context is tls.ssl_context()
+
+    async def main():
+        import httpx
+        seen = []
+        real = httpx.AsyncClient
+        monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: seen.append(k.get("verify")) or real(*a, **k))
+        try:
+            await t._request_anthropic([{"role": "user", "content": "x"}], "m", 8)
+        except Exception:
+            pass   # no gateway here; only the client construction matters
+        return seen
+
+    assert asyncio.run(main()) == [tls.ssl_context()]
