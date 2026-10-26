@@ -30,6 +30,9 @@ selects it; `CUSTOM_OPENAI_RESPONSES_MODEL` names the model.
 | `JUST WHEN WED FINALLY GOTTEN CLOSER...` | ทั้งที่ในที่สุดเราก็สนิทกันขึ้นแล้วแท้ๆ... | ก็เพิ่งจะสนิทกันขึ้นแท้ ๆ… |
 | `バッ` | พรึ่บ | ฟับ |
 
+**Blind judge (same #1141 method, text only):** 13 differing segments, A/B order shuffled, judged by
+deepseek-v4.1-flash on naturalness and faithfulness: **Luna 9, haiku 3, tie 1** (sign test p ≈ 0.07).
+
 Luna keeps the voice: interjections, stutters and the source punctuation. Haiku is cleaner but flattens those,
 which is exactly the "machine-made" tell this work is meant to remove.
 

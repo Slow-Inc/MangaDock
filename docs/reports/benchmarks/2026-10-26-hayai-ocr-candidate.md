@@ -96,6 +96,14 @@ overlapping a real neighbour line is dropped by `resolve_rescue`.
 - The hallucination case is a *classification* problem (is this crop lettering at all?), not a recognition one;
   a cheap lettering/art gate would let the model be primary later.
 
+## Other OCR candidates from the PRD, and why they are not on the bench yet
+
+| candidate | status on this box |
+|---|---|
+| **manga-ocr** (`Ocr.mocr`, MIT already supports it) | tested — unusable for an English-source pipeline: it is a Japanese recogniser, so it returns full-width mixed garbage (`ｌ＇ｍ９ｌａｄ．`, `ＫＵＲＯＳＥ一ｋｕｎ`), every region drops (p9: **0 patches**), and it took 57.5 s for one page |
+| Paddle recognisers (PP-OCRv6/v5), OpenOCR/SVTRv2, PARSeq | not installed (no `paddle`/`paddleocr`); would need a Paddle stack or an ONNX export |
+| Thai post-render check (`th_PP-OCRv5`) | same Paddle dependency; no Thai recogniser is on the box today |
+
 **Environment notes**
 - Run it on the default CUDA device (`cuda`); moving the weights to `cuda:1` makes the CUDA-graph engine return
   one-character answers.
