@@ -441,6 +441,12 @@ def get_cached_font(path: str) -> freetype.Face:
         font_cache[path] = freetype.Face(Path(path).open('rb'))
     return font_cache[path]
 
+def current_font_path() -> str:
+    """The primary face currently selected ('' when only the fallbacks are). Used by the renderer to switch a
+    single region to a heavier face and back without guessing what the base was (#1143 Track A1)."""
+    return _SELECTED_FONT_PATHS[0] if _SELECTED_FONT_PATHS else ''
+
+
 def set_font(font_path: str):
     global FONT_SELECTION, _SELECTED_FONT_PATHS
     if font_path:

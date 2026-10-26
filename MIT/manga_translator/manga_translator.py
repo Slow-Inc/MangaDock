@@ -1006,6 +1006,15 @@ class MangaTranslator:
                     block = format_context(hints)
                     if block:
                         logger.info('[vision-context] analyst notes for %d lines', len(lines))
+                # #1143 Track A1: which lines are raised voices, for the renderer's heavier face.
+                from .role_fonts import role_fonts_enabled, wants_bold
+                _loud = 0
+                for index, region in enumerate(ctx.text_regions or [], start=1):
+                    hint = hints.get(index) or {}
+                    region.emphasis = wants_bold(hint.get('role'), hint.get('emotion'))
+                    _loud += 1 if region.emphasis else 0
+                if role_fonts_enabled():
+                    logger.info('[role-fonts] %d emphasised line(s) of %d', _loud, len(ctx.text_regions or []))
             except Exception:
                 logger.warning('[vision-context] analyst failed - translating as before', exc_info=True)
         with page_image_scope(getattr(ctx, 'img_rgb', None)), vision_context_scope(block):
