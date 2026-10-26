@@ -52,8 +52,11 @@ SIIIG SOR MORNIN MAN GRANTING LEAVING DISGUSTING SURVIVE SKYSCRAPER ANYTHING THE
 _NAME_STOP = _COMMON_WORDS | _OCR_JUNK
 
 _LATIN_NAME = re.compile(r"\b([A-Z][a-z]{2,}|[A-Z]{3,})\b")
-#: A name broken by a stammer hyphen or a line break ("TSUKU- YOMI", "TSUKU - YOMI") is one name.
-_HYPHEN_BREAK = re.compile(r"(?<=[A-Z])-\s*(?=[A-Z])")
+#: A name broken by a LINE BREAK is one name ("TSUKU- YOMI", "TSUKU - YOMI"): the hyphen is followed by
+#: whitespace. An inline hyphen is a separator, not a break ("HAIMIYA-SENPAI" = the name HAIMIYA plus the address
+#: word SENPAI) - fusing that produced the candidate HAIMIYASENPAI, which never matched the same character written
+#: on another page and left the spelling free to drift (measured on Haimiya ch. 6).
+_HYPHEN_BREAK = re.compile(r"(?<=[A-Z])\s*-\s+(?=[A-Z])")
 _THAI_RUN = re.compile("[\\u0E00-\\u0E7F]{3,}")
 #: JP->TH (#980c): a Japanese character name is a katakana run. 2-8 chars keeps short SFX-ish runs
 #: (pinned too - consistent SFX is fine) and drops long loanwords; the two-occurrence filter is the second net.
@@ -141,6 +144,121 @@ def count_candidates(regions) -> dict:
     return counts
 
 
+#: Thai consonants (0E01-0E2E); vowels and tone marks sit outside this range and are stripped for the skeleton.
+_CONSONANT_RANGE = ('\u0e01', '\u0e2e')
+
+
+def _skeleton(text: str) -> str:
+    """The consonant skeleton of a Thai word: transliteration variants usually differ in vowels, not consonants
+    (ไฮมิยะ / ฮาอิมิยะ -> ฮมย / ฮอมย). Pure."""
+    return ''.join(c for c in (text or '') if _CONSONANT_RANGE[0] <= c <= _CONSONANT_RANGE[1])
+
+
+def _same_name_skeleton(a: str, b: str) -> bool:
+    """Two Thai spellings of the same transliterated name (pure).
+
+    Same first consonant, skeletons within one edit, similar length. This catches variant pairs the generic
+    similarity guard rejects (ไฮมิยะ vs ฮาอิมิยะ = 0.57 similarity, 4 edits) while needing the shared consonant
+    backbone, so unrelated words do not match."""
+    if len(a) < 4 or len(b) < 4:
+        return False
+    sa, sb = _skeleton(a), _skeleton(b)
+    if not sa or not sb or sa[0] != sb[0]:
+        return False
+    return _edit_distance(sa, sb) <= 1 and abs(len(a) - len(b)) <= 4
+
+
+def _cluster_safe(run: str, start: int, length: int) -> bool:
+    """Whether the slice starts and ends on a whole Thai character cluster (pure).
+
+    Cutting inside a cluster builds hybrids: taking 'ี่ฮาอิมิยะ' out of 'รุ่นพี่ฮาอิมิยะ' leaves 'รุ่นพ' and the
+    replacement reads 'รุ่นพฮาอิมิยะ'. A cluster starts on a base letter and must not end before its marks."""
+    import unicodedata
+    if start < 0 or length <= 0 or start + length > len(run):
+        return False
+    if unicodedata.category(run[start]) != 'Lo':
+        return False
+    end = start + length
+    if end < len(run) and unicodedata.category(run[end]) == 'Mn':
+        return False
+    # A name does not end on a dangling leading vowel: "ไฮมิยะเอ" cut before the next syllable's า, and replacing
+    # it turned "เอามาคืน" into "อามาคืน".
+    if run[end - 1] in 'เแโใไ':
+        return False
+    return True
+
+
+def _find_near_spelling(text: str, target: str, matcher=None):
+    """The substring of a Thai run that is the same name spelled differently (pure).
+
+    Thai has no spaces between words, so the whole-run comparison this used to do only worked when the model
+    happened to separate the name ("รุ่นพี่ ฮาอิมิยะ"). Here each run is also scanned with windows of the target's
+    length +-2, and the best window within 3 edits and 60 % similarity is returned - the same guards as the
+    whole-run rule, so unrelated words stay untouched."""
+    from difflib import SequenceMatcher
+    matcher = matcher or SequenceMatcher
+
+    def score(window, strict_len=False):
+        """(kind, ratio) for a candidate spelling, or (0, 0.0) when it is not the same name.
+
+        Two ways to be a variant: the generic near-match (ratio >= 0.6 and <= 3 edits), or the consonant skeleton
+        of a transliteration - ไฮมิยะ / ฮาอิมิยะ sit at 0.57 similarity and 4 edits but share the consonants
+        ฮมย / ฮอมย. A window may only use the generic rule when it is the name almost in full (one character of
+        slack); a two-character longer window let "พี่ฮาอิมิยะ" pass as "ฮาอิมิยะ" and the replacement deleted the
+        address word."""
+        ratio = matcher(None, window, target).ratio()
+        if (not strict_len or abs(len(window) - len(target)) <= 1) and ratio >= 0.6 \
+                and _edit_distance(window, target) <= 3:
+            return 1, ratio
+        if _same_name_skeleton(window, target):
+            return 0.5, ratio
+        return 0.0, 0.0
+
+    def key(candidate, ratio):
+        """Rank by kind, then by how close the window is to the target's length, then similarity, then shorter.
+
+        The length first is what keeps a PARTIAL spelling from winning: "ฮมิยะ" (5) scores a higher similarity than
+        "ไฮมิยะ" (6) against "ฮาอิมิยะ", but it dropped the leading vowel and replacing it would corrupt the word.
+        A window longer than the target loses the same way ("ฮาอิมิยะเ")."""
+        return (candidate[0], -abs(len(candidate[1]) - len(target)), ratio, -len(candidate[1]))
+
+    def better(candidate, ratio, best, best_ratio):
+        if best is None:
+            return True
+        return key(candidate, ratio) > key(best, best_ratio)
+
+    runs = _THAI_RUN.findall(text)
+    # Whole runs first: when the model separated the name, replacing just a window inside the run would splice
+    # the old spelling together with the new one ("ทสึคึโยมิ" -> "ทสึคสึกุโยมิ" instead of "สึกุโยมิ").
+    best, best_ratio = None, 0.0
+    for run in runs:
+        if abs(len(run) - len(target)) > 2:
+            continue
+        kind, ratio = score(run)
+        candidate = (kind, run)
+        if kind and better(candidate, ratio, best, best_ratio):
+            best, best_ratio = candidate, ratio
+    if best is not None:
+        return best[1], best_ratio
+    # Unspaced Thai: the name sits inside a longer run, so scan windows of the target's length, aligned to whole
+    # character clusters so a cut never splits a Thai cluster.
+    for run in runs:
+        for length in range(max(4, len(target) - 3), len(target) + 4):
+            if length > len(run):
+                break
+            for start in range(0, len(run) - length + 1):
+                if start == 0 and length < len(run) - 2:
+                    continue
+                if not _cluster_safe(run, start, length):
+                    continue
+                window = run[start:start + length]
+                kind, ratio = score(window, strict_len=True)
+                candidate = (kind, window)
+                if kind and better(candidate, ratio, best, best_ratio):
+                    best, best_ratio = candidate, ratio
+    return (best[1], best_ratio) if best is not None else (None, 0.0)
+
+
 def apply_glossary(regions, glossary) -> int:
     """Deterministically enforce a glossary on one page's translated regions; returns how many were fixed.
 
@@ -173,15 +291,18 @@ def apply_glossary(regions, glossary) -> int:
             # (`ทสึคุโยมิ` contains `สึคุโยมิ`), so the series memory would never fix exactly that shape (#1065).
             if any(tok == target for tok in _THAI_RUN.findall(new_dst)):
                 continue
-            best = None
-            best_ratio = 0.0
-            for tok in _THAI_RUN.findall(new_dst):
-                if abs(len(tok) - len(target)) > 2:
-                    continue
-                ratio = SequenceMatcher(None, tok, target).ratio()
-                if ratio >= 0.6 and _edit_distance(tok, target) <= 3 and ratio > best_ratio:
-                    best, best_ratio = tok, ratio
-            if best is not None:
+            best, best_ratio = _find_near_spelling(new_dst, target, SequenceMatcher)
+            if best == target:
+                # The spelling is already there inside a longer run ("ทสึคุโยมิ" contains "สึคุโยมิ"): the extra
+                # prefix is the drift, so the run becomes exactly the glossary spelling (#1065).
+                for run in _THAI_RUN.findall(new_dst):
+                    if target in run and len(run) <= len(target) + 2:
+                        new_dst = new_dst.replace(run, target, 1)
+                        fixed += 1
+                        break
+            elif best is not None and abs(len(target) - len(best)) <= 2:
+                # A spelling variant differs by a couple of characters; a bigger jump means the window was a
+                # different word (or the name plus an honorific) and replacing it would change the sentence.
                 new_dst = new_dst.replace(best, target, 1)
                 fixed += 1
         if new_dst != dst:
@@ -214,6 +335,91 @@ def _edit_distance(a: str, b: str) -> int:
             cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
         prev = cur
     return prev[-1]
+
+
+#: Address words that ride along with a name in the source ("HAIMIYA-SENPAI") and must never become a name
+#: themselves, or the glossary would enforce a Thai function word.
+_NAME_STOP = _NAME_STOP | frozenset("""
+SENPAI SEMPAI SENSEI KUN CHAN SAN SAMA ONII ONIISAN ONIICHAN ONEE BRO SIS
+""".split())
+
+#: Grammar the translator puts in front of a name ("รุ่นพี่ไฮมิยะ" = "senpai Haimiya"); stripped from a learned
+#: spelling so the glossary stores the name alone.
+_THAI_PREFIXES = ('รุ่นพี่', 'คุณ', 'นาย', 'เธอ', 'น้อง', 'พี่')
+
+
+def _ngrams(run, max_len: int):
+    for n in range(3, min(len(run), max_len) + 1):
+        for start in range(0, len(run) - n + 1):
+            yield run[start:start + n]
+
+
+#: Honorifics the translator appends to a name ("คุโรเสะคุง" = "Kurose-kun"); they belong to the sentence, not to
+#: the remembered spelling, or the glossary would append one to every mention.
+_THAI_SUFFIXES = ('คุง', 'จัง', 'ซัง', 'ซัง', 'คุงซัง')
+
+
+def _strip_prefix(spelling: str) -> str:
+    for prefix in _THAI_PREFIXES:
+        rest = spelling[len(prefix):]
+        if spelling.startswith(prefix) and len(rest) >= 3:
+            spelling = rest
+            break
+    for suffix in _THAI_SUFFIXES:
+        rest = spelling[:len(spelling) - len(suffix)]
+        if spelling.endswith(suffix) and len(rest) >= 3:
+            return rest
+    return spelling
+
+
+def learn_spellings(regions, min_lines: int = 2, max_len: int = 16, specificity: float = 0.75) -> dict:
+    """name -> Thai spelling learned from every line that MENTIONS the name (pure).
+
+    extract_glossary only reads name-focused lines, so a character whose name only ever appears inside full
+    sentences never enters the glossary and its spelling drifts (measured: HAIMIYA as ไฮมิยะ and ฮาอิมิยะ in one
+    chapter). This votes on Thai character n-grams over the name-bearing lines and keeps a candidate only when it
+    appears in at least min_lines of them AND is mostly confined to them - the specificity test rejects the
+    grammar the translator uses everywhere (รุ่นพี่), which naive substring voting would choose. Leading address
+    words are stripped, so the stored spelling is the name alone."""
+    pairs = [(src, dst) for src, dst in _pairs(regions) if src and dst]
+    if not pairs:
+        return {}
+    names = []
+    for src, _ in pairs:
+        for name in candidate_names([src]):
+            if name not in names:
+                names.append(name)
+    out = {}
+    for name in names:
+        bearing, others = [], []
+        for src, dst in pairs:
+            (bearing if name in candidate_names([src]) else others).append(dst)
+        if len(bearing) < min_lines:
+            continue
+        counts = {}
+        for dst in bearing:
+            grams = set()
+            for run in _THAI_RUN.findall(dst):
+                for gram in _ngrams(run, max_len):
+                    grams.add(gram)
+            for gram in grams:
+                counts[gram] = counts.get(gram, 0) + 1
+        best = None
+        for gram, count in counts.items():
+            if count < min_lines or len(gram) < 3:
+                continue
+            other = sum(1 for dst in others if gram in dst)
+            if count / float(count + other) < specificity:
+                continue
+            key = (count, len(gram))
+            if best is None or key > best[0]:
+                best = (key, gram)
+        if not best:
+            continue
+        spelling = _strip_prefix(best[1])
+        if 3 <= len(spelling) <= 12:
+            out[name] = spelling
+    return out
 
 
 def format_glossary(glossary) -> str:

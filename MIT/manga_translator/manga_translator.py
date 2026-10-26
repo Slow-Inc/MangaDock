@@ -2021,9 +2021,17 @@ class MangaTranslator:
                 cfg.translator.prev_context = prev_context
             if glossary_enabled and prev_regions:
                 glossary = extract_glossary(prev_regions, existing=glossary)
+                # #1143: a character whose name only ever appears inside full sentences never enters the
+                # name-focused extraction above; vote on the name-bearing lines instead (measured: HAIMIYA
+                # rendered two ways in one chapter because nothing was learned).
+                from .name_glossary import learn_spellings
+                for _name, _spelling in learn_spellings(prev_regions).items():
+                    glossary.setdefault(_name, _spelling)
                 # Only names seen at least twice become constraints: a one-off ALL-CAPS word is probably not
                 # a character (SKY, GROUND) and pinning it would only constrain ordinary vocabulary.
                 enforced = {n: sp for n, sp in glossary.items() if name_counts.get(n, 0) >= 2}
+                if enforced:
+                    logger.info('[name-glossary] enforcing %s', enforced)
                 cfg.translator.name_glossary = format_glossary(enforced) or None
             else:
                 enforced = None
