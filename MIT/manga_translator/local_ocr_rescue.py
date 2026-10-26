@@ -10,9 +10,6 @@ This is the ladder's second rung only; ``ocr_rescue.py`` keeps the ML-free polic
 import asyncio
 import os
 
-from .config import Ocr
-from .ocr import get_ocr
-
 _DISABLED_AFTER_FAILURE = False
 
 
@@ -25,6 +22,10 @@ async def transcribe_crops_local(crops, device: str) -> list:
     """Read each crop with the local recogniser, preserving order. '' for a read below the confidence floor.
 
     Raises if the model cannot be loaded, which the caller treats as "use the gateway"."""
+    # Imported here, not at module scope: the OCR package pulls torch, and the policy helper above must stay
+    # importable by the torch-free CI logic gate.
+    from .config import Ocr
+    from .ocr import get_ocr
     global _DISABLED_AFTER_FAILURE
     if _DISABLED_AFTER_FAILURE:
         raise RuntimeError('local OCR rescue disabled after an earlier failure')

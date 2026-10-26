@@ -19,7 +19,9 @@ import torch
 from PIL import Image
 
 from .common import OfflineOCR
-from .hayai_post import HAYAI_MIN_CONF, accept_read, clean_text, colors_from_crop
+# The pure helpers live outside the ``ocr`` package (manga_translator/ocr_hayai_post.py) so their unit tests run
+# in the torch-free CI logic gate: importing anything from this package pulls every adapter, torch included.
+from ..ocr_hayai_post import HAYAI_MIN_CONF, accept_read, clean_text, colors_from_crop
 from ..config import OcrConfig
 from ..utils import Quadrilateral
 

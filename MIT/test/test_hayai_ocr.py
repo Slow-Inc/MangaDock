@@ -9,7 +9,7 @@ import asyncio
 import numpy as np
 import pytest
 
-from manga_translator.ocr.hayai_post import HAYAI_MIN_CONF, accept_read, clean_text, colors_from_crop
+from manga_translator.ocr_hayai_post import HAYAI_MIN_CONF, accept_read, clean_text, colors_from_crop
 
 
 def test_black_on_white_lettering_gives_black_fg_and_white_bg():
