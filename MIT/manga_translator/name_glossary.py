@@ -404,13 +404,23 @@ def learn_spellings(regions, min_lines: int = 2, max_len: int = 16, specificity:
                     grams.add(gram)
             for gram in grams:
                 counts[gram] = counts.get(gram, 0) + 1
-        best = None
+        candidates = {}
         for gram, count in counts.items():
             if count < min_lines or len(gram) < 3:
                 continue
             other = sum(1 for dst in others if gram in dst)
             if count / float(count + other) < specificity:
                 continue
+            candidates[gram] = count
+        # A partial spelling can outcount the full one when the chapter used two variants: 'มิยะ' matches both
+        # 'ไฮมิยะ' and 'ฮาอิมิยะ', so it appears on every line while each full spelling appears on only some. Drop
+        # any candidate contained in a longer candidate that is itself frequent enough, and the full spellings
+        # remain to be ranked.
+        maximal = {gram: count for gram, count in candidates.items()
+                   if not any(gram != other and gram in other and other_count >= min_lines
+                              for other, other_count in candidates.items())}
+        best = None
+        for gram, count in maximal.items():
             key = (count, len(gram))
             if best is None or key > best[0]:
                 best = (key, gram)
