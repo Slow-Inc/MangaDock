@@ -19,10 +19,54 @@ _ANALYST_TIMEOUT_S = 120.0
 _block = contextvars.ContextVar('mit_vision_context', default='')
 
 
+#: ``MIT_VISION_CONTEXT`` values: 'notes' (scene notes in the prompt), 'correct' (the analyst's corrected
+#: English replaces the OCR text as the source line), 'both', or 'off'. '1'/'on' mean 'notes'.
+_MODES = ('off', 'notes', 'correct', 'both')
+
+
+def vision_context_mode(env=None) -> str:
+    """Which use of the analyst pass is on: 'off' | 'notes' | 'correct' | 'both'."""
+    value = str((env if env is not None else os.environ).get('MIT_VISION_CONTEXT', '')).strip().lower()
+    if value in ('1', 'true', 'yes', 'on'):
+        return 'notes'
+    if value in ('correct', 'notes+correct', 'both'):
+        return 'both' if value in ('notes+correct', 'both') else 'correct'
+    return value if value in _MODES else 'off'
+
+
 def vision_context_enabled(env=None) -> bool:
     """``MIT_VISION_CONTEXT`` turns the analyst pass on; unset/0 keeps today's prompt byte-identical."""
-    value = str((env if env is not None else os.environ).get('MIT_VISION_CONTEXT', '')).strip().lower()
-    return value in ('1', 'true', 'yes', 'on')
+    return vision_context_mode(env) != 'off'
+
+
+def _mostly_ascii(text: str) -> bool:
+    letters = [c for c in text if not c.isspace()]
+    if not letters:
+        return False
+    return sum(1 for c in letters if ord(c) < 128) / len(letters) >= 0.7
+
+
+def apply_corrections(regions, hints) -> int:
+    """Replace each region's OCR text with the analyst's corrected reading where the fix is safe (pure).
+
+    Only two kinds of change are accepted: the corrected line must be mostly ASCII (the source page is English),
+    and its length may not leave the original's 0.5-2x band - that keeps a hallucinated or truncated answer from
+    becoming the source line. Returns how many regions were corrected."""
+    applied = 0
+    for index, region in enumerate(regions or [], start=1):
+        hint = (hints or {}).get(index) or {}
+        corrected = str(hint.get('corrected') or '').strip()
+        current = str(getattr(region, 'text', '') or '').strip()
+        if not corrected or not _mostly_ascii(corrected):
+            continue
+        ratio = len(corrected) / max(1, len(current))
+        if not (0.5 <= ratio <= 2.0):
+            continue
+        if corrected == current:
+            continue
+        region.text = corrected
+        applied += 1
+    return applied
 
 
 def current_vision_context() -> str:
