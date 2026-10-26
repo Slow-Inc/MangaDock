@@ -990,17 +990,24 @@ class MangaTranslator:
         # #1143 Track B5: with MIT_VISION_CONTEXT=1 an analyst pass (cheap model, page image + OCR lines) adds
         # who-speaks/what-kind-of-line notes in front of the numbered segments. It fails open: no context, no loss.
         from .page_image import page_image_scope
-        from .vision_context import (analyse_page, format_context, vision_context_enabled,
+        from .vision_context import (analyse_page, apply_corrections, format_context, vision_context_mode,
                                      vision_context_scope)
         block = ''
-        if vision_context_enabled():
+        mode = vision_context_mode()
+        if mode != 'off':
             try:
                 lines = [region.text for region in (ctx.text_regions or [])]
-                block = format_context(await analyse_page(getattr(ctx, 'img_rgb', None), lines))
-                if block:
-                    logger.info('[vision-context] analyst notes for %d lines', len(lines))
+                hints = await analyse_page(getattr(ctx, 'img_rgb', None), lines)
+                if mode in ('correct', 'both'):
+                    fixed = apply_corrections(ctx.text_regions, hints)
+                    if fixed:
+                        logger.info('[vision-context] analyst corrected the source of %d lines', fixed)
+                if mode in ('notes', 'both'):
+                    block = format_context(hints)
+                    if block:
+                        logger.info('[vision-context] analyst notes for %d lines', len(lines))
             except Exception:
-                logger.warning('[vision-context] analyst failed - translating without scene notes', exc_info=True)
+                logger.warning('[vision-context] analyst failed - translating as before', exc_info=True)
         with page_image_scope(getattr(ctx, 'img_rgb', None)), vision_context_scope(block):
             return await self._translate_page_texts(config, ctx)
 
