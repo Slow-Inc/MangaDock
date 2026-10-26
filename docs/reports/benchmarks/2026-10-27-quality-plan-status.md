@@ -14,7 +14,8 @@ rejected and why, and what is left.
 | Reading errors | **analyst corrects the OCR source** before translation (`MIT_VISION_CONTEXT=correct`) | geometry-matched blind A/B 20:12 over 32 differing regions; 3–9 lines corrected per page |
 | Text colour | **contrast rule** on the repaired patch (`MIT_TEXT_CONTRAST`, on) | dark-on-black `ฮึ!!` → white-with-black-stroke, checked by eye |
 | Page image | every translation request carries the page (ADR 036) | blind A/B 163:97 (earlier round) |
-| Art repair | LaMa-large (unchanged) | Flux Klein measured and rejected |
+| Character names | **series memory + maximal-gram learner + unspanned-run enforcement** (`MIT_SERIES_GLOSSARY`, on) | live chapter: 4 of 5 occurrences unified after page 0; pre-fix page 12 disagreed with page 1 |
+| Art repair | LaMa-large **+ selective Flux repair** for text over textured art (`Inpainter.selective_flux`, on by default) | p2 hand-lettered HUH over hair: grey smear → plausible hair/panel; ~16–20 s on affected pages, nothing elsewhere |
 
 ## Measured and rejected (kept as notes, not code defaults)
 
@@ -25,32 +26,45 @@ rejected and why, and what is left.
 | manga-ocr | Japanese recogniser: full-width garbage on an EN page, 0 patches, 57.5 s |
 | scene notes in the prompt | blind judge 5:7 for plain, +10 s/page (code kept behind `MIT_VISION_CONTEXT=notes`) |
 | SAM 2.1 glyph-accurate erase mask | the refined mask is smaller than the seed by construction and leaves the English lettering visible under the Thai (fill vs outline); a union would erase at least as much |
+| rolling cross-page dialogue context (`MIT_CONTEXT_PAGES`) | 6× slower (43/58 → 285/264 s) and blind judge 9:10:tie — no gain; a names-only context is the affordable variant, not tested |
+| `mask_tighten` (shrink the mask to ink strokes) | on the HUH-over-hair page it produced a white LaMa blob on the dark panel — visibly worse than the plain mask |
 
 ## End-to-end number today
 
-14-page chapter on the live stack (Luna + corrected source + contrast + Hayai rescue + LaMa): **42.7 s / 42.6 s,
-14/14 pages per run** — the analyst pass is most of the difference against the 33.8/26.7 s measured for Luna
-without it, and it is the price of the corrected source (quality-first decision, recorded here so performance work
-can find it later).
+14-page chapter on the live stack (Luna + corrected source + contrast + Hayai rescue + LaMa + selective Flux):
+**173.1 s / 172.7 s, 14/14 pages per run**. The two quality-first prices are visible here: the analyst pass
+(~10 s/page, against 33.8/26.7 s measured for Luna without it) and the selective Flux repair (~20 s on the four
+pages per chapter that have text over textured art). Two performance tasks are recorded below: keep Flux warm per
+chapter, and either accept or trim the analyst pass.
+
+**Chapter quality audit on the same runs:** 156 regions, 58 dialogue lines, **53 translated (91 %)**, 5 without
+Thai — all five on the credit page (e-mail/wallet/URLs, not meant to be translated, #1139) — and **0 names
+drifting** in both runs. That is 58/58 for dialogue, with consistent spellings.
 
 ## Measurement tooling now in the repo
 
 - `MIT/tools/render_qa.py` + `manga_translator/render_qa.py`: read the rendered Thai back with `th_PP-OCRv5` and print
   a CER table plus review candidates (medians 0.105 / 0.000 / 0.135 on ch. 6 pages 2/9/10; flags are candidates, not
   verdicts). Runs under the separate Paddle venv.
+- `MIT/tools/quality_audit.py` + `manga_translator/quality_audit.py`: the chapter audit (completeness, residue,
+  name drift for requested names) over a bench JSON or a patches response.
 - `docs/reports/benchmarks/`: one report per experiment (this directory), plus ADR 037 for the rescue design.
 
 ## Open questions with evidence (not started)
 
-1. **Figure compositing** (Track A4): restore original pixels for figure areas the repair touched but the lettering
-   did not. The glyph-mask result says art preservation cannot come from shrinking the mask; compositing is the
-   remaining route. Needs a figure-mask source and a render-level seam.
+1. **Figure compositing** (Track A4): selectively repairing text-over-art with Flux closed most of the gap that
+   compositing was meant to fill (the HUH-over-hair case now reads as art, not a smear). What remains is the case
+   where a *character* overlaps the lettering box — no figure mask is available yet, and the glyph-mask experiment
+   showed the erase mask cannot simply be shrunk.
 2. **Role-aware lettering** (Track A1): the analyst already returns per-line role (dialogue/thought/narration/sfx);
    fonts and size policy per role are not implemented, and there is no measurement for "looks typeset" yet.
 3. **Thai post-check in the pipeline**: blocked on a Thai ONNX recogniser (paddle2onnx does not load on this box).
-4. **Selective analyst cost**: a cheap "this page looks degraded" trigger was checked against saved data — every one
-   of 8 pages had a junk-looking line and every page was corrected, so the trigger would skip nothing on this
-   corpus. Dropped unless a better signal appears.
+4. **Selective analyst cost** (dropped, recorded): a cheap "this page looks degraded" trigger was checked against
+   saved data — every one of 8 pages had a junk-looking line and every page was corrected, so the trigger would skip
+   nothing on this corpus. Revisit only with a better signal.
+5. **Performance of the two quality-first prices**: selective Flux reloads the model per page (~20 s on affected
+   pages) — keep it warm or run one Flux session per chapter; the analyst pass is ~10 s/page. Both are pure
+   performance work with quality already adopted.
 
 ## How to check the live stack
 
