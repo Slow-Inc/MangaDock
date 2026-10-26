@@ -1,6 +1,7 @@
 """#980: cross-page character-name glossary — extraction and prompt formatting, pure logic."""
-from manga_translator.name_glossary import (apply_glossary, candidate_names, count_candidates, extract_glossary,
-                                            format_glossary, glossary_enabled)
+from manga_translator.name_glossary import (_same_name_skeleton, apply_glossary, candidate_names,
+                                            count_candidates, extract_glossary, format_glossary,
+                                            glossary_enabled, learn_spellings)
 
 
 def test_candidate_names_finds_romaji_names_and_joins_hyphenated_ones():
@@ -169,3 +170,38 @@ def test_apply_glossary_fixes_a_variant_that_contains_the_spelling_1065():
     exact = R()
     exact.translation = 'สึคุโยมิ?'
     assert apply_glossary([exact], {'TSUKUYOMI': 'สึคุโยมิ'}) == 0  # already exact: untouched
+
+def test_an_inline_hyphen_is_a_separator_not_a_line_break_1143():
+    # HAIMIYA-SENPAI must be the name HAIMIYA plus the address word, not one fused candidate that can never
+    # match the same character written on another page (measured on Haimiya ch. 6).
+    found = candidate_names(["HAIMIYA-SENPAI IS SCARY"])
+    assert "HAIMIYA" in found, found
+    assert not [n for n in found if n.startswith("HAIMIYA") and n != "HAIMIYA"], found
+    assert "SENPAI" not in found, found
+
+
+def test_learn_spellings_reads_names_only_mentioned_inside_sentences_1143():
+    # the existing extraction only reads name-focused lines, so Haimiya (always inside a full sentence) never
+    # entered the glossary and its spelling drifted
+    regions = [
+        {"src": "AND I DON'T KNOW WHAT FACE TO MAKE WHEN I SEE HAIMIYA-SENPAI",
+         "dst": "แล้วฉันก็ไม่รู้ว่าควรทำหน้ายังไงเวลาเจอรุ่นพี่ไฮมิยะ..."},
+        {"src": "IT'S HAIMIYA-SENPAI...!!", "dst": "รุ่นพี่ไฮมิยะนี่นา...!!"},
+        {"src": "I RUSHED HOME AFTER THAT INCIDENT...", "dst": "หลังจากเรื่องวันนั้น... ฉันก็รีบกลับบ้านทันที..."},
+    ]
+    learned = learn_spellings(regions)
+    assert learned.get("HAIMIYA") == "ไฮมิยะ", learned
+
+
+def test_apply_glossary_fixes_the_variant_inside_an_unspaced_run_1143():
+    # Thai has no spaces: the variant sits inside "รุ่นพี่ฮาอิมิยะเอามาคืน" and the old whole-run comparison
+    # could never see it
+    regions = [{"src": "Returned by Haimiya-Senpai", "dst": "รุ่นพี่ฮาอิมิยะเอามาคืน"}]
+    fixed = apply_glossary(regions, {"HAIMIYA": "ไฮมิยะ"})
+    assert fixed == 1
+    assert "ไฮมิยะ" in regions[0]["dst"] and "ฮาอิมิยะ" not in regions[0]["dst"]
+
+
+def test_skeleton_matching_separates_name_variants_from_other_words_1143():
+    assert _same_name_skeleton("ฮาอิมิยะ", "ไฮมิยะ") is True
+    assert _same_name_skeleton("รุ่นพี่", "ไฮมิยะ") is False

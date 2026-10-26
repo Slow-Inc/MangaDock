@@ -12,7 +12,7 @@ import hashlib
 import os
 from collections import Counter, OrderedDict
 
-from .name_glossary import _THAI_RUN, apply_glossary, candidate_names, glossary_enabled
+from .name_glossary import _THAI_RUN, apply_glossary, candidate_names, glossary_enabled, learn_spellings
 
 _MAX_SERIES = 32
 _memory = OrderedDict()
@@ -65,6 +65,11 @@ def _learn(regions, existing) -> dict:
         spelling = min(runs, key=len)
         if len(dst) > len(spelling) + 6:
             continue
+        votes.setdefault(name, Counter())[spelling] += 1
+    # #1143: names that only ever appear inside full sentences never pass the name-focused gate above, so their
+    # spelling drifted (measured: HAIMIYA as ไฮมิยะ / ฮาอิมิยะ). Vote from the name-bearing lines as well; an
+    # exact name-focused vote still wins.
+    for name, spelling in learn_spellings(regions).items():
         votes.setdefault(name, Counter())[spelling] += 1
     for name, counter in votes.items():
         if name not in glossary:
