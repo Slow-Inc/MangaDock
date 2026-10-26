@@ -34,6 +34,11 @@ Warm latency 0.07–0.26 s per crop (first call 2.1 s including warm-up).
 | **art crop** `[0,1033,355,1500]` | `T` (junk, dropped) | `JUMP VALKI-GITNELY CLOSER...` | **Hayai hallucinates English on artwork** |
 | art crop `[822,1076,1055,1500]` | `I` | `...I WAS WORIRID THE WHOLE TIME...` | same failure |
 
+The hallucination is not cosmetic — it reached the translator and would have been rendered:
+`JUMP VALKI-GITNELY CLOSER...` became `ตอนที่เพิ่งจะเริ่มสนิทกันได้ไม่นาน…` (a fabricated line drawn over the art),
+`...I WAS WORIRID THE WHOLE TIME...` duplicated a real line that already sat next to it, and on p10 the
+container box came back as `Kurose-kun, you... Kurose -kun, you...` and was translated as a doubled sentence.
+
 **Two engineering findings that decide the integration**
 1. **The crop contract matters more than the model.** The pipeline's usual crop warps the quad to a rectangle at a
    fixed height (right for a 48 px line recogniser). Fed that warp, Hayai turned `Kurose -kun, you...` into
