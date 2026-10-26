@@ -50,6 +50,20 @@ def find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask,
     return _merge_overlapping(boxes)
 
 
+def selective_flux_enabled(config_value: bool, env=None) -> bool:
+    """Whether to run the Flux repair pass: the config wins unless MIT_SELECTIVE_FLUX overrides it (pure).
+
+    The flag defaults on in the config; the env override exists so a worker with tight VRAM can turn the pass
+    off without a code or Backend change."""
+    import os
+    value = str((env or os.environ).get('MIT_SELECTIVE_FLUX', '')).strip().lower()
+    if value in ('0', 'false', 'no', 'off'):
+        return False
+    if value in ('1', 'true', 'yes', 'on'):
+        return True
+    return bool(config_value)
+
+
 async def apply_selective_flux_repair(full_inpainted, img_rgb, erase_mask, text_only_mask,
                                       flux_inpaint, logger=None, **route_kw):
     """Orchestrate the #421 repair: route text-over-art components, Flux-inpaint each crop

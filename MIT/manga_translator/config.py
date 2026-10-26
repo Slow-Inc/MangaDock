@@ -463,13 +463,17 @@ class InpainterConfig(BaseModel):
     create_text_only_mask's dilate+MORPH_CLOSE swept in (a small drawing enclosed by surrounding
     text — raw glyph polygons cover 0% of it, the closed mask 95%). Clips the mask to the raw
     glyph polygons + margin (provenance, not a pixel heuristic). Off → byte-identical."""
-    selective_flux: bool = False
+    selective_flux: bool = True
     """#421 (MIT_SELECTIVE_FLUX): after the full-page LaMa inpaint, route only the erase-mask
     components that sit over textured ART (a character's hair under dialogue text — where LaMa
     leaves a gray smear it cannot synthesise back) to a Flux Klein repair pass, pasted mask-only
     into the LaMa result. LaMa handles everything else. LaMa is unloaded before Flux loads
-    (VRAM), the pass is serialised by a lock, and any failure keeps the LaMa result. Off →
-    byte-identical (no Flux, no cost)."""
+    (VRAM), the pass is serialised by a lock, and any failure keeps the LaMa result.
+
+    On by default since the 2026-10-27 measurement (2026-10-27-selective-flux-adopted.md): on the
+    hand-lettered HUH over hair it replaces the gray smear with plausible art, costs ~16 s on that
+    page and nothing when a page has no text-over-art component. MIT_SELECTIVE_FLUX=0 turns it off
+    without a config change."""
     restrict_fullpage_mask: bool = False
     """#540 (MIT_RESTRICT_FULLPAGE_MASK): on the full-page inpaint path, clip the refined
     (CRF) erase mask to the to-be-rendered textlines (dilated 8px) — parity with the per-crop
