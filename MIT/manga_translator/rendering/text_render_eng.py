@@ -503,6 +503,18 @@ def render_textblock_list_eng(
             line.pos_y -= canvas_y1
 
         region_font_color, region_stroke_color = region.get_font_colors()
+        # #1143 follow-up: the colour pair came from the lettering crop; the pixels actually painted behind the text
+        # are the repaired art. When the two luma are close (dark text on dark hair) switch to white/black.
+        try:
+            from ..text_contrast import contrast_enabled, readable_colors
+            if contrast_enabled():
+                _x1, _y1, _x2, _y2 = (int(v) for v in region.xyxy)
+                _ih, _iw = img.shape[:2]
+                _painted = img[max(0, _y1):min(_ih, _y2), max(0, _x1):min(_iw, _x2)]
+                region_font_color, region_stroke_color = readable_colors(
+                    region_font_color, region_stroke_color, _painted)
+        except Exception:
+            pass
 
         textlines_image = render_lines(textlines, canvas_h, canvas_w, font_size, sw, line_spacing, region_font_color, region_stroke_color)
         rel_cx = ((canvas_x1 + canvas_x2) / 2 - rx) / resize_ratio
