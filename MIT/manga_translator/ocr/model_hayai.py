@@ -19,7 +19,7 @@ import torch
 from PIL import Image
 
 from .common import OfflineOCR
-from .hayai_post import clean_text, colors_from_crop
+from .hayai_post import HAYAI_MIN_CONF, accept_read, clean_text, colors_from_crop
 from ..config import OcrConfig
 from ..utils import Quadrilateral
 
@@ -28,6 +28,14 @@ VISION_PROCESSOR = 'google/siglip2-base-patch16-naflex'
 LOCAL_DIR_NAME = 'hayai-ocr-v2.5-nova'
 PATCH_BUDGET = 512   # the model card's "max quality" setting (CER 3.10 %, small glyphs)
 MAX_NEW_TOKENS = 128
+
+
+def min_confidence() -> float:
+    """``MIT_OCR_HAYAI_MIN_CONF`` or the measured floor (-0.35). Env-read so a page can be A/B'd without a deploy."""
+    try:
+        return float(os.environ.get('MIT_OCR_HAYAI_MIN_CONF', HAYAI_MIN_CONF))
+    except ValueError:
+        return HAYAI_MIN_CONF
 
 
 class ModelHayaiOCR(OfflineOCR):
@@ -63,7 +71,10 @@ class ModelHayaiOCR(OfflineOCR):
         self.tokenizer = None
         self.processor = None
 
-    def _read(self, crop_rgb: np.ndarray) -> str:
+    def _read(self, crop_rgb: np.ndarray):
+        """(text, mean token log-likelihood). The likelihood is the confidence the model does not return itself:
+        it is what separates real lettering (-0.01 to -0.09 on ch. 6) from text invented over artwork
+        (-0.55 to -2.58). One extra forward pass, no second vision call."""
         inputs = self.processor(images=[Image.fromarray(crop_rgb)], max_num_patches=PATCH_BUDGET,
                                 return_tensors='pt').to(self.device)
         with torch.no_grad():
@@ -72,7 +83,19 @@ class ModelHayaiOCR(OfflineOCR):
                                       spatial_shapes=inputs['spatial_shapes'],
                                       tokenizer=self.tokenizer, max_new_tokens=MAX_NEW_TOKENS,
                                       repetition_penalty=1.0)
-        return clean_text(out[0] if out else '')
+        text = clean_text(out[0] if out else '')
+        ids = self.tokenizer(text, add_special_tokens=False)['input_ids'] if text else []
+        if not ids:
+            return '', float('-inf')
+        seq = torch.tensor([[self.tokenizer.bos_token_id] + ids], device=self.device)
+        with torch.no_grad():
+            logits = self.model(pixel_values=inputs['pixel_values'],
+                                pixel_attention_mask=inputs['pixel_attention_mask'],
+                                spatial_shapes=inputs['spatial_shapes'], text_token_ids=seq)
+        logp = torch.log_softmax(logits[0].float(), dim=-1)
+        targets = ids + [self.tokenizer.eos_token_id]
+        confidence = float(np.mean([float(logp[i, targets[i]]) for i in range(len(targets))]))
+        return text, confidence
 
     @staticmethod
     def _crop(image: np.ndarray, q: Quadrilateral, direction: str) -> np.ndarray:
@@ -102,9 +125,12 @@ class ModelHayaiOCR(OfflineOCR):
             crop = self._crop(image, q, direction)
             if crop.ndim == 3 and crop.shape[2] == 4:
                 crop = crop[:, :, :3]
-            text = self._read(crop) if getattr(crop, 'size', 0) else ''
-            q.text = text
-            q.prob = 1.0 if text else 0.0
+            text, confidence = self._read(crop) if getattr(crop, 'size', 0) else ('', float('-inf'))
+            trusted = bool(text) and accept_read(confidence, min_confidence())
+            q.text = text if trusted else ''
+            # ``prob`` is the pipeline's quality signal (thresholds, region prob, art-glyph guards); map the
+            # likelihood onto it so a junk read ranks below anything the gates expect.
+            q.prob = float(np.exp(confidence)) if trusted else 0.0
             fg, bg = colors_from_crop(crop)
             q.fg_r, q.fg_g, q.fg_b = fg
             q.bg_r, q.bg_g, q.bg_b = bg

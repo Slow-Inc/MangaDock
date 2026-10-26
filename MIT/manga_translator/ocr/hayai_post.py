@@ -44,3 +44,18 @@ def colors_from_crop(crop_rgb):
 def clean_text(text) -> str:
     """The model's answer as one line: strip whitespace runs and empty answers. Pure."""
     return ' '.join(str(text or '').split())
+
+
+#: #1143 Track C: minimum mean token log-likelihood for a Hayai read to be trusted. Measured on ch. 6 crops:
+#: real lettering scored -0.01 to -0.09, invented text on artwork -0.55 to -2.58 (see the benchmark report).
+#: A crop that really contains text but is a duplicate of its neighbour can score higher (-0.11) - that is a
+#: merge problem, handled downstream, not a hallucination.
+HAYAI_MIN_CONF = -0.35
+
+
+def accept_read(confidence: float, threshold: float = HAYAI_MIN_CONF) -> bool:
+    """Whether a read is confident enough to become a region's text (pure)."""
+    try:
+        return confidence >= threshold
+    except TypeError:
+        return False

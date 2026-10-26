@@ -47,6 +47,26 @@ container box came back as `Kurose-kun, you... Kurose -kun, you...` and was tran
 2. **The model has no confidence score.** The 48 px recogniser's `prob` is what stops junk reads from being
    translated. Hayai returns text only, so a hallucinated phrase on artwork looks exactly like a read.
 
+**Tuning: three levers tried, one decides it**
+
+| lever | effect on real dialogue crops | effect on the hallucination |
+|---|---|---|
+| patch budget 384 vs 512 | none (both exact) | changes the invented text, never removes it |
+| padding 12 px, upscale to 64 px min side | none | changes the invented text (`SLAM`, `WWWW...`) |
+| **mean token log-likelihood of its own answer** | real lettering −0.01 to −0.09 | invented text −0.55 to −2.58; a crop that really contains a neighbouring line scores −0.11 |
+
+The third lever is the fix. `ModelHayaiOCR` now teacher-forces its own answer through the decoder (one extra
+forward pass, no second vision call) and accepts the read only when the mean token log-likelihood clears
+`MIT_OCR_HAYAI_MIN_CONF` (default −0.35, the gap between the two measured bands). Re-run on pages 2/9/10:
+
+- the artwork reads that were translated in the previous run (`JUMP VALKI-GITNELY CLOSER...`, `...I WAS WORIRID
+  THE WHOLE TIME...` on the art box, the `ー`/digit junk) are gone — those regions come back empty;
+- every dialogue line still reads: `Im glad.`, `Kurose-kun, you...`, `Th- that's...! Th- that's not it!!!`,
+  `SENPAI! GOOD AFTERN...`, `バッ`;
+- two leftovers, both merge-level rather than recognition: the nested SENPAI boxes on p2 now both read the line
+  (they merged into one patch), and a box overlapping a real neighbour line still reads that line twice
+  (confidence −0.11 passes the gate because the text really is there).
+
 **Decision**
 - **Not adopted as the primary recogniser yet.** It wins every dialogue case, but on artwork it invents English
   where the 48 px model produced harmless 1-character junk that the downstream filters dropped. Without a
