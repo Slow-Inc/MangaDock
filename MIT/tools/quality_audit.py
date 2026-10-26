@@ -20,11 +20,14 @@ from manga_translator.quality_audit import audit, pairs_from_payload, summary_li
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("json_path", help="bench result, patches response, or a list of {src,dst}")
+    ap.add_argument("--names", default="",
+                    help="comma-separated source names to check for spelling drift (e.g. HAIMIYA,KUROSE)")
     ap.add_argument("--json", help="write the full report here")
     args = ap.parse_args()
 
+    names = [n.strip().upper() for n in args.names.split(",") if n.strip()]
     payload = json.load(open(args.json_path, encoding="utf-8"))
-    report = audit(pairs_from_payload(payload))
+    report = audit(pairs_from_payload(payload), names=names)
     print(summary_line(report))
     for row in report["residue"][:15]:
         print("  no Thai  p%s: %r -> %r" % (row["page"], row["src"][:52], row["dst"][:32]))

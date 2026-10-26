@@ -28,18 +28,23 @@ rejected and why, and what is left.
 | SAM 2.1 glyph-accurate erase mask | the refined mask is smaller than the seed by construction and leaves the English lettering visible under the Thai (fill vs outline); a union would erase at least as much |
 | rolling cross-page dialogue context (`MIT_CONTEXT_PAGES`) | 6× slower (43/58 → 285/264 s) and blind judge 9:10:tie — no gain; a names-only context is the affordable variant, not tested |
 | `mask_tighten` (shrink the mask to ink strokes) | on the HUH-over-hair page it produced a white LaMa blob on the dark panel — visibly worse than the plain mask |
+| role-aware emphasis (bold for shouts, from the analyst's role/emotion) | implemented behind `MIT_ROLE_FONTS` (off): conflicts with the product's lighter-Thai preference, and the analyst's emotion labels are not stable — the same two pages analysed twice gave 6/15, 3/7, 0/15, 4/7 emphasised lines |
+| selective Flux at 1024 instead of 2048 | p2 27.6 → 29.5 s, i.e. no speed-up; art equivalent — the knob stays, the default keeps the config size |
 
 ## End-to-end number today
 
 14-page chapter on the live stack (Luna + corrected source + contrast + Hayai rescue + LaMa + selective Flux):
-**173.1 s / 172.7 s, 14/14 pages per run**. The two quality-first prices are visible here: the analyst pass
+**148.1 s / 154.1 s, 14/14 pages per run** (final verification run; earlier runs of the same stack measured
+173.1/172.7 s — GPU warmth and sampling move it by ~10 %). The two quality-first prices are visible here: the analyst pass
 (~10 s/page, against 33.8/26.7 s measured for Luna without it) and the selective Flux repair (~20 s on the four
 pages per chapter that have text over textured art). Two performance tasks are recorded below: keep Flux warm per
 chapter, and either accept or trim the analyst pass.
 
-**Chapter quality audit on the same runs:** 156 regions, 58 dialogue lines, **53 translated (91 %)**, 5 without
+**Chapter quality audit on the final runs:** 156 regions, 58 dialogue lines, **53 translated (91 %)**, 5 without
 Thai — all five on the credit page (e-mail/wallet/URLs, not meant to be translated, #1139) — and **0 names
-drifting** in both runs. That is 58/58 for dialogue, with consistent spellings.
+drifting** in both runs. That is 58/58 for dialogue, with consistent spellings. The worker log confirms the
+adopted parts ran: 28 selective-Flux passes (8 repairing 1–2 regions, 0 failures), the analyst corrected the
+source on 25 pages, and the local Hayai rescue loaded in each worker.
 
 ## Measurement tooling now in the repo
 
@@ -56,15 +61,18 @@ drifting** in both runs. That is 58/58 for dialogue, with consistent spellings.
    compositing was meant to fill (the HUH-over-hair case now reads as art, not a smear). What remains is the case
    where a *character* overlaps the lettering box — no figure mask is available yet, and the glyph-mask experiment
    showed the erase mask cannot simply be shrunk.
-2. **Role-aware lettering** (Track A1): the analyst already returns per-line role (dialogue/thought/narration/sfx);
-   fonts and size policy per role are not implemented, and there is no measurement for "looks typeset" yet.
+2. **Deterministic shout styling** (Track A1 follow-up): role/emotion from the analyst was implemented and rejected
+   (labels not stable). The deterministic variant — short all-caps source = shout, decided from the source text with
+   no analyst call — reuses the same renderer seam and is the one worth trying.
 3. **Thai post-check in the pipeline**: blocked on a Thai ONNX recogniser (paddle2onnx does not load on this box).
 4. **Selective analyst cost** (dropped, recorded): a cheap "this page looks degraded" trigger was checked against
    saved data — every one of 8 pages had a junk-looking line and every page was corrected, so the trigger would skip
    nothing on this corpus. Revisit only with a better signal.
-5. **Performance of the two quality-first prices**: selective Flux reloads the model per page (~20 s on affected
-   pages) — keep it warm or run one Flux session per chapter; the analyst pass is ~10 s/page. Both are pure
-   performance work with quality already adopted.
+5. **Performance of the two quality-first prices** (measured, both opt-in): `MIT_FLUX_WARM=1` keeps LaMa and Flux
+   resident and made the chapter 173 → 155 s (~9 %; the rest is Flux inference, not the load), at the cost of holding
+   both models in VRAM; the analyst pass is ~10 s/page. Defaults stay cold and unaffected.
+6. **Product decision on the Flux cost**: accept ~20 s on pages with text over art, gate the pass on a larger minimum
+   art-box area, or run it as an offline chapter pass. The engineering levers are measured; the choice is taste.
 
 ## How to check the live stack
 

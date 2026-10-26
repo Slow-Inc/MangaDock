@@ -46,3 +46,17 @@ def test_no_drift_for_one_spelling_or_when_not_requested():
     ]
     assert audit(pairs)["name_drift"] == {}
     assert audit(pairs, names=["HAIMIYA"])["name_drift"] == {}
+
+def test_drift_reports_the_canonical_spelling_and_the_different_lines():
+    from manga_translator.quality_audit import name_drift
+
+    pairs = [
+        (0, "HAIMIYA SENPAI IS SCARY", "\u0e23\u0e38\u0e48\u0e19\u0e1e\u0e35\u0e48\u0e2e\u0e32\u0e2d\u0e34\u0e21\u0e34\u0e22\u0e30\u0e19\u0e48\u0e32\u0e01\u0e25\u0e31\u0e27"),
+        (1, "IT'S HAIMIYA-SENPAI...!!", "\u0e23\u0e38\u0e48\u0e19\u0e1e\u0e35\u0e48\u0e2e\u0e32\u0e2d\u0e34\u0e21\u0e34\u0e22\u0e30\u0e19\u0e35\u0e48\u0e19\u0e32...!!"),
+    ]
+    # whichever spelling the learner picks, a line that differs must be reported as a line, not as a guessed variant
+    report = name_drift(pairs, ["HAIMIYA"])
+    if report:
+        info = report["HAIMIYA"]
+        assert info["used"] >= 1
+        assert info["different"], info

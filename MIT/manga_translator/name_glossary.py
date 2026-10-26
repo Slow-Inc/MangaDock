@@ -168,6 +168,11 @@ def _same_name_skeleton(a: str, b: str) -> bool:
     return _edit_distance(sa, sb) <= 1 and abs(len(a) - len(b)) <= 4
 
 
+#: Thai characters that cannot START a syllable: a vowel sign or mark that only ever follows a consonant. A
+#: window opening on one of these cut a syllable in half ("าไฮมิยะ" out of "รุ่นพี่ไฮมิยะ").
+_NON_INITIAL = frozenset('ะาำำๅ๎๏๚๛')
+
+
 def _cluster_safe(run: str, start: int, length: int) -> bool:
     """Whether the slice starts and ends on a whole Thai character cluster (pure).
 
@@ -176,7 +181,7 @@ def _cluster_safe(run: str, start: int, length: int) -> bool:
     import unicodedata
     if start < 0 or length <= 0 or start + length > len(run):
         return False
-    if unicodedata.category(run[start]) != 'Lo':
+    if unicodedata.category(run[start]) != 'Lo' or run[start] in _NON_INITIAL:
         return False
     end = start + length
     if end < len(run) and unicodedata.category(run[end]) == 'Mn':
