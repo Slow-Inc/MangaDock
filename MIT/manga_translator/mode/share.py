@@ -339,6 +339,15 @@ class MangaTranslatorShared:
                             await asyncio.to_thread(_preload_sfx, _translator.device)
                         except Exception as exc:
                             print(f"[share] detector preload skipped: {exc}", flush=True)
+                        # #1143: the local OCR rescue loads on first use (15 s + its CUDA-graph capture); warm it
+                        # at boot so no page pays that inside the pipeline.
+                        try:
+                            from ..local_ocr_rescue import local_rescue_enabled, transcribe_crops_local
+                            if local_rescue_enabled():
+                                await transcribe_crops_local([np.full((64, 64, 3), 255, np.uint8)],
+                                                             _translator.device)
+                        except Exception as exc:
+                            print(f"[share] local OCR rescue preload skipped: {exc}", flush=True)
                         print(f"[share] models preloaded in {(_time.perf_counter() - _t0) * 1000:.0f} ms", flush=True)
                     except Exception as exc:  # preload is an optimisation, never a boot failure
                         print(f"[share] model preload skipped: {exc}", flush=True)

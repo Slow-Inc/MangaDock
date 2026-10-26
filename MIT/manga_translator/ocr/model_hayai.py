@@ -65,6 +65,14 @@ class ModelHayaiOCR(OfflineOCR):
         # device string ('cuda'); a '.to("cuda:1")' weight move yields one-character answers.
         self.model = AutoModel.from_pretrained(self._local_dir, trust_remote_code=True).to(device).eval()
         self.device = device
+        # Warm-up at load time, not on the first page: the fast engine captures a CUDA graph on its first
+        # generate, and a capture that happens while another stage is issuing CUDA work fails the whole stage
+        # (seen once: ultralytics' bubble detector inside a capture -> "operation not permitted when stream is
+        # capturing"). Capturing here keeps the graph AND keeps it out of the pipeline.
+        try:
+            self._read(np.full((64, 64, 3), 255, np.uint8))
+        except Exception:
+            pass
 
     async def _unload(self):
         self.model = None

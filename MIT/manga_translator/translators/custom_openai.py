@@ -19,6 +19,7 @@ from ..extra_headers import parse_extra_headers
 from ..runtime_options import resolve_reasoning_effort
 from ..tls import ssl_context
 from ..anthropic_messages import anthropic_endpoint, anthropic_model, post_messages, protocol_from_env, to_anthropic_payload
+from ..response_protocol import post_responses, responses_endpoint, responses_model, to_responses_payload
 
 
 # #1119: Anthropic-protocol connection pools, one per event loop (see CustomOpenAiTranslator._anthropic_client)
@@ -354,6 +355,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         return await post_messages(self._anthropic_client(), anthropic_endpoint(str(self.client.base_url)), headers,
                                    to_anthropic_payload(messages, model, max_tokens))
 
+    async def _request_responses(self, messages, model, max_tokens):
+        """#1143: the same request on the OpenAI Responses protocol (CUSTOM_OPENAI_PROTOCOL=responses).
+
+        gpt-6-luna is served only here; the chat-completions endpoint answers ModelProtocolUnsupported. The HTTP
+        pool is the Anthropic one (same gateway, same TLS), and extra_body knobs are OpenAI-chat-only."""
+        headers = {'Authorization': f'Bearer {self.client.api_key}', **self._extra_headers}
+        return await post_responses(self._anthropic_client(), responses_endpoint(str(self.client.base_url)),
+                                    headers, to_responses_payload(messages, model, max_tokens))
+
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
         messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
@@ -365,8 +375,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         # #1141: the page image goes with the request, so the model sees speaker, gender and scene
         from ..page_image import current_page_image, with_page_image
-        anthropic = protocol_from_env() == 'anthropic'
-        sent_model = anthropic_model(self.model or CUSTOM_OPENAI_MODEL) if anthropic else (self.model or CUSTOM_OPENAI_MODEL)
+        protocol = protocol_from_env()
+        anthropic = protocol == 'anthropic'
+        if anthropic:
+            sent_model = anthropic_model(self.model or CUSTOM_OPENAI_MODEL)
+        elif protocol == 'responses':
+            sent_model = responses_model(self.model or CUSTOM_OPENAI_MODEL)
+        else:
+            sent_model = self.model or CUSTOM_OPENAI_MODEL
         # the first call of a page encodes it; a thread keeps the JPEG encode off the slots' shared event loop
         page = await asyncio.to_thread(current_page_image) if sent_model not in _TEXT_ONLY_MODELS else None
         messages.append({'role': 'user', 'content': with_page_image(prompt, page, protocol_from_env()) if page else prompt})
@@ -396,6 +412,8 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         async def send():
             if anthropic:
                 return await self._request_anthropic(messages, sent_model, create_kwargs['max_tokens'])
+            if protocol == 'responses':
+                return await self._request_responses(messages, sent_model, create_kwargs['max_tokens'])
             return await self.client.chat.completions.create(**create_kwargs)
         try:
             response = await send()
