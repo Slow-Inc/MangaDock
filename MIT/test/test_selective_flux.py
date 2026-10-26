@@ -179,3 +179,12 @@ def test_dark_frac_boundary_matches_real_page_distribution():
         img[dark] = (rng.rand(h, w)[dark] * 80).astype(np.uint8)  # dark-textured fraction
         img3 = np.stack([img] * 3, axis=-1)
         assert len(find_text_over_art_boxes(mask, img3, mask.copy())) == expect
+
+def test_the_pass_is_on_by_default_and_the_env_can_override_it():
+    from manga_translator.selective_flux import selective_flux_enabled
+
+    assert selective_flux_enabled(True, {}) is True
+    assert selective_flux_enabled(False, {}) is False
+    assert selective_flux_enabled(False, {"MIT_SELECTIVE_FLUX": "1"}) is True
+    for off in ("0", "false", "no", "off"):
+        assert selective_flux_enabled(True, {"MIT_SELECTIVE_FLUX": off}) is False

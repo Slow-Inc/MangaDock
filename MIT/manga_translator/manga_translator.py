@@ -1915,7 +1915,8 @@ class MangaTranslator:
                 # LaMa result. LaMa is unloaded first (VRAM), the pass is lock-serialised
                 # (batch OOM), and any failure keeps the LaMa result. Runs AFTER flatten so
                 # the two disjoint repairs (white captions vs textured art) don't clobber.
-                if getattr(config.inpainter, 'selective_flux', False):
+                from .selective_flux import selective_flux_enabled
+                if selective_flux_enabled(getattr(config.inpainter, 'selective_flux', False)):
                     from .selective_flux import apply_selective_flux_repair
                     from .inpainting import dispatch as dispatch_inpainting
                     from .config import Inpainter
