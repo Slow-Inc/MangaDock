@@ -188,3 +188,20 @@ def test_the_pass_is_on_by_default_and_the_env_can_override_it():
     assert selective_flux_enabled(False, {"MIT_SELECTIVE_FLUX": "1"}) is True
     for off in ("0", "false", "no", "off"):
         assert selective_flux_enabled(True, {"MIT_SELECTIVE_FLUX": off}) is False
+
+def test_the_warm_switch_is_opt_in():
+    from manga_translator.selective_flux import flux_warm_enabled
+
+    assert flux_warm_enabled({}) is False
+    for on in ("1", "true", "YES", "on"):
+        assert flux_warm_enabled({"MIT_FLUX_WARM": on}) is True, on
+    assert flux_warm_enabled({"MIT_FLUX_WARM": "0"}) is False
+
+
+def test_the_working_size_keeps_the_config_unless_overridden():
+    from manga_translator.selective_flux import flux_working_size
+
+    assert flux_working_size(2048, {}) == 2048
+    assert flux_working_size(2048, {"MIT_FLUX_SIZE": "1024"}) == 1024
+    assert flux_working_size(2048, {"MIT_FLUX_SIZE": "0"}) == 2048
+    assert flux_working_size(2048, {"MIT_FLUX_SIZE": "nonsense"}) == 2048
