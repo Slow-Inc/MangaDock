@@ -1886,6 +1886,23 @@ class MangaTranslator:
                 if getattr(config.inpainter, 'mask_tighten', False):
                     from .patch_geometry import tighten_text_mask
                     ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
+                # #1143 Track A4: erase the letters, not everything inside their line box. SAM 2.1 segments the
+                # glyph strokes; the refinement is clipped to the seed and only replaces it when its area is
+                # plausible, so a failed or odd prompt leaves today's mask untouched.
+                from .glyph_mask import glyph_mask_enabled, refine_with_sam2
+                if glyph_mask_enabled():
+                    try:
+                        seed_area = int((ctx.mask > 0).sum())
+                        refined = await asyncio.to_thread(refine_with_sam2, ctx.mask, ctx.img_rgb, self.device)
+                        if refined is not None:
+                            ctx.mask = refined
+                            logger.info('[glyph-mask] SAM 2.1 glyph mask: seed %d px -> %d px',
+                                        seed_area, int((refined > 0).sum()))
+                        else:
+                            logger.info('[glyph-mask] SAM 2.1 declined the refinement (seed %d px kept)', seed_area)
+                    except Exception:
+                        logger.warning('[glyph-mask] refinement failed, keeping the textline mask',
+                                       exc_info=True)
                 await self._report_progress('inpainting')
                 full_inpainted = await self._run_inpainting(config, ctx)
                 # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
