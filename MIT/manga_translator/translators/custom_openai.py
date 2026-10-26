@@ -365,6 +365,12 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                                     headers, to_responses_payload(messages, model, max_tokens))
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
+        # #1143 Track B5: scene notes from the per-page analyst ride in front of the numbered segments (empty
+        # string when MIT_VISION_CONTEXT is off, so the prompt is byte-identical to today).
+        from ..vision_context import current_vision_context
+        notes = current_vision_context()
+        if notes:
+            prompt = notes + '\n\n' + prompt
         messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
         # Add chat samples if available
