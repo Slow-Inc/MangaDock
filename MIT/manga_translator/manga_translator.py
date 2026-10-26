@@ -1929,20 +1929,31 @@ class MangaTranslator:
                     from .selective_flux import apply_selective_flux_repair
                     from .inpainting import dispatch as dispatch_inpainting
                     from .config import Inpainter
+                    # #1143 perf: keeping Flux resident across pages (MIT_FLUX_WARM=1) removes the per-page
+                    # model load that dominates the repair cost; it needs both faces in VRAM at once, so it is
+                    # opt-in and a failure still keeps the LaMa result.
+                    from .selective_flux import flux_working_size, flux_warm_enabled
+                    _flux_warm = flux_warm_enabled()
                     async with self._flux_lock:
                         try:
-                            await self._model_unloader.unload('inpainting', config.inpainter.inpainter)
+                            if not _flux_warm:
+                                await self._model_unloader.unload('inpainting', config.inpainter.inpainter)
+                            # #1143 perf: the working size for the repair pass (measured: a smaller size was no
+                            # faster, so this is a knob rather than a changed default).
+                            _flux_size = flux_working_size(config.inpainter.inpainting_size)
+
                             async def _flux(crop, mcrop):
                                 return await dispatch_inpainting(
                                     Inpainter.flux_klein, crop, mcrop, config.inpainter,
-                                    config.inpainter.inpainting_size, self.device, self.verbose)
+                                    _flux_size, self.device, self.verbose)
                             full_inpainted, _nrep = await apply_selective_flux_repair(
                                 full_inpainted, ctx.img_rgb, ctx.mask, text_only, _flux, logger=logger)
                             logger.info(f'[SelectiveFlux] repaired {_nrep} text-over-art region(s)')
                         except Exception:
                             logger.warning(f'[SelectiveFlux] pass failed, LaMa result stands:\n{traceback.format_exc()}')
                         finally:
-                            await self._model_unloader.unload('inpainting', Inpainter.flux_klein)
+                            if not _flux_warm:
+                                await self._model_unloader.unload('inpainting', Inpainter.flux_klein)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")

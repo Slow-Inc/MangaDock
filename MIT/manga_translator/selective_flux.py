@@ -50,6 +50,28 @@ def find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask,
     return _merge_overlapping(boxes)
 
 
+def flux_warm_enabled(env=None) -> bool:
+    """Keep LaMa and Flux resident across pages instead of swapping them per page (pure; MIT_FLUX_WARM=1).
+
+    Saves ~9 % of a chapter (measured) but needs both faces in VRAM, so it stays opt-in."""
+    import os
+    return str((env or os.environ).get('MIT_FLUX_WARM', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def flux_working_size(config_size: int, env=None) -> int:
+    """The working size for the Flux repair pass: the config size unless MIT_FLUX_SIZE overrides it (pure).
+
+    A smaller size was measured to be no faster (the model's tiling dominates), so the override is a knob, not a
+    default; 0/invalid keeps the config value."""
+    import os
+    raw = str((env or os.environ).get('MIT_FLUX_SIZE', '') or '').strip()
+    try:
+        size = int(raw)
+    except (TypeError, ValueError):
+        return int(config_size or 0)
+    return size if size > 0 else int(config_size or 0)
+
+
 def selective_flux_enabled(config_value: bool, env=None) -> bool:
     """Whether to run the Flux repair pass: the config wins unless MIT_SELECTIVE_FLUX overrides it (pure).
 
