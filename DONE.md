@@ -5159,3 +5159,11 @@ Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#
   [ADR 034](docs/adr/034-hybrid-phase5-web-session-and-os-push.md).
 - No remote database migration, production deployment, provider configuration or
   production signing was applied. Push rollout remains off.
+
+### Update memory saved at the user's request
+
+Saved [Mobile Hybrid Phase 5 Update 2026-10-26](<Obsidian-MangaDock/Mobile Hybrid Phase 5 Update 2026-10-26.md>)
+and linked it from the vault Home index. The note records implementation commit,
+worktree, tests, APK hash, acceptance limits and resume steps. A pointer in the
+original workspace's `Documents/Plan/MOBILE_PHASE5_RESUME.md` directs future
+sessions to the canonical note. Documentation-only update; runtime unchanged.

@@ -39,6 +39,8 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 
 ## 🚧 Project — สถานะงาน & ข้อจำกัด
 
+- [[Mobile Hybrid Phase 5 Update 2026-10-26]] — Phase 5 ต่อจาก hybrid ที่ push แล้ว: branch/commit, Feed/Collections/Push bridge, ผลทดสอบ, APK QA และจุดทำต่อก่อน rollout
+
 - [[project-animetext-approved]] — User approved downloading the AnimeText YOLO model (deepghs/AnimeText_yolo) for #168 SFX detection on 2026-06-09 — the .pt security gate is cleared for this model
 - [[project-backend-pre-existing-test-failures]] — Backend books suite has 14 pre-existing test failures (pubsub suite only) unrelated to feature work
 - [[project-cache-phase2]] — "Multi-layer cache hardening phases 2.1–2.3 — what's done, what's pending"
