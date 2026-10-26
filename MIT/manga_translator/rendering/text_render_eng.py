@@ -1,9 +1,12 @@
+import os
+
 import cv2
 import numpy as np
 from PIL import Image
 from typing import List, Tuple
 
-from .text_render import get_char_glyph, put_char_horizontal, add_color
+from .text_render import (BASE_PATH, add_color, current_font_path, get_char_glyph, put_char_horizontal,
+                          set_font)
 from .ballon_extractor import extract_ballon_region
 from ..utils import TextBlock, rect_distance
 
@@ -415,7 +418,28 @@ def render_textblock_list_eng(
                 # print(region.translation, region.enlarged_xyxy, region.enlarge_ratio)
                 # print('>->', region2.translation, region2.enlarged_xyxy, region2.enlarge_ratio)
 
+    # #1143 Track A1: the analyst labels every line (dialogue / thought / narration / sfx) and its emotion.
+    # A raised-voice line is typeset in the heavier face; everything else stays in the body face the product uses.
+    _base_font = current_font_path()
+    _emphasis_on = False
+    _loud_font = ''
+    try:
+        from ..role_fonts import bold_font_path, font_for_region, role_fonts_enabled
+        _emphasis_on = role_fonts_enabled()
+        if _emphasis_on:
+            _loud_font = bold_font_path(os.path.join(BASE_PATH, 'fonts'))
+    except Exception:
+        _emphasis_on = False
+
+    def _apply_emphasis_font(region):
+        if not _emphasis_on:
+            return
+        desired = font_for_region(region, _base_font, _loud_font, True)
+        if desired and desired != current_font_path():
+            set_font(desired)
+
     for region in text_regions:
+        _apply_emphasis_font(region)
         words = seg_eng(region.translation)
         if not words:
             continue
@@ -550,4 +574,6 @@ def render_textblock_list_eng(
         # cv2.imshow('raw_lines', np.array(raw_lines))
         # cv2.waitKey(0)
 
+    if _emphasis_on:
+        set_font(_base_font)
     return np.array(img_pil)
