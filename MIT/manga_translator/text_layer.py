@@ -76,6 +76,31 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
     return out
 
 
+#: #1144: a page whose source was echoed back for this many lines FAILED to translate. Two, because the live
+#: repro echoed two lines (Haimiya ch. 6 p2) and the branch's first cut-off of three missed its own defect; this
+#: branch only runs when the page already rendered nothing, so one kept line (a sign, a name) still means "empty
+#: page", not "failed page" (independent review, 2026-10-26).
+ECHO_FAILURE_MIN = 2
+
+
+#: #1144: a page that failed to translate. Its own exception, so the worker can answer 422 (a settled
+#: failure) instead of 500 — the Backend retries every 500 as "MIT is still starting", 30 times, re-running
+#: the whole GPU pipeline for a page that will fail the same way (#1144 review).
+class PageTranslationFailed(RuntimeError):
+    """A page failed to translate: a stage crashed and fell back, or the translator echoed the source."""
+
+
+def page_failure(dropped: Iterable, failed_stages) -> str:
+    """Why a page that renders nothing FAILED, or '' when it simply has no text (#1144). A failed page must
+    be reported as an error: an empty success is cached by the Backend for 7 days. Pure."""
+    if failed_stages:
+        return 'stage failed: ' + ', '.join(failed_stages)
+    echoed = sum(1 for _r, reason in dropped or [] if reason == 'Translation identical to original')
+    if echoed >= ECHO_FAILURE_MIN:
+        return f'translation echoed the source for {echoed} lines'
+    return ''
+
+
 def empty_patch_result(img_w: int, img_h: int, dropped: Optional[Iterable]) -> Dict:
     """The /patches result for a page that renders nothing — still listing what was dropped and
     why, so "no text" and "every region dropped" are distinguishable (2026-10-20 quality loop)."""

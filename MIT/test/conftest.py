@@ -28,7 +28,8 @@ _HEAVY_TESTS = [
     'test_custom_openai_glitch_retry.py',  # imports translators.custom_openai (torch)
     'test_custom_openai_parse.py',
     'test_custom_openai_thinking.py',
-    'test_page_image_request.py',  # #1141: imports translators.custom_openai + manga_translator (torch)
+    'test_page_image_request.py',
+    'test_page_failure_patches.py',  # #1144: imports MangaTranslator (torch)  # #1141: imports translators.custom_openai + manga_translator (torch)
     'test_patch_stage_progress.py',  # imports manga_translator.manga_translator (torch) (#1137)
     'test_offline_model_load_lock.py',  # imports utils.inference (torch) (#1123)
     'test_queue_race.py',            # imports server.myqueue -> server.instance -> manga_translator (torch) (#1119)

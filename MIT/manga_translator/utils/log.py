@@ -19,8 +19,9 @@ class Formatter(logging.Formatter):
 
 class Filter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        # Try to filter out logs from imported modules
-        if not record.name.startswith(ROOT_TAG):
+        # Try to filter out logs from imported modules. #1147: our modules that use
+        # logging.getLogger('manga_translator') were silenced here too.
+        if not record.name.startswith((ROOT_TAG, 'manga_translator')):
             return False
         # Shorten the name
         record.name = replace_prefix(record.name, ROOT_TAG + '.', '')

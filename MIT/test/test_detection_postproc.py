@@ -300,3 +300,46 @@ def test_empty_balloon_rescue_shares_the_pages_balloon_detection(monkeypatch):
     assert ctx.bubble_polygons == [[(100, 100), (300, 100), (300, 300), (100, 300)]]
     merge_empty_balloons(ctx, ([], None, None), 'cpu')        # a second consumer on the same page
     assert calls['n'] == 1
+
+
+def test_a_page_without_balloons_still_gets_caption_and_ink_rescue_1147(monkeypatch):
+    # merge_empty_balloons returned as soon as the balloon YOLO found nothing, skipping the white-caption
+    # and ink-cluster rescues below it - narration pages (no balloons at all) lost both.
+    import types
+    import numpy as np
+    import manga_translator.detection_postproc as dp
+    monkeypatch.setattr(dp, 'white_box_candidates', lambda gray: [(10, 10, 90, 40)])
+    monkeypatch.setattr(dp, 'empty_balloon_boxes', lambda balloons, existing, ink: list(balloons))
+    monkeypatch.setattr(dp, 'uncovered_text_clusters', lambda gray, covered: [(100, 100, 150, 130)])
+    ctx = types.SimpleNamespace(img_rgb=np.full((200, 200, 3), 255, np.uint8), bubble_polygons=[])
+    textlines, _raw, _mask = dp.merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert len(textlines) == 2 and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146():
+    # ch. 6 p2: DBNet boxed `AND I DON'T` (left balloon) and `HOME AFTER` (right balloon) as ONE line,
+    # so OCR read "AND I DONT HOME AFTER" and the two speeches interleaved.
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]
+    straddle = Quadrilateral(np.array(poly(99, 331, 353, 350)), '', 1.0)
+    inside = Quadrilateral(np.array(poly(101, 356, 200, 373)), '', 1.0)
+    out = split_cross_balloon_lines([straddle, inside], balloons)
+    boxes = sorted(tuple(int(v) for v in t.xyxy) for t in out)
+    assert len(out) == 3
+    assert boxes[0][0] == 99 and boxes[0][2] <= 253          # left part ends inside the left balloon
+    assert boxes[-1][2] == 353 and boxes[-1][0] >= 208        # right part starts inside the right balloon
+    assert split_cross_balloon_lines([inside], balloons)[0] is inside
+
+
+def test_a_line_that_only_overhangs_its_own_balloon_is_not_split_1146():
+    """Independent review: with overlapping balloons, a line that pokes a few pixels past its OWN balloon (a
+    rotated line, an undersegmented mask) was cut and the tail of a real word became a line in the neighbour.
+    The overhang into the second balloon must be at least one line height."""
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]   # the ch. 6 p2 pair, overlapping
+    overhang = Quadrilateral(np.array(poly(99, 331, 260, 350)), '', 1.0)   # 7 px past the left balloon
+    assert split_cross_balloon_lines([overhang], balloons) == [overhang]

@@ -120,7 +120,11 @@ async def _run_batch_pipelined(index_list, images_data, config_str, taskId, call
                 "error": error,
             }
         else:
-            normalized = normalize_patch_result(raw_results[pos])
+            raw = raw_results[pos]
+            # #1144 review: the worker marks a page it could not translate on the page's own result, so one bad
+            # page is a page error instead of an empty success the Backend caches for 7 days.
+            page_error = raw.get("error") if isinstance(raw, dict) else None
+            normalized = normalize_patch_result(raw)
             payload = {
                 "taskId": taskId,
                 "pageIndex": page_idx,
@@ -128,7 +132,7 @@ async def _run_batch_pipelined(index_list, images_data, config_str, taskId, call
                 "imgHeight": normalized["img_height"],
                 "patches": normalized["patches"],
                 "regions": normalized["regions"],
-                "error": None,
+                "error": page_error,
             }
         if is_cancelled(taskId):
             print(f"[batch] task {taskId} cancelled - dropping page {page_idx} result")

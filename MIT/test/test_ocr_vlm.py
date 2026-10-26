@@ -9,8 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, crop_has_lettering,
-                                       restore_sfx_translations, sanitize_sfx, swallows_dialogue,
-                                       vlm_localize_sfx)
+                                       restore_sfx_translations, sanitize_sfx, vlm_localize_sfx)
 
 
 def _crop():
@@ -228,7 +227,10 @@ def test_rescue_NOT_for_ascii_reads_even_with_provenance():
     # ASCII letter/digit is proof the OCR succeeded on real text, NOT a dropped glyph.
     # Rescuing those made the vision model hallucinate a phantom Thai SFX that merged INTO
     # and corrupted the real dialogue render (observed across 5 Gal Yome EN→Thai pages).
-    for ascii_read in ("W", "I", "THE", "M", "8", "1", "WHA"):
+    # #881: the rescue now TRANSCRIBES instead of inventing an SFX, so 1-2 mark reads from det_sfx
+    # are sent; a box over a bubble then comes back as that bubble's own text and is dropped by
+    # resolve_rescue (below). Real words ("THE", "WHA") still prove the OCR did its job.
+    for ascii_read in ("THE", "WHA"):
         assert not should_rescue_sfx(ascii_read, from_sfx_detection=True,
                                      box_w=400, box_h=370, vlm_rescue=True), ascii_read
 
@@ -556,21 +558,9 @@ def test_lettering_is_several_strokes_887():
     assert crop_has_lettering(_lettered_crop()) is True
 
 
-def test_a_container_that_swallows_a_dialogue_line_is_not_rescued_887():
-    """Akuyaku p1: the merge produced a big container region whose own OCR read was junk while it
-    fully contained the balloon's `NYA` line. The rescue turned it into a second `เหมียว`, so the
-    bubble showed two meows. A region that fully contains real dialogue must not be rescued."""
-    container = (969, 580, 1158, 812)
-    nya = (997, 678, 1074, 717)
-    assert swallows_dialogue(container, [nya]) is True
-
-
-def test_a_normal_sfx_box_does_not_swallow_dialogue_887():
-    sfx = (1084, 440, 1160, 477)
-    other = (997, 678, 1074, 717)
-    assert swallows_dialogue(sfx, [other]) is False
-    assert swallows_dialogue(sfx, []) is False
-
+# #881 review: `swallows_dialogue` was folded into `resolve_rescue` (`_containment`, same 70 % threshold), so
+# the #887 r3 container case is pinned by `test_resolve_rescue_keeps_new_text_and_drops_what_repeats_a_bubble`
+# below rather than by two tests of a helper the pipeline no longer calls.
 
 def test_localize_candidates_runs_concurrently_and_preserves_order():
     import asyncio
@@ -592,3 +582,206 @@ def test_localize_candidates_runs_concurrently_and_preserves_order():
     assert out == ['sfx-a', 'sfx-b', 'sfx-c', 'sfx-d']
     assert sorted(calls) == ['a', 'b', 'c', 'd']
     assert elapsed < 0.45  # 4 sequential sleeps would be >= 0.6 s
+
+
+# ── #881: the rescue reaches the gateway and transcribes ─────────────────────
+def test_rescue_calls_send_the_gateway_headers(monkeypatch):
+    # OpenCode Go answers 400 MissingSessionID without x-opencode-session: every rescue failed
+    # silently since the move to that gateway (0 rescued in three session logs, 925 boxes dropped).
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setattr(v, '_gateway_headers', lambda: {'x-opencode-session': 's1'})
+    for call in (v.vlm_localize_sfx, v.vlm_transcribe):
+        post = _post_returning('BOOM')
+        v.reset_sfx_breaker()
+        call(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post)
+        assert post.calls['headers']['x-opencode-session'] == 's1'
+        assert post.calls['headers']['Authorization'] == 'Bearer k'
+
+
+def test_transcribe_returns_the_lettered_text_on_one_line():
+    from manga_translator.ocr_vlm import vlm_transcribe
+    post = _post_returning('Kurose\n-kun,\nyou...')
+    assert vlm_transcribe(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post) == 'Kurose -kun, you...'
+    assert 'Transcribe' in post.calls['json']['messages'][0]['content'][0]['text']
+
+
+def test_transcription_parse_drops_markers_and_refusals():
+    from manga_translator.ocr_vlm import parse_transcription
+    assert parse_transcription("I'm glad.") == "I'm glad."
+    assert parse_transcription('SFX: ドキドキ') == 'ドキドキ'
+    assert parse_transcription('NONE') == ''
+    assert parse_transcription('  ') == ''
+    assert parse_transcription(None) == ''
+
+
+def test_a_det_sfx_box_read_as_short_ascii_is_still_worth_a_transcription():
+    # the '-kun, you...' box read as '14' by the 48px OCR; a transcription cannot invent an SFX,
+    # it reads the box or answers NONE, so ASCII junk from det_sfx no longer blocks it
+    from manga_translator.ocr_vlm import should_rescue_sfx
+    assert should_rescue_sfx('14', True, 300, 460, True)
+    assert should_rescue_sfx('T', True, 300, 460, True)
+    assert not should_rescue_sfx('HUH?', False, 300, 460, True)     # dialogue read, not det_sfx: unchanged
+    assert not should_rescue_sfx('KUROSE', True, 300, 460, True)    # a real word read: OCR did its job
+
+
+def test_a_container_takes_over_only_the_dialogue_its_transcription_repeats():
+    from manga_translator.ocr_vlm import transcription_covers
+    assert transcription_covers('Kurose -kun, you...', ['Kurose'])
+    assert transcription_covers("KUROSE-KUN, YOU...", ['kurose'])
+    assert not transcription_covers('NO WAY', ['Kurose'])
+    assert not transcription_covers('Kurose -kun', [])
+
+
+def test_resolve_rescue_keeps_new_text_and_drops_what_repeats_a_bubble():
+    from manga_translator.ocr_vlm import resolve_rescue
+    dialogue = [((100, 100, 300, 160), 'Kurose', 'r1'), ((600, 600, 800, 700), 'WHAT DO YOU MEAN?!', 'r2')]
+    # nothing underneath: a hand-lettered line the OCR lost -> keep it
+    assert resolve_rescue((0, 0, 90, 90), "I'm glad.", dialogue) == ('keep', [], 'transcribed')
+    # a box over a bubble that transcribes that bubble's own text: the #278 phantom -> drop
+    assert resolve_rescue((620, 610, 700, 650), 'WHAT DO YOU MEAN', dialogue) == (
+        'drop', [], 'repeats an overlapping line')
+    # a container swallowing a line it repeats AND extends: it replaces that line (#881 Kurose case)
+    assert resolve_rescue((80, 80, 400, 500), 'Kurose -kun, you...', dialogue) == (
+        'takeover', ['r1'], 'replaces the lines it swallows')
+    # a big ink cluster that only repeats the bubble it swallows adds nothing -> drop (live ch. 6 p10:
+    # the panel-sized 'T' box took over "JUST WHEN WE'D FINALLY GOTTEN CLOSER...")
+    assert resolve_rescue((80, 80, 400, 500), 'KUROSE!', dialogue) == (
+        'drop', [], 'swallows a dialogue line it does not repeat')
+    # a container swallowing a line it does NOT repeat: leave the dialogue alone
+    assert resolve_rescue((80, 80, 400, 500), 'BOOM', dialogue) == (
+        'drop', [], 'swallows a dialogue line it does not repeat')
+    # every drop says WHY it dropped - the log used to call all of them "repeats an overlapping line"
+    assert resolve_rescue((0, 0, 90, 90), '', dialogue) == ('drop', [], 'nothing read')
+
+
+def test_a_guessed_box_survives_a_failed_line_read_so_the_rescue_can_try():
+    # #881: 'I'm glad.' (hand-lettered, 70 px glyphs) was boxed by det_sfx, read below the prob floor
+    # by the 48px OCR and dropped before the rescue ever saw it. Guessed boxes are kept, as empty
+    # text; a normal dialogue line below the floor still drops.
+    from manga_translator.ocr_vlm import keep_ocr_line
+    sfx = SimpleNamespace(text='', is_sfx=True)
+    placeholder = SimpleNamespace(text='', rescue_placeholder=True)
+    dialogue = SimpleNamespace(text='')
+    assert keep_ocr_line(sfx, below_floor=True)
+    assert keep_ocr_line(placeholder, below_floor=True)
+    assert not keep_ocr_line(dialogue, below_floor=True)
+    assert keep_ocr_line(SimpleNamespace(text='HELLO'), below_floor=False)
+    assert not keep_ocr_line(SimpleNamespace(text='  '), below_floor=False)
+
+
+def test_placeholders_count_as_guessed_boxes_for_the_rescue():
+    from manga_translator.ocr_vlm import guessed_box
+    assert guessed_box(SimpleNamespace(from_sfx_detection=True))
+    assert guessed_box(SimpleNamespace(rescue_placeholder=True))
+    assert not guessed_box(SimpleNamespace())
+
+
+def test_a_placeholder_skips_the_sfx_ink_gate():
+    # an empty-balloon / ink-cluster placeholder already proved its ink when it was made; the #887
+    # contrast gate (tuned for SFX on art) rejected thin lettering in a big white balloon
+    # (`Kurose -kun, you...`: dark 5 %, std 54)
+    from manga_translator.ocr_vlm import vlm_transcribe
+    faint = np.full((200, 200, 3), 250, dtype=np.uint8)
+    faint[90:100, 40:160] = 30
+    post = _post_returning('Kurose -kun, you...')
+    assert vlm_transcribe(faint, api_base='http://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert vlm_transcribe(faint, api_base='http://gw/v1', api_key='k', model='m', post_fn=post,
+                          check_lettering=False) == 'Kurose -kun, you...'
+
+
+def test_a_read_of_only_dashes_or_rings_is_line_art_not_worth_a_call():
+    # 3 chapters live: 60 rescue calls on 'ー' / 'ーー' / '○' reads, 0 transcriptions - balloon arcs and lines
+    from manga_translator.ocr_vlm import should_rescue_sfx
+    for read in ('ー', 'ーー', '○', '—', '~'):
+        assert not should_rescue_sfx(read, True, 300, 300, True), read
+    assert should_rescue_sfx('', True, 300, 300, True)
+    assert should_rescue_sfx('ぬ', True, 300, 300, True)
+
+
+def test_transcription_follows_the_translator_onto_the_anthropic_protocol(monkeypatch):
+    # live: deepseek (thinking) spent all 512 tokens reasoning now and then -> finish=length, content '' ->
+    # three in a row paused the rescue for 300 s and every box in that window dropped. The translator already
+    # runs haiku on the Anthropic protocol, which does not think; the rescue now goes the same way.
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+    monkeypatch.setattr(v, '_gateway_headers', lambda: {'x-opencode-session': 's1'})
+    calls = {}
+
+    class R:
+        def json(self):
+            return {'content': [{'type': 'text', 'text': "I'm glad."}], 'stop_reason': 'end_turn'}
+
+    def post(url, headers=None, json=None, timeout=None):
+        calls.update(url=url, headers=headers, json=json)
+        return R()
+    v.reset_sfx_breaker()
+    out = v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='deepseek', post_fn=post)
+    assert out == "I'm glad."
+    assert calls['url'].endswith('/anthropic/v1/messages')
+    assert calls['json']['model'] == 'claude-haiku-5-5'
+    assert calls['json']['messages'][0]['content'][0]['type'] == 'image'
+    assert calls['headers']['x-opencode-session'] == 's1' and calls['headers']['anthropic-version']
+
+
+# ── #881 review: the failure modes that made the original rescue silent ──────
+
+def test_the_rescue_sends_the_extra_headers_parsed_from_the_env(monkeypatch):
+    """#881 root cause: the rescue never sent CUSTOM_OPENAI_EXTRA_HEADERS, so every call answered 400
+    MissingSessionID (0 of 925 boxes rescued). Pin the REAL parse, not a monkeypatched header dict."""
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_EXTRA_HEADERS', '{"x-opencode-session":"s1"}')
+    post = _post_returning('BOOM')
+    v.reset_sfx_breaker()
+    v.vlm_transcribe(_crop(), api_base='http://gw/v1', api_key='k', model='m', post_fn=post)
+    assert post.calls['headers']['x-opencode-session'] == 's1'
+    assert post.calls['headers']['Authorization'] == 'Bearer k'
+
+
+def test_a_non_200_transcription_is_a_failure_not_a_silent_empty(monkeypatch):
+    """The status was never checked: a 400 body parsed to content='' and the rescue dropped the line while
+    telling the breaker everything was fine - #881 recurring silently."""
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+
+    class R:
+        status_code = 400
+        text = '{"error":{"message":"MissingSessionID"}}'
+
+        def json(self):
+            return {'content': []}
+
+    v.reset_sfx_breaker()
+    for _ in range(3):
+        assert v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='m',
+                                post_fn=lambda *a, **k: R()) == ''
+    assert not v._breaker.allows()   # three unusable answers still stop the rescue, as before
+
+
+def test_a_200_with_no_content_blocks_is_not_an_answer(monkeypatch):
+    import manga_translator.ocr_vlm as v
+    monkeypatch.setenv('CUSTOM_OPENAI_PROTOCOL', 'anthropic')
+    monkeypatch.setenv('CUSTOM_OPENAI_ANTHROPIC_MODEL', 'claude-haiku-5-5')
+
+    class R:
+        status_code = 200
+        text = ''
+
+        def json(self):
+            return {'content': [], 'stop_reason': 'end_turn'}
+
+    v.reset_sfx_breaker()
+    assert v.vlm_transcribe(_crop(), api_base='https://gw/zen/go/openai/v1', api_key='k', model='m',
+                            post_fn=lambda *a, **k: R()) == ''
+    assert v._breaker.streak == 1
+
+
+def test_a_two_letter_sfx_clipping_a_bubble_is_not_dropped_as_a_phantom():
+    """The phantom check was any overlap + symmetric substring, so a real 2-letter Latin SFX over a bubble edge
+    ('HA' over 'WHAT?!') was dropped. The phantom sits INSIDE the line it repeats."""
+    from manga_translator.ocr_vlm import resolve_rescue
+    dialogue = [((100, 100, 300, 160), 'WHAT?!', 'r1')]
+    assert resolve_rescue((60, 120, 110, 150), 'HA', dialogue)[0] == 'keep'      # 20 % over the line
+    assert resolve_rescue((150, 110, 200, 150), 'WHAT', dialogue)[0] == 'drop'   # inside, repeats it
+

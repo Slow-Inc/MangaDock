@@ -12,7 +12,25 @@ drift, and lets it be unit-tested without importing the ML stack.
 is reassigned at runtime by `set_main_logger`; resolving it at the call site
 keeps S23 byte-identical with the inline blocks.
 """
+import contextvars
 import traceback
+
+#: #1144: stages that failed and fell back on this page. A crashed stage's fallback ([]) made the page look
+#: like a page with no text; translate_patches reads this to report a failure instead.
+#:
+#: A ContextVar only copies the *reference* into a child task, so isolation comes from where begin_page() runs,
+#: not from the ContextVar itself: it must be called in the task that owns the page. translate_patches owns
+#: its page; translate_batch_pipelined runs each phase in its own task (front / translation / back) and calls
+#: begin_page() in the phase that runs the stages, reading failed_stages() before the phase returns.
+_failed = contextvars.ContextVar('mit_failed_stages', default=None)
+
+
+def begin_page() -> None:
+    _failed.set([])
+
+
+def failed_stages() -> list:
+    return list(_failed.get() or [])
 
 
 async def run_stage(name, fn, fallback, *, report_progress, ignore_errors, logger):
@@ -32,4 +50,7 @@ async def run_stage(name, fn, fallback, *, report_progress, ignore_errors, logge
         logger.error(f"Error during {name}:\n{traceback.format_exc()}")
         if not ignore_errors:
             raise
+        failed = _failed.get()
+        if failed is not None:
+            failed.append(name)
         return fallback()

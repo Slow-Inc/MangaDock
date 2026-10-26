@@ -140,3 +140,25 @@ def test_an_art_scale_cjk_glyph_is_dropped_886():
 def test_small_cjk_text_is_not_treated_as_art_886():
     r = SimpleNamespace(text='月', translation='เดือน', font_size=40)
     assert filter_translated_regions([r], _cfg()) == [r]
+
+
+def test_a_translator_note_in_brackets_is_not_rendered_1145():
+    # Haimiya ch. 6 p2: OCR junk '9 y31dVH' (a vertical "CHAPTER 6" label) came back as '(ไม่มีข้อความ)',
+    # another run '(เสียงไม่ชัดเจน)' - notes about the line, drawn onto the art.
+    kept, dropped = filter_translated_regions_with_drops(
+        [_r('9 y31dVH', '(ไม่มีข้อความ)'), _r('9 y31dVH', '[เสียงไม่ชัดเจน]'), _r('9 y31dVH', '（ไม่ทราบ）')], _cfg())
+    assert kept == [] and {reason for _r_, reason in dropped} == {'Translator note, not a translation'}
+
+
+def test_a_bracketed_line_that_was_bracketed_in_the_source_is_kept_1145():
+    keep = [_r('(I SHOULD SAY SOMETHING...)', '(ควรพูดอะไรสักอย่าง...)'),
+            _r('HUH (WHAT)?', 'หา (อะไรนะ)?')]
+    assert filter_translated_regions(keep, _cfg()) == keep
+
+
+def test_a_real_parenthesised_translation_is_not_mistaken_for_a_note_1145():
+    """Independent review: the shape test alone (answer wholly in brackets) dropped ordinary translated
+    asides and SFX, which main rendered. Only a note that SAYS the line is empty/unreadable is a note."""
+    keep = [_r('ドン', '(BAM!)'), _r('はぁ…', '(sigh)'), _r('HELLO', '(HELLO)'),
+            _r('ピンポン', '(DING DONG)'), _r('……', '(…')]
+    assert filter_translated_regions(keep, _cfg()) == keep

@@ -25,6 +25,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from manga_translator import Config, Context, MangaTranslator
 from manga_translator.request_scope import request_scope
+from manga_translator.text_layer import PageTranslationFailed
 from server.worker_slots import SlotGate, effective_slots, page_runs_alone, slots_from_env
 
 logger = logging.getLogger('shared')
@@ -148,6 +149,12 @@ async def simple_execute_translate_patches(request: Request):
             if report:
                 await send_telemetry(_PARENT["url"], _PARENT["nonce"], {"kind": "vram", **report})
         return Response(content=pickle.dumps(patches), media_type="application/octet-stream")
+    except PageTranslationFailed as e:
+        # #1144 review: a settled page failure answers 422, not 500. The Backend retries every 500 as "MIT is
+        # still starting" (30 x 5 s) and re-submits the page, so a deterministic failure ran the whole GPU
+        # pipeline 31 times; any other status is terminal and becomes a page error, which is never cached.
+        logger.warning(f"Page translation failed: {e}")
+        raise HTTPException(422, detail=f"page translation failed: {e}")
     except Exception as e:
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))

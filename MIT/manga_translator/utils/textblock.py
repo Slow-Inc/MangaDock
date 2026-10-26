@@ -85,9 +85,12 @@ class TextBlock(object):
         self._direction = direction
 
         self.texts = texts if texts is not None else []
-        self.text = self.texts[0] if self.texts else ""
-        if self.text and len(self.texts) > 1:
-            for txt in self.texts[1:]:
+        # #881 review: a guessed box that the OCR could not read contributes an empty text, and the merge sorts
+        # it first often enough — taking texts[0] verbatim then emptied a real dialogue line that merged with it.
+        read = [t for t in self.texts if t and t.strip()]
+        self.text = read[0] if read else ""
+        if self.text and len(read) > 1:
+            for txt in read[1:]:
                 first_cjk = '\u3000' <= self.text[-1] <= '\u9fff'
                 second_cjk = txt and ('\u3000' <= txt[0] <= '\u9fff')
                 if first_cjk or second_cjk:

@@ -131,3 +131,29 @@ def test_fallback_value_can_be_a_tuple_for_multi_assign():
         report_progress=report, ignore_errors=True, logger=_RecLogger()))
 
     assert out == ([], None, None)      # caller does textlines, mask_raw, mask = ...
+
+
+def test_a_swallowed_stage_failure_is_remembered_for_the_page_1144():
+    # #1144: with ignore_errors the stage's fallback ([]) made a crashed page look like a page with
+    # no text, and the Backend cached it for 7 days. The page now knows a stage failed.
+    import asyncio
+    import logging
+    from manga_translator import stage_runner as sr
+
+    async def boom():
+        raise RuntimeError('x')
+
+    async def report(name):
+        pass
+
+    async def page():
+        sr.begin_page()
+        out = await sr.run_stage('textline_merge', boom, lambda: [], report_progress=report,
+                                 ignore_errors=True, logger=logging.getLogger('t'))
+        return out, sr.failed_stages()
+    assert asyncio.run(page()) == ([], ['textline_merge'])
+
+    async def clean():
+        sr.begin_page()
+        return sr.failed_stages()
+    assert asyncio.run(clean()) == []

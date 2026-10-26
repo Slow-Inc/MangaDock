@@ -432,3 +432,10 @@ def test_merged_region_records_a_horizontal_source_direction_1006():
     regions = asyncio.run(dispatch_merge([Quadrilateral(wide, 'A', 1.0)], 200, 200))
     assert regions
     assert regions[0].source_direction == 'h'
+
+
+
+# #881 review: this file used to carry a #1146 test that passed on `main` — it drove `dispatch_merge` with the
+# pre-existing `containers=` guard (#170), which already keeps two balloons apart, so it never exercised the new
+# splitter. The splitter has its own behavioural test in test_detection_postproc.py
+# (`test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146`).

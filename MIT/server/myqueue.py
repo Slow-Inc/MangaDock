@@ -122,6 +122,14 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
                 else:
                     return result
 
+            except HTTPException as e:
+                # #1144 review: keep the worker's status instead of collapsing it to 500. A settled page failure
+                # answers 422, and the Backend retries every 500 as "MIT is still starting" (30 x 5 s), which
+                # re-ran a deterministic failure through the whole GPU pipeline 31 times.
+                if notify:
+                    notify(2, str(getattr(e, 'detail', e)).encode('utf-8'))
+                    return None
+                raise
             except Exception as e:
                 # 如果是连接错误，发送友好的错误消息
                 if "Cannot connect to host" in str(e) or "Connection refused" in str(e):

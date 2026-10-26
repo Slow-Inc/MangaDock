@@ -669,8 +669,9 @@ class MangaTranslator:
                                    dispatch_ocr, self.verbose)
 
         new_textlines = []
+        from .ocr_vlm import keep_ocr_line
         for textline in textlines:
-            if textline.text.strip():
+            if keep_ocr_line(textline, below_floor=False):
                 if config.render.font_color_fg:
                     textline.fg_r, textline.fg_g, textline.fg_b = config.render.font_color_fg
                 if config.render.font_color_bg:
@@ -719,36 +720,32 @@ class MangaTranslator:
         from .ocr_vlm import placeholder_junk, sfx_false_positive, speculative_box
         dialogue_boxes = [r.xyxy for r in text_regions if not speculative_box(r)]
         dialogue_regions = [(r.xyxy, r) for r in text_regions if not speculative_box(r)]
-        # Prefetch the vision SFX localizations concurrently: this loop used to make one blocking 4-5 s request per
+        # Prefetch the vision transcriptions concurrently: this loop used to make one blocking 4-5 s request per
         # candidate (a 7-SFX page spent ~32 s in textline_merge). The calls are independent and order is preserved.
         prefetched_sfx = {}
+        from .ocr_vlm import guessed_box as _guessed_box
         if bool(getattr(config.ocr, 'vlm_rescue', False)) and text_regions:
             from .ocr_vlm import should_rescue_sfx as _should_rescue
-            from .ocr_vlm import swallows_dialogue as _swallows
-            from .ocr_vlm import localize_candidates as _localize_sfx
+            from .ocr_vlm import transcribe_candidates as _transcribe
             from .translators.keys import (CUSTOM_OPENAI_API_BASE as _sfx_base,
                                            CUSTOM_OPENAI_API_KEY as _sfx_key,
                                            CUSTOM_OPENAI_MODEL as _sfx_model)
             _owners, _crops = [], []
             for region in text_regions:
                 x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-                if _swallows((x1, y1, x2, y2),
-                             [box for box, other in dialogue_regions if other is not region]):
-                    continue
-                if not _should_rescue(region.text, getattr(region, 'from_sfx_detection', False),
-                                      x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+                if not _should_rescue(region.text, _guessed_box(region), x2 - x1, y2 - y1, config.ocr.vlm_rescue):
                     continue
                 crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
                 if crop.size:
                     _owners.append(region)
                     _crops.append(crop)
             if _crops:
-                _localized = await _localize_sfx(
-                    _crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
-                    target_lang=config.translator.target_lang)
-                # Keep empty results too: they are the model's "no SFX" answer, and re-asking the same region
-                # sequentially in the loop below would undo the batching (measured: 6 empty answers re-queried).
-                prefetched_sfx = {id(r): out for r, out in zip(_owners, _localized)}
+                _read = await _transcribe(_crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
+                                          check_lettering=[not getattr(r, 'rescue_placeholder', False) for r in _owners])
+                # Keep empty results too: they are the model's "no lettering" answer, and re-asking the same
+                # region sequentially in the loop below would undo the batching.
+                prefetched_sfx = {id(r): out for r, out in zip(_owners, _read)}
+        _taken_over = set()   # #881: dialogue lines a rescued container replaced
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
             original_text = region.text  
@@ -844,14 +841,9 @@ class MangaTranslator:
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
             # #693: gated by should_rescue_sfx — det_sfx provenance + ADR 026 Addendum real-text
             # guard (no phantom SFX over an ASCII-read bubble) + size. See ADR 026.
-            from .ocr_vlm import should_rescue_sfx, swallows_dialogue
+            from .ocr_vlm import should_rescue_sfx, resolve_rescue
             x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-            # #887 round 3: a merge container can fully cover a dialogue line while its own OCR read
-            # is junk; rescuing it lettered a SECOND meow over the bubble (Akuyaku p1).
-            swallows = swallows_dialogue((x1, y1, x2, y2),
-                                        [box for box, other in dialogue_regions if other is not region])
-            if not swallows and should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
-                                                  x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+            if should_rescue_sfx(region.text, _guessed_box(region), x2 - x1, y2 - y1, config.ocr.vlm_rescue):
                 from .translators.keys import (CUSTOM_OPENAI_API_BASE,
                                                CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
                 crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
@@ -859,21 +851,28 @@ class MangaTranslator:
                     rescued = prefetched_sfx.get(id(region))
                     if rescued is None:
                         # Not prefetched (the text changed after the pre-pass): same call, in a thread (#1119) -
-                        # it is a 4-5 s blocking HTTP request, and with worker slots it stalled every page on the loop.
-                        from .ocr_vlm import localize_candidates
-                        rescued = (await localize_candidates([crop], api_base=CUSTOM_OPENAI_API_BASE,
-                                                             api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                                             target_lang=config.translator.target_lang))[0]
-                    if rescued:
-                        logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
-                        # The rescue produced the FINAL SFX in the target language. Pre-setting
-                        # text+translation makes source_lang auto-derive as the target so the
-                        # translate stage skips it, and filter_translated_regions keeps it.
+                        # it is a blocking HTTP request, and with worker slots it stalled every page on the loop.
+                        from .ocr_vlm import transcribe_candidates
+                        rescued = (await transcribe_candidates(
+                            [crop], api_base=CUSTOM_OPENAI_API_BASE, api_key=CUSTOM_OPENAI_API_KEY,
+                            model=CUSTOM_OPENAI_MODEL,
+                            check_lettering=[not getattr(region, 'rescue_placeholder', False)]))[0]
+                    # #881: the rescue transcribes; the translate stage (which sees the page image) translates
+                    # the result like any line. A box repeating a bubble it overlaps is the #278 phantom (drop);
+                    # a container repeating the lines it swallows replaces them (#887 r3 otherwise).
+                    verdict, swallowed, why = resolve_rescue(
+                        (x1, y1, x2, y2), rescued or '',
+                        [(box, other.text, id(other)) for box, other in dialogue_regions if other is not region])
+                    if verdict in ('keep', 'takeover'):
+                        logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" '
+                                    f'({verdict}: {why})')
                         region.text = rescued
-                        region.translation = rescued
-                        region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
+                        region.vlm_transcribed = True
+                        _taken_over.update(swallowed)
                         new_text_regions.append(region)
                         continue
+                    logger.info(f'[OcrVLM] transcribed rescue region "{region.text}" -> "{rescued}" '
+                                f'dropped ({why})')
 
             # #754 (ADR 026 Addendum DROP): a det_sfx box the OCR read as one stray ASCII char, or as
             # real text over a dialogue line, is a detector false-positive — translated, it renders
@@ -900,6 +899,11 @@ class MangaTranslator:
                     if config.render.font_color_bg:
                         region.adjust_bg_color = False
                 new_text_regions.append(region)
+        if _taken_over:
+            ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+            ctx.dropped_regions.extend((r, 'replaced by a transcribed container') for r in new_text_regions
+                                       if id(r) in _taken_over)
+            new_text_regions = [r for r in new_text_regions if id(r) not in _taken_over]
         text_regions = new_text_regions
 
         text_regions = sort_regions(
@@ -1460,7 +1464,8 @@ class MangaTranslator:
             # target language ("SQUELCH") — lang-detect sees EN != JPN and would drop
             # it here even though the post-translation filter deliberately kept it
             # (the ぬ-stays-untranslated bug: rescued but never rendered).
-            if getattr(region, 'sfx_rescued', False):
+            # #881: a transcribed rescue (a det_sfx box) may be a Japanese SFX on an English page - keep it too.
+            if getattr(region, 'sfx_rescued', False) or getattr(region, 'vlm_transcribed', False):
                 filtered_regions.append(region)
                 continue
             # #535: langdetect misfires on short/all-caps Latin text ("STARTING WITH
@@ -1626,6 +1631,18 @@ class MangaTranslator:
         """
         self._translation_memory.reset()
 
+    def _empty_or_failed(self, ctx, img_w, img_h, extra_failed=()):
+        """The empty /patches result for a page with no text - or an error for a page that FAILED (#1144): a stage
+        crashed and fell back, or the translator echoed the source so every line dropped. Returned empty, the
+        Backend cached the untranslated page for 7 days (Haimiya ch. 6 p2)."""
+        from .stage_runner import failed_stages
+        from .text_layer import PageTranslationFailed, page_failure
+        dropped = getattr(ctx, 'dropped_regions', None)
+        why = page_failure(dropped, failed_stages() + list(extra_failed))
+        if why:
+            raise PageTranslationFailed(why)
+        return empty_patch_result(img_w, img_h, dropped)
+
     async def translate_patches(self, image: Image.Image, config: Config) -> dict:
         """Translate image and return per-region rendered PNG patches.
 
@@ -1634,6 +1651,8 @@ class MangaTranslator:
         Nearby regions are grouped into a single crop to avoid overlapping patches.
         """
         self.reset_page_context()
+        from .stage_runner import begin_page
+        begin_page()   # #1144: stage failures of this page are counted from here
         # Carry the source page's ICC profile into every patch PNG — manga
         # scans often embed non-sRGB profiles (e.g. "Dot Gain 20%"); an
         # untagged patch renders darker than the color-managed page (#156).
@@ -1642,9 +1661,10 @@ class MangaTranslator:
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h)
 
         await self._report_progress('translating')
+        translate_failed = []
         try:
             ctx.text_regions = await self._run_text_translation(config, ctx)
         except Exception:
@@ -1652,10 +1672,11 @@ class MangaTranslator:
             if not self.ignore_errors:
                 raise
             ctx.text_regions = []
+            translate_failed = ['translating']
 
         await self._report_progress('after-translating')
         if not ctx.text_regions or ctx.text_regions == 'cancel':
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h, translate_failed)
 
 
         # #980 follow-up (opt-in MIT_SERIES_GLOSSARY=1): the single-page production path has no batch context, so
@@ -1745,7 +1766,7 @@ class MangaTranslator:
             # between the front stage and this point.
             print(f'[region-filter] before={_n_before_filter} after={len(regions or [])}', flush=True)
         if not regions:
-            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return self._empty_or_failed(ctx, img_w, img_h)
 
         # Bubble segmentation (#170): tag each region with its speech balloon so
         # grouping stays within balloons (no cross-balloon clumps). Opt-in via
@@ -1921,16 +1942,23 @@ class MangaTranslator:
         prev_regions = None
 
         async def prepare_front(image):
+            from .stage_runner import begin_page, failed_stages
+            begin_page()   # #1144: the front stages of THIS page, in this phase task's own context
             cfg = copy.deepcopy(config)
             icc = image.info.get('icc_profile')
             ctx = await self._translate_until_translation(image, cfg)
-            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions)}
+            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions),
+                    'failed': failed_stages()}
 
         async def translate(front, prev_context):
-            ctx, cfg = front['ctx'], front['cfg']
             nonlocal prev_regions, glossary
+            from .stage_runner import begin_page, failed_stages
+            begin_page()   # #1144: this page's translation, in the pipeline task's own context
+            failed = []
+            ctx, cfg = front['ctx'], front['cfg']
             if not front['has_regions']:
-                return {'front': front, 'ok': False, 'block': rolling.render_block()}
+                return {'front': front, 'ok': False, 'block': rolling.render_block(),
+                        'failed': list(front.get('failed') or [])}
             if prev_context:
                 cfg.translator.prev_context = prev_context
             if glossary_enabled and prev_regions:
@@ -1949,7 +1977,9 @@ class MangaTranslator:
                 if not self.ignore_errors:
                     raise
                 ctx.text_regions = []
+                failed = ['translating']
             await self._report_progress('after-translating')
+            failed = failed + failed_stages()
             ok = bool(ctx.text_regions) and ctx.text_regions != 'cancel'
             if ok and glossary_enabled and enforced:
                 # Deterministic follow-up: prompt instructions are not reliable for exact spellings.
@@ -1960,13 +1990,23 @@ class MangaTranslator:
                 page_counts = count_candidates(ctx.text_regions)
                 for name, n in page_counts.items():
                     name_counts[name] = name_counts.get(name, 0) + n
-            return {'front': front, 'ok': ok, 'block': rolling.render_block()}
+            return {'front': front, 'ok': ok, 'block': rolling.render_block(), 'failed': failed}
 
         async def finish_back(image, front, translated):
             ctx, cfg, icc = front['ctx'], front['cfg'], front['icc']
             if not translated['ok']:
                 img_h, img_w = ctx.img_rgb.shape[:2]
-                return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+                # #1144 review: the batch path must not hand back an empty success either — this is the path whose
+                # results the Backend caches for 7 days. The error rides the page's own payload so the rest of the
+                # chapter still lands; batch_runner forwards it and the Backend treats a page error as no result.
+                from .text_layer import PageTranslationFailed
+                try:
+                    return self._empty_or_failed(ctx, img_w, img_h,
+                                                 list(front.get('failed') or []) + list(translated.get('failed') or []))
+                except PageTranslationFailed as exc:
+                    result = empty_patch_result(img_w, img_h, None)
+                    result['error'] = str(exc)
+                    return result
             return await self._finish_patches(ctx, cfg, icc)
 
         return await run_pipelined(list(images), prepare_front=prepare_front, translate=translate,
