@@ -43,10 +43,16 @@ windows that end on a dangling leading vowel or that are more than one character
   - old: glossary `{}`, 0 fixes, final variants `ไฮมิยะ ×4 / ฮาอิมิยะ ×1`;
   - new: glossary learns `{HAIMIYA: <the spelling of that run>}` from page 1, enforcement fixes the later page,
     and both chapter runs replay to a single spelling (the run whose page 1 wrote `ฮาอิมิยะ` replays to 4× `ฮาอิมิยะ`).
-- **Live:** two full chapter runs still show both spellings (3:2), and the batch path logged **no** enforcement at
-  all, so the batch glossary is apparently not reaching the new code in the bench configuration — that is the open
-  item, not the algorithm. A live single-page run with a series context kept one spelling throughout the four
-  pages it touched (no drift occurred, so it does not prove the fix either).
+- **Live, and the missing piece:** two chapter runs through the production batch endpoint still showed both
+  spellings and logged no enforcement. The cause was not the algorithm: `run_batch_with_callbacks` only uses
+  `translate_batch_pipelined` (which owns the cross-page glossary) when the pipelined mode is enabled; by default it
+  delivers **each page as an independent request**, so with a config that carries no `translator.series_context`
+  (the bench's) there is no cross-page name memory at all. Production sends `series_context` (#157), so the series
+  memory is the path that matters there.
+- **Live with `series_context` set** (two full chapter runs through the same batch endpoint, memory persisting in
+  the worker): page 0 wrote `ไฮมิยะ`, and **every later page (p1, p1, p4, p12) came back `ฮาอิมิยะ` — 4 of 5
+  occurrences unified**, in both runs. Before the fix, page 12 disagreed with page 1 in the same chapter. Page 0 is
+  the streaming limit below: it was translated before anything was learned.
 
 ## Limits
 
