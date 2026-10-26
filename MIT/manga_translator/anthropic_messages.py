@@ -16,7 +16,11 @@ ENV_ANTHROPIC_MODEL = "CUSTOM_OPENAI_ANTHROPIC_MODEL"
 def protocol_from_env(env=None) -> str:
     env = env if env is not None else os.environ
     value = str(env.get(ENV_PROTOCOL, "") or "").strip().lower()
-    return "anthropic" if value == "anthropic" else "openai"
+    if value == "anthropic":
+        return "anthropic"
+    if value == "responses":       # #1143: gpt-6-luna is only served on /v1/responses
+        return "responses"
+    return "openai"
 
 
 def anthropic_model(default: str, env=None) -> str:
