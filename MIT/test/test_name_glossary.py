@@ -205,3 +205,11 @@ def test_apply_glossary_fixes_the_variant_inside_an_unspaced_run_1143():
 def test_skeleton_matching_separates_name_variants_from_other_words_1143():
     assert _same_name_skeleton("ฮาอิมิยะ", "ไฮมิยะ") is True
     assert _same_name_skeleton("รุ่นพี่", "ไฮมิยะ") is False
+
+def test_a_window_cannot_open_on_a_trailing_vowel_1143():
+    # "าไฮมิยะ" was picked out of "รุ่นพี่ไฮมิยะ" because it is closer in length to "ฮาอิมิยะ"; a syllable cannot
+    # start on า, so the matcher must reject it and pick the real spelling instead.
+    from manga_translator.name_glossary import _find_near_spelling
+
+    best, _ratio = _find_near_spelling("รุ่นพี่ไฮมิยะน่ากลัว", "ฮาอิมิยะ")
+    assert best == "ไฮมิยะ", best

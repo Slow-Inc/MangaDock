@@ -58,6 +58,12 @@ def pairs_from_payload(payload) -> list:
     return out
 
 
+def _skeleton_close(text: str, spelling: str) -> bool:
+    """Whether a line contains a run that is plausibly the same name spelled differently (pure)."""
+    from .name_glossary import _THAI_RUN, _same_name_skeleton
+    return any(_same_name_skeleton(run, spelling) for run in _THAI_RUN.findall(text or ""))
+
+
 def name_drift(pairs, names) -> dict:
     """Which of the GIVEN names the chapter spelled more than one way (pure).
 
@@ -65,23 +71,25 @@ def name_drift(pairs, names) -> dict:
     words and brands (measured: COIN / PAYPAL / MAD came back as "drift"). The check learns the chapter's own
     spelling with the same machinery the glossary uses, then counts how many name-bearing lines used something
     close to it instead."""
-    from .name_glossary import _find_near_spelling, learn_spellings
+    from .name_glossary import learn_spellings
     learned = learn_spellings([{"src": s, "dst": d} for _, s, d in pairs])
     out = {}
     for name in names or []:
         canonical = learned.get(name)
-        counts = {}
+        if not canonical:
+            continue
+        used = 0
+        different = []
         for _, src, dst in pairs:
             if name not in candidate_names([src]):
                 continue
-            if canonical and canonical in dst:
-                counts[canonical] = counts.get(canonical, 0) + 1
-                continue
-            matched, _ratio = _find_near_spelling(dst, canonical) if canonical else (None, 0.0)
-            if matched:
-                counts[matched] = counts.get(matched, 0) + 1
-        if len(counts) > 1:
-            out[name] = {"spellings": sorted(counts), "lines": sum(counts.values())}
+            if canonical in (dst or ""):
+                used += 1
+            elif _skeleton_close(dst, canonical):
+                different.append(dst)
+        if different:
+            out[name] = {"spelling": canonical, "used": used, "lines": used + len(different),
+                         "different": different[:4]}
     return out
 
 
