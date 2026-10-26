@@ -97,6 +97,14 @@ class ModelHayaiOCR(OfflineOCR):
         confidence = float(np.mean([float(logp[i, targets[i]]) for i in range(len(targets))]))
         return text, confidence
 
+    def read_crop(self, crop_rgb: np.ndarray) -> str:
+        """Read one crop for the rescue path: the text, or '' when the read is below the confidence floor.
+
+        Used by ``manga_translator.ocr_rescue`` in place of the vision gateway (a ~0.13 s local read instead of a
+        ~2 s HTTP call), so it applies the same gate the OCR stage does - the caller only ever sees trusted text."""
+        text, confidence = self._read(crop_rgb) if getattr(crop_rgb, 'size', 0) else ('', float('-inf'))
+        return text if text and accept_read(confidence, min_confidence()) else ''
+
     @staticmethod
     def _crop(image: np.ndarray, q: Quadrilateral, direction: str) -> np.ndarray:
         """The page pixels inside the detection box, unwarped whenever the box is axis-aligned.

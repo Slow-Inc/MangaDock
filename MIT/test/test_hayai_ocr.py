@@ -85,6 +85,29 @@ def test_the_adapter_reads_native_crops_and_sets_text_prob_and_colours(monkeypat
     assert out[0].fg_colors.tolist()[0] < 60 and out[0].bg_colors.tolist()[0] > 200
 
 
+def test_the_local_rescue_is_on_by_default_and_can_be_switched_off(monkeypatch):
+    from manga_translator.local_ocr_rescue import local_rescue_enabled
+    monkeypatch.delenv('MIT_RESCUE_LOCAL_OCR', raising=False)
+    assert local_rescue_enabled() is True
+    for off in ('0', 'false', 'no', 'off', 'FALSE'):
+        monkeypatch.setenv('MIT_RESCUE_LOCAL_OCR', off)
+        assert local_rescue_enabled() is False, off
+    monkeypatch.setenv('MIT_RESCUE_LOCAL_OCR', '1')
+    assert local_rescue_enabled() is True
+
+
+def test_read_crop_returns_nothing_below_the_confidence_floor(monkeypatch):
+    pytest.importorskip('torch')
+    from manga_translator.ocr.model_hayai import ModelHayaiOCR
+
+    ocr = ModelHayaiOCR()
+    ocr.device = 'cpu'
+    monkeypatch.setattr(ocr, '_read', lambda crop: ("I'm glad.", -0.02))
+    assert ocr.read_crop(np.full((10, 10, 3), 255, np.uint8)) == "I'm glad."
+    monkeypatch.setattr(ocr, '_read', lambda crop: ('JUMP VALKI-GITNELY CLOSER...', -1.22))
+    assert ocr.read_crop(np.full((10, 10, 3), 255, np.uint8)) == ''
+
+
 def test_a_low_confidence_read_is_dropped_before_it_can_be_translated(monkeypatch):
     """The model invents English on artwork; its token likelihood is what tells the two apart, so a read below
     the floor leaves the region empty (0 prob) for the normal empty-box handling instead of renderable text."""

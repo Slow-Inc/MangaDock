@@ -740,8 +740,20 @@ class MangaTranslator:
                     _owners.append(region)
                     _crops.append(crop)
             if _crops:
-                _read = await _transcribe(_crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
-                                          check_lettering=[not getattr(r, 'rescue_placeholder', False) for r in _owners])
+                # #1143: the local recogniser reads the same crops in ~0.13 s instead of a ~2 s gateway call; the
+                # gateway stays as the fallback so a worker without the model behaves exactly as before.
+                _read = None
+                from .local_ocr_rescue import local_rescue_enabled, transcribe_crops_local
+                if local_rescue_enabled():
+                    try:
+                        _read = await transcribe_crops_local(_crops, str(self.device or 'cpu'))
+                    except Exception:
+                        logger.warning('[OCR rescue] local reader unavailable - falling back to the gateway',
+                                       exc_info=True)
+                if _read is None:
+                    _read = await _transcribe(_crops, api_base=_sfx_base, api_key=_sfx_key, model=_sfx_model,
+                                              check_lettering=[not getattr(r, 'rescue_placeholder', False)
+                                                               for r in _owners])
                 # Keep empty results too: they are the model's "no lettering" answer, and re-asking the same
                 # region sequentially in the loop below would undo the batching.
                 prefetched_sfx = {id(r): out for r, out in zip(_owners, _read)}
@@ -850,13 +862,22 @@ class MangaTranslator:
                 if crop.size:
                     rescued = prefetched_sfx.get(id(region))
                     if rescued is None:
-                        # Not prefetched (the text changed after the pre-pass): same call, in a thread (#1119) -
-                        # it is a blocking HTTP request, and with worker slots it stalled every page on the loop.
-                        from .ocr_vlm import transcribe_candidates
-                        rescued = (await transcribe_candidates(
-                            [crop], api_base=CUSTOM_OPENAI_API_BASE, api_key=CUSTOM_OPENAI_API_KEY,
-                            model=CUSTOM_OPENAI_MODEL,
-                            check_lettering=[not getattr(region, 'rescue_placeholder', False)]))[0]
+                        # Not prefetched (the text changed after the pre-pass). Read it locally first (#1143);
+                        # then the gateway, which is a blocking HTTP call and used to stall every page on the loop.
+                        rescued = None
+                        from .local_ocr_rescue import local_rescue_enabled, transcribe_crops_local
+                        if local_rescue_enabled():
+                            try:
+                                rescued = (await transcribe_crops_local([crop], str(self.device or 'cpu')))[0]
+                            except Exception:
+                                logger.warning('[OCR rescue] local reader unavailable - falling back to '
+                                               'the gateway', exc_info=True)
+                        if rescued is None:
+                            from .ocr_vlm import transcribe_candidates
+                            rescued = (await transcribe_candidates(
+                                [crop], api_base=CUSTOM_OPENAI_API_BASE, api_key=CUSTOM_OPENAI_API_KEY,
+                                model=CUSTOM_OPENAI_MODEL,
+                                check_lettering=[not getattr(region, 'rescue_placeholder', False)]))[0]
                     # #881: the rescue transcribes; the translate stage (which sees the page image) translates
                     # the result like any line. A box repeating a bubble it overlaps is the #278 phantom (drop);
                     # a container repeating the lines it swallows replaces them (#887 r3 otherwise).

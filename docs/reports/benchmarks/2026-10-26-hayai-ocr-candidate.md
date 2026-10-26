@@ -67,6 +67,20 @@ forward pass, no second vision call) and accepts the read only when the mean tok
   (they merged into one patch), and a box overlapping a real neighbour line still reads that line twice
   (confidence −0.11 passes the gate because the text really is there).
 
+**Adopted (2026-10-26): the local reader replaces the gateway in the rescue path**
+
+``manga_translator/local_ocr_rescue.py`` routes the rescue through the on-device Hayai reader, on by default
+(`MIT_RESCUE_LOCAL_OCR=0` restores the gateway-only path), with the gateway kept as an automatic fallback — a
+worker whose model load fails logs one warning and carries on exactly as before.
+
+Measured on the live stack, 14-page chapter, two runs: **24.7 s / 19.0 s wall, 14/14 pages** (baseline median
+25.0 s). `textline_merge` p50 fell from **2,163 ms to 722 ms** (that stage was dominated by waiting on the
+gateway), `ocr` p50 stayed at 569 ms (baseline 623 ms). Per-crop cost of the local read, measured under the
+same GPU load: 76 ms generate, **131 ms with the confidence pass**. Zero gateway fallbacks in the run, and the
+two lines that used to need a rescue are still recovered (`I'm glad.` → ดีใจด้วยนะ, `Kurose -kun, you...` →
+container takeover → คุโรเสะคุง เธอนี่นะ...). The artwork junk stays away: `T` and `O` come back empty, and a box
+overlapping a real neighbour line is dropped by `resolve_rescue`.
+
 **Decision**
 - **Not adopted as the primary recogniser yet.** It wins every dialogue case, but on artwork it invents English
   where the 48 px model produced harmless 1-character junk that the downstream filters dropped. Without a
