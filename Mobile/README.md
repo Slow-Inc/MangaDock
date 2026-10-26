@@ -5,7 +5,7 @@ Android-first React Native CLI shell for MangaDock. The native layer is intentio
 ## Current Scope
 
 - Android only.
-- Uses React Native CLI, not Expo.
+- Uses React Native CLI and the accepted WebView UI. SDK 56 Expo modules provide Android notifications; there is no native-screen migration or generated prebuild replacement.
 - Loads the production Frontend by default: `https://hayateotsu.space`.
 - Keeps Supabase auth, routing, reader UI, and content rendering inside the web app.
 - Includes `react-native-webview` and `react-native-safe-area-context`.
@@ -16,6 +16,18 @@ Android-first React Native CLI shell for MangaDock. The native layer is intentio
 - Includes a beta diagnostics overlay and `MangaDockMobile` logcat events for QA triage.
 - Bridges web `window.onerror`, `window.onunhandledrejection`, and `console.error` events back into native diagnostics.
 - Does not include iOS artifacts.
+
+## Hybrid Phase 5 (2026-10-26)
+
+Following/personalized feeds, private/public reading collections and an OS Push
+bridge continue directly from the pushed hybrid Phase 4 branch. Web sessions stay
+in WebView. Both push rollout flags default off; permission is requested only by
+the notification settings action. Feed/collection/notification-settings deep links
+are supported. The APK alone does not deploy the new web/API features.
+
+See [implementation, build commands and remaining acceptance](docs/2026-10-26-hybrid-phase5.md),
+[browser evidence](../docs/reports/hybrid-phase5-2026-10-26/README.md) and
+[ADR 034](../docs/adr/034-hybrid-phase5-web-session-and-os-push.md).
 
 Follow-up issue ownership:
 

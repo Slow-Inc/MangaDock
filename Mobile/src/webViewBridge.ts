@@ -3,13 +3,14 @@ import {getMobileShellUrl} from './config';
 
 const WEB_HARDWARE_ID_KEY = 'mangadock_device_id';
 
-export function createMobileShellInjectionScript(hardwareId: string, authConfig?: NativeAuthPublicConfig) {
+export function createMobileShellInjectionScript(hardwareId: string, authConfig?: NativeAuthPublicConfig, pushEnabled = false) {
   const serializedHardwareId = JSON.stringify(hardwareId);
   const serializedHardwareIdKey = JSON.stringify(WEB_HARDWARE_ID_KEY);
 
   return `
     (function () {
     if (window.location.origin !== ${JSON.stringify(new URL(getMobileShellUrl()).origin)}) return;
+    window.__MANGA_DOCK_PUSH_ENABLED__ = ${pushEnabled};
     ${createLegacyOAuthInjectionScript(authConfig)}
     (function () {
       try {

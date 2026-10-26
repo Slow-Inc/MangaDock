@@ -11,9 +11,11 @@ import { usePopoverDismiss } from "../hooks/popoverDismiss";
 interface MangaSearchSelectorProps {
   onSelect: (manga: LandingBook | null) => void;
   selectedManga: LandingBook | null;
+  label?: string;
+  placeholder?: string;
 }
 
-export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSearchSelectorProps) {
+export default function MangaSearchSelector({ onSelect, selectedManga, label = 'แท็กมังงะ (เลือกได้ 1 เรื่อง)', placeholder = 'พิมพ์ชื่อมังงะเพื่อแท็กในโพสต์...' }: MangaSearchSelectorProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<LandingBook[]>([]);
   const [searching, setSearching] = useState(false);
@@ -84,7 +86,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
         <svg className="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
-        <label htmlFor={inputId} className="block text-[10px] font-black text-ink-3 uppercase">แท็กมังงะ (เลือกได้ 1 เรื่อง)</label>
+        <label htmlFor={inputId} className="block text-[10px] font-black text-ink-3 uppercase">{label}</label>
       </div>
       
       {selectedManga ? (
@@ -131,7 +133,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
             }}
             // Opens on click or typing — not on focus, so focus returned here does not reopen the list (#874)
             onClick={() => setShowDropdown(true)}
-            placeholder="พิมพ์ชื่อมังงะเพื่อแท็กในโพสต์..."
+            placeholder={placeholder}
             className={inputClass}
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">

@@ -88,6 +88,19 @@ if (nativeAuthPropertiesPath) {
     file(nativeAuthPropertiesPath).withInputStream { nativeAuthProperties.load(it) }
 }
 def nativeAuthValue = { name -> signingValue(name) ?: nativeAuthProperties.getProperty(name, '') }
+def pushEnabled = nativeAuthValue('MANGADOCK_PUSH_ENABLED') == 'true'
+def easProjectId = nativeAuthValue('MANGADOCK_EAS_PROJECT_ID')
+def googleServicesPath = nativeAuthValue('MANGADOCK_GOOGLE_SERVICES_JSON')
+if (pushEnabled) {
+    if (!(easProjectId ==~ /(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/) || !googleServicesPath || !file(googleServicesPath).isFile()) {
+        throw new GradleException('Push builds require MANGADOCK_EAS_PROJECT_ID and MANGADOCK_GOOGLE_SERVICES_JSON for com.mobile.')
+    }
+    apply plugin: 'com.google.gms.google-services'
+    // Use the existing team's config directly; never copy it into source control.
+    tasks.withType(com.google.gms.googleservices.GoogleServicesTask).configureEach {
+        googleServicesJsonFiles.setFrom(file(googleServicesPath))
+    }
+}
 
 // Fail before building a distribution artifact with missing signing credentials.
 gradle.taskGraph.whenReady { graph ->
@@ -119,8 +132,10 @@ android {
         applicationId "com.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "1.1.0-phase4-beta.2"
+        versionCode 8
+        versionName "1.2.0-phase5-beta.1"
+        buildConfigField "boolean", "MANGADOCK_PUSH_ENABLED", pushEnabled.toString()
+        buildConfigField "String", "MANGADOCK_EAS_PROJECT_ID", groovy.json.JsonOutput.toJson(easProjectId)
         buildConfigField "String", "MANGADOCK_FRONTEND_URL", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_FRONTEND_URL'))
         buildConfigField "boolean", "MANGADOCK_QA", qaSigning.toString()
         buildConfigField "String", "MANGADOCK_SUPABASE_URL", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_SUPABASE_URL'))

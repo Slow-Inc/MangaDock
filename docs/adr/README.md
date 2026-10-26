@@ -33,6 +33,9 @@ overturns an earlier one marks the old ADR **Superseded**.
 
 ## Conventions
 
+- [ADR 033: Phase 5 retention and push delivery](033-phase5-retention-and-push-delivery.md)
+- [ADR 034: Hybrid Phase 5 web session and OS push](034-hybrid-phase5-web-session-and-os-push.md)
+
 - Filename: `NNN-kebab-title.md`, zero-padded number.
 - Body: a title line, a status/context bullet block, then `## Context`, `## Decision`,
   `## Alternatives considered`, `## Consequences` (see [ADR 003](003-mit-flux-klein-optional-inpainter.md)).

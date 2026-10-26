@@ -127,6 +127,8 @@ function createHomeScreen(lastKnownReaderPath?: string) {
             ['library', 'Library', 'native-home-library-button'],
             ['studio', 'Studio', 'native-home-studio-button'],
             ['community', 'Community', 'native-home-community-button'],
+            ['feed', 'ฟีดของฉัน', 'native-home-feed-button'],
+            ['collections', 'คอลเลกชัน', 'native-home-collections-button'],
           ].map(([action, label, testID]) => (
             <Pressable
               accessibilityRole="button"

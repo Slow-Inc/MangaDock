@@ -2066,3 +2066,80 @@ vault. **Remaining = user-gated:** merge #533 + prod-enable of the proven-good f
 **Risk.** Low — five of six PRs are test/docs/IO-hardening; the encoding + timer fixes are additive-safe (no legacy non-ASCII files existed pre-fix; timer cleanup is a no-op when unset). Base-staleness verified disjoint for every merge (no clobber possible).
 
 **Remaining.** #614 (load_dotenv extraction) + #615 (BaseGPTTranslator) filed as focused leftovers; CLAUDE.md copy of the #620 rule deferred to Stage B.
+## 2026-10-26 — Hybrid Phase 5 continuation / ต่อ Phase 5 บน hybrid
+
+### 1. What changed / เปลี่ยนอะไร
+Backend/Frontend retention and durable push seams from `b168975` integrated onto
+hybrid `69badd5f`; CLI WebView retained. New OS bridge, web push controller/settings,
+deep links and Android notification-module wiring. Paths and resume:
+[delivery record](../../Mobile/docs/2026-10-26-hybrid-phase5.md).
+
+### 2. Results / ผลลัพธ์
+Feed, collection sharing/privacy and acknowledged push opt-in flow pass controlled
+browser acceptance through the actual Next proxy. Remote OS delivery is pending.
+
+### 3. Expected performance gain / ประสิทธิภาพ
+Not measured; no runtime speedup percentage claimed. APK size grows with supported
+notifications modules. Both sending flags remain off until rollout acceptance.
+
+### 4. Benefits / ข้อดี
+Adds Phase 5 journeys without replacing the accepted hybrid Reader/Auth shell.
+
+### 5. Purpose / เป้าหมายการเปลี่ยน
+Continue from the owner's latest pushed hybrid Phase 4, reusing existing service
+contracts and public/private collection authorization.
+
+### 6. Architectural impact / ผลกระทบสถาปัตยกรรม
+Auth remains in web; native owns permission/token/response APIs. Expo modules are
+embedded in the CLI Android project. [ADR 034](../adr/034-hybrid-phase5-web-session-and-os-push.md).
+
+### 7. Before / ปัญหาเดิม
+Hybrid Phase 4 had no feed/collection routes or Android push bridge; Phase 5 work
+lived on a separate native implementation.
+
+### 8. Goals / เป้าหมาย
+Retain Phase 4 behavior; add retention UI and lifecycle-safe push; verify through
+actual interfaces; leave provider/database rollout explicit and reviewable.
+
+### 9. Architecture Before
+CLI shell → deployed Phase 4 web; follow/in-app inbox foundations only.
+
+### 10. Architecture After
+CLI shell ↔ trusted-origin OS RPC ↔ web push controller → Next proxy → existing
+Auth/Nest → PostgreSQL ownership/outbox → independent Redis/Expo worker.
+
+### 11. Change list / รายการ
+Backend retention/push + SQL; Frontend feed/collections/settings; Mobile host and
+deep links; auth cleanup hook; isolated SQL/HTTP/worker/browser and host tests.
+
+### 12. Metrics / ตัวชี้วัด
+Mobile 91/91, web controller 16/16, auth/cache 12/12, Backend Phase 5 18/18.
+390/1280 browser acceptance passes. Broad Frontend 510 pass, same 8 fail/2 errors
+as baseline (494 pass). Full Backend CI on Node 22 passes 1,179/1,179; Node 26 teardown is incompatible.
+
+### 13. Technical Debt Removed
+Reused service seams instead of a second feed/collection backend. Prevented Expo
+same-token refresh loops and disabled its server token mapping during reset.
+
+### 14. Risk Reduction
+Rollout off; explicit permission; server-acknowledged UI; stale-result/recipient
+checks; logout removes binding before Auth disposal; persistent cleanup markers.
+Offline cleanup and already-submitted deliveries cannot guarantee recall.
+
+### 15. Developer Experience
+Reproducible QA build, opt-in build guard, isolated SQL fixture, actual-proxy browser
+harness, linked screenshots and a single resume point. Existing worktrees preserved.
+
+### 16. Future Opportunities
+Real database migration/deployment, EAS/Firebase and Redis acceptance, remote device
+delivery, production signing; external MangaDex polling and iOS remain separate.
+
+### 17. Lessons Learned
+Trace framework token-read events, not only rotation events. Preserve device headers
+in test forwarding. Install an immutable APK copy so ADB cannot lock Gradle outputs.
+
+### 18. KPI / Validation, risk and rollback
+Feature/authorization/lifecycle tests above are acceptance evidence, not production
+availability metrics. Revert this branch's source and rebuild the APK for rollback;
+disable native/server flags first. No remote migration/provider/deployment changed.
+Full [QA evidence](hybrid-phase5-2026-10-26/README.md).

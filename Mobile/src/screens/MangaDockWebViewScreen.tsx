@@ -25,6 +25,7 @@ import { createMobileShellInjectionScript } from '../webViewBridge';
 import {productLinkPath} from '../navigation/productLinks';
 import {parseFileDownloadMessage} from '../fileShare';
 import {mobileTheme} from '../theme/mobileTheme';
+import {createHybridPushHost, hybridPushEnabled, parsePushRequest} from '../hybridPush';
 
 const EXPORT_FAILED_NOTICE = 'ส่งออกไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง';
 const OAUTH_INTERRUPTED_NOTICE = 'การเข้าสู่ระบบถูกขัดจังหวะ กรุณาเข้าสู่ระบบอีกครั้ง';
@@ -43,6 +44,20 @@ export function MangaDockWebViewScreen(
   const safeAreaInsets = useSafeAreaInsets();
   const diagnostics = useMobileDiagnosticsActions();
   const webViewRef = useRef<WebView>(null);
+  const pushHostRef = useRef<ReturnType<typeof createHybridPushHost> | null>(null);
+  useEffect(() => {
+    if (!hybridPushEnabled) return;
+    const host = createHybridPushHost(event => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.location.origin === ${JSON.stringify(new URL(getMobileShellUrl()).origin)}) {
+          window.dispatchEvent(new CustomEvent('mangadock:push', {detail: ${JSON.stringify(event)}}));
+        }
+        true;
+      `);
+    });
+    pushHostRef.current = host;
+    return () => { pushHostRef.current = null; host.dispose(); };
+  }, []);
   const canGoBackRef = useRef(false);
   const webViewReadyRef = useRef(false);
   const webModalOpenRef = useRef(false);
@@ -186,6 +201,11 @@ export function MangaDockWebViewScreen(
         if (!nativeEvent.data || !nativeEvent.url ||
             new URL(nativeEvent.url).origin !== new URL(getMobileShellUrl()).origin) return;
         const message = JSON.parse(nativeEvent.data);
+        if (message.type === 'push_request') {
+          const request = parsePushRequest(message);
+          if (request) pushHostRef.current?.handle(request);
+          return;
+        }
 
         if (message.type === 'mangadock:oauth:start' &&
             (message.provider === 'google' || message.provider === 'facebook') &&
@@ -467,8 +487,10 @@ export function MangaDockWebViewScreen(
         injectedJavaScriptBeforeContentLoaded={createMobileShellInjectionScript(
           hardwareId,
           NativeModules.MangaDockAuthConfig,
+          hybridPushEnabled,
         )}
         onLoadStart={({ nativeEvent }) => {
+          pushHostRef.current?.suspend();
           webViewReadyRef.current = false;
           webModalOpenRef.current = false;
           recordDiagnostics({

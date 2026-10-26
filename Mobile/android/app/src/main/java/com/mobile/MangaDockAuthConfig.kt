@@ -12,6 +12,8 @@ class MangaDockAuthConfigModule(context: ReactApplicationContext) : ReactContext
     "url" to BuildConfig.MANGADOCK_SUPABASE_URL,
     "frontendUrl" to BuildConfig.MANGADOCK_FRONTEND_URL,
     "qaBuild" to BuildConfig.MANGADOCK_QA,
+    "pushEnabled" to BuildConfig.MANGADOCK_PUSH_ENABLED,
+    "easProjectId" to BuildConfig.MANGADOCK_EAS_PROJECT_ID,
     "publicKey" to BuildConfig.MANGADOCK_SUPABASE_PUBLIC_KEY,
   )
 }

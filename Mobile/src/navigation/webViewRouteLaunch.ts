@@ -3,6 +3,8 @@ export type WebViewQuickAction =
   | 'search'
   | 'library'
   | 'studio'
+  | 'feed'
+  | 'collections'
   | 'community';
 
 const quickActionPaths: Record<WebViewQuickAction, string> = {
@@ -10,6 +12,8 @@ const quickActionPaths: Record<WebViewQuickAction, string> = {
   search: '/search',
   library: '/mylist',
   studio: '/studio',
+  feed: '/feed',
+  collections: '/collections',
   community: '/community',
 };
 

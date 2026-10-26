@@ -5143,3 +5143,19 @@ Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#
 - เพิ่ม native collections/history CSV และ OS sharing รีวิว/คอมเมนต์รายหน้า/รายงาน/โหวตแปล profiles/banner/follows เช็กอิน/แจ้งเตือน/preferences/สถิติ account security ที่รองรับครบ Community CRUD/รูป/replies/votes/SSE creator Studio/uploads/publish/earnings และทีมงาน users/content/transactions/audit เดิม ยึด source responsive mobile กับ DESIGN.md คง contracts server/บัญชี/ธุรกิจ
 - ตรวจก่อน final review: **Mobile 210 tests**, typecheck, Hermes Android export ใหม่ **772 modules / ประมาณ 3 MB / assets 11 ไฟล์** และประกอบ debug native x86_64 ผ่าน (204 tasks) ติดตั้ง media/sharing dependencies ที่เข้ากับ SDK และ generate Android ใหม่โดยไม่ clean Missing-import failures แรกของ tracers ห้าตัวไม่ใช่ behavior RED ที่ถูกต้อง แก้หลักฐานใน ledger โดยไม่อ้างประวัติ TDD สมบูรณ์
 - Review source สุดท้ายใช้บริบทใหม่หนึ่งตัวแล้ว แก้ native image construction navigation อ่าน Studio Android Back การเปลี่ยนตอนภาษาเดียว SSE post/vote เก่าทับใหม่และ labels creator/source ยกระดับ preferences mode/RTL/zoom หายเป็น Important และคงข้ามตอน พบ behavior RED→GREEN จริงรวม flow components/controllers React ที่จำลองเฉพาะขอบ OS **218/218 tests**, typecheck และ Hermes Android หลังแก้ผ่าน ยังเปิดภาพ populated web/native บริการ provider/captcha/payment/translation จริงและ signed physical-device acceptance S10/S29 Validate env ยังขาด public variables สามค่า ไม่คัดลอกหรือเผย secrets ไม่มี commit/ปิด issue หรือเพิ่ม source changes Backend/Frontend/MIT รอบนี้ ดู [mapping ฟีเจอร์/สถานะ](Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](Mobile/docs/2026-10-03-native-completion-ledger.md), [ADR 030](docs/adr/030-mobile-native-account-community-and-creator-contracts.md), [impact report](docs/reports/system-impact-report.md)
+# 2026-10-26 — Phase 5 continued on the pushed hybrid Phase 4 branch
+
+- Base: `69badd5f`; worktree `md-hybrid-phase5-20261026`, branch
+  `feat/mobile-hybrid-phase5-20261026`. Existing dirty/native worktrees preserved.
+- Reused Backend/Frontend Phase 5 feature seams from `b168975`; kept the CLI
+  WebView shell. Added hybrid deep links/shortcuts, SDK 56 notifications bridge,
+  web-owned push lifecycle and `/settings/notifications`; Auth tokens stay in web.
+- Validation: Mobile 91/91 + types; push controller 16/16; auth/cache 12/12;
+  Backend SQL/HTTP/worker 18/18 + build and full Node 22 Jest 1,179/1,179; Frontend build/types/focused lint;
+  390/1280 browser QA through actual Next proxy. See the linked record for broad
+  baseline failures, native build/device evidence and rollout prerequisites.
+- [Implementation/resume](Mobile/docs/2026-10-26-hybrid-phase5.md),
+  [QA](docs/reports/hybrid-phase5-2026-10-26/README.md),
+  [ADR 034](docs/adr/034-hybrid-phase5-web-session-and-os-push.md).
+- No remote database migration, production deployment, provider configuration or
+  production signing was applied. Push rollout remains off.

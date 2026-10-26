@@ -90,6 +90,8 @@ jobs:
       # --runInBand keeps Redis-backed specs deterministic; jest.ci.config.js
       # skips documented pre-existing failures (#358).
       - run: npx jest -c jest.ci.config.js --runInBand --ci
+      - name: Phase 5 migration, authorization and worker contracts
+        run: npm run test:phase5
 
   frontend:
     name: frontend (bun test)
@@ -132,14 +134,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Mobile is an Expo/React Native project; package-lock.json is its maintained
+      # The hybrid CLI app embeds Expo notification modules; package-lock.json is its maintained
       # lockfile (no bun.lock here, unlike Backend/Frontend). npm ci also fails the
       # build if the lockfile drifts out of sync with package.json — a free extra check.
       - run: npm ci
-      # tsc --noEmit (strict, expo/tsconfig.base). No device/emulator build in CI; the
-      # @mangadock/mobile-bridge unit suite runs in the frontend job, not duplicated here.
+      # No device/emulator build in CI. Test the actual shell and OS bridge boundaries.
       - name: Typecheck (tsc --noEmit, strict)
         run: npm run typecheck
+      - name: Hybrid shell and push boundary tests
+        run: npm test -- --runInBand
 
   # MIT is two jobs since #359 lazy-imported torch (job ids use underscores — a hyphen in a
   # job id breaks `${{ needs.mit-logic }}` expression parsing, which reads `-` as subtraction):

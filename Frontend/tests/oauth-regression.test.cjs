@@ -45,6 +45,7 @@ function loadComponent(relativePath, {auth, window, fetch} = {}) {
       if (name.endsWith('/userCache')) return {setTokenSupplier: noop, loadUserData: noop};
       if (name.endsWith('/readingHistory')) return {setHistoryTokenSupplier: noop, loadHistoryData: noop};
       if (name.endsWith('/identityReset')) return {resetClientStateForIdentityChange: noop};
+      if (name.endsWith('/hybridPushLifecycle')) return {cleanupHybridPush: async () => {}};
       if (name.endsWith('/browserActions')) return {reloadPage: noop, redirectToHome: noop};
       if (name.endsWith('/fingerprint')) return {getHardwareId: () => null};
       if (name.endsWith('/avatarUpload')) return {resolveAvatarUrl: value => value};
