@@ -1,5 +1,33 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-29 — K01 Android Collections keyboard correction
+
+| Field | Record / บันทึก |
+| --- | --- |
+| What / where | `Mobile/src/NativeRetentionView.tsx`, two existing keyboard wrappers: Android height behavior + existing top inset offset / แก้เฉพาะ wrapper ฟอร์ม Collections สองเส้นทาง |
+| Why | Empty-list Save/Cancel remained behind Samsung Keyboard despite repeated scrolling / ผู้ใช้สร้างชุดแรกเลื่อนปุ่มพ้น keyboard ไม่ได้ |
+| Before → After | Actual baseline hit boxes y1866–2010 vs IME1524 FAIL → final y1086–1230 PASS; Save succeeds with IME open / ตรวจกรอบจริงและกดบันทึกได้ |
+| Performance Δ | Not benchmarked; no new package, network or storage operation; existing KAV keyboard updates only / ไม่อ้างตัวเลข performance |
+| Quality / validation | Same Z Flip4, Android16: empty/populated multiline create, edit and search/add pass; 268/268, types, HTTP/Nest/SQL and final release/vital pass / ใช้เครื่องจริงกับ QA แยก |
+| Diagnosis | Undefined Android behavior leaves viewport unchanged; SafeArea root adds a 94px origin shift. Long lists masked first use. Both addressed with existing APIs / ใช้ height และ inset จริง |
+| Risk / rollback | iOS unchanged; only Collections affected. Revert these UI lines to restore baseline; no Backend/schema/auth change / ความเสี่ยงจำกัด layout ของ Collections |
+| Evidence / next | [Actual before/after and binary hashes](../../Mobile/docs/2026-10-29-native-keyboard-fix.md), ADR034 updated. K01 reaccepted; production service/Push/signing gates remain / มีภาพและ hash ตรวจสอบได้ |
+| Publication | Local uncommitted source/docs only; no push/merge/deploy / เก็บในเครื่องตามคำสั่งเดิม |
+
+## 2026-10-29 — Native Phase 5 physical QA, product source unchanged
+
+| Field | Record / บันทึก |
+| --- | --- |
+| What / where | Physical Z Flip4 / Android16, source5a48595, isolated package `com.mangadock.mobile.phase5qa`, [report](../../Mobile/docs/2026-10-29-native-phase5-device-qa.md), original screenshot evidence / ตรวจNativeเครื่องจริงด้วยpackageและข้อมูลQAแยก |
+| Why | Owner requested Collections/Feed keyboard/scroll/share/deep-link acceptance / ผู้ใช้ขอตรวจพฤติกรรมNativeเหล่านี้ |
+| Before → After | Device UI unaccepted →15scenario groups observed PASS, K01 confirmed FAIL; source/architecture/dependencies unchanged, so no new ADR / จากยังไม่รับบนเครื่องจริงเป็นมีผลผ่าน15กลุ่มและพบK01 ไม่เปลี่ยนสถาปัตยกรรม |
+| Performance Δ | Not measured; no speed, memory or throughput claim / ไม่ได้วัดperformance |
+| Quality / validation | Fresh268/268, TypeScript, real HTTP/Nest/PostgreSQL fixture integration, ARM64 release/vital build, installed hash match;44realPNG/XML captures / ตรวจsourceและเครื่องจริงพร้อมแยกขอบAuth/catalogจำลอง |
+| Diagnosis | Empty collection list exhausts scroll range while IME overlays unshrunk Android viewport; iOS-only KAV behavior. Repeated swipes fail; dismissing IME makes Save succeed. Populated lists mask defect / keyboardบังปุ่มชุดแรก ทำซ้ำและเปรียบเทียบเปิด-ปิดIMEแล้ว |
+| Risk / rollback | No personal session, production data/schema/config, external message, cloud/Push change. Remove only temporary QA package and4017reverse, stop fixture; artifacts retained locally / ไม่แตะproductionหรือsessionส่วนตัว คืนสภาพเฉพาะสิ่งที่สร้างทดสอบ |
+| Remaining | Fix/reaccept K01; production services/Push/signing and other devices remain separate / ต้องแก้keyboardและตรวจซ้ำ งานreleaseอื่นยังแยกค้าง |
+| Links / publication | Native branch5a48595; local docs/history only; no commit/push/merge/deploy/remote comments / เก็บรายงานในเครื่องเท่านั้น |
+
 ## 2026-10-24 — Native Phase 5 retention follow-up
 
 - Added Mobile Collections CRUD/search/items/public-private/native share, personal feeds and validated collection links on the existing Phase 5 branch. Existing Backend contracts, six tabs, post/spoiler behavior and rollout settings are retained; no runtime dependency or production schema/provider change.

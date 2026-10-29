@@ -1,5 +1,7 @@
 # Native Phase 5 Collections, Feed and deep links
 
+**Follow-up 2026-10-29:** [Physical Native QA on Galaxy Z Flip4](2026-10-29-native-phase5-device-qa.md) completed 16 scenario groups: 15 pass and K01 fails (empty-list first-create controls stay behind Samsung Keyboard). The new report supersedes the blanket "device not tested" status for those scoped scenarios; production service/Push acceptance remains separate. / **ผลตรวจเพิ่มเติม 29 ต.ค.:** ตรวจ Native บน Z Flip4 จริงผ่าน15กลุ่ม พบ1ข้อ keyboardฟอร์มชุดแรกที่รายการว่าง รายงานใหม่ใช้แทนสถานะยังไม่ทดสอบเครื่องจริงเฉพาะกลุ่มที่ตรวจ บริการproduction/Pushยังเป็นเกณฑ์แยก
+
 <!-- lang:en -->
 ## Delivered source
 

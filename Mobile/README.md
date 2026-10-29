@@ -1,5 +1,13 @@
 # MangaDock Mobile
 
+2026-10-29 K01 fix: Android Collections now resize their viewport for the keyboard and account for the existing top safe-area inset. Empty/populated create, edit and search pass on the physical Z Flip4; 268/268 tests, TypeScript, HTTP/Nest/SQL integration and final release/vital build pass. [Real before/after screenshots and final APK identity](docs/2026-10-29-native-keyboard-fix.md). Production rollout remains separate.
+
+ภาษาไทย: แก้ keyboard บังปุ่มชุดแรกแล้ว Android ย่อพื้นที่ฟอร์มและชดเชย safe-area จริง ตรวจรายการว่าง/ยาว แก้ไข และค้นหาบน Z Flip4 ผ่าน พร้อมtests268/types/integration/buildผ่าน ภาพจริงก่อน–หลังอยู่ในรายงานด้านบน ยังแยกเกณฑ์production
+
+2026-10-29: Native Phase 5 checked on a physical Galaxy Z Flip4 using an isolated QA package and real local Nest/SQL retention paths. 15 device scenario groups pass; first-collection keyboard avoidance fails (Save/Cancel stay behind IME when the list is empty). Mobile 268/268 and TypeScript still pass. [Physical evidence, reproduction and acceptance limits](docs/2026-10-29-native-phase5-device-qa.md). No product source fix or production acceptance claimed.
+
+ภาษาไทย: 29 ต.ค. ตรวจ Collections/Feed บน Z Flip4 จริงด้วย package และข้อมูล QA แยก ผ่าน 15 กลุ่ม ไม่ผ่าน keyboard กรณีคอลเลกชันแรกที่รายการว่าง ปุ่มบันทึก/ยกเลิกเลื่อนพ้นคีย์บอร์ดไม่ได้ Tests 268/268 และ TypeScript ผ่าน รายงานด้านบนมีภาพ วิธีทำซ้ำและขอบเขต รอบนี้ยังไม่แก้ source และไม่รับรอง production
+
 2026-10-24: Native Collections, personal feeds and collection deep links are implemented on the Phase 5 branch. Mobile 268/268 and TypeScript pass; real HTTP/Nest/SQL fixture integration passes. [Features, QA commands and remaining visual/live acceptance](docs/2026-10-24-native-retention.md).
 
 ภาษาไทย: 24 ต.ค. เพิ่ม Collections, Feed ส่วนตัวและ deep link แบบ native บน branch Phase 5 ผ่าน tests 268/268, TypeScript และ HTTP/Nest/SQL แบบ QA แยก ยังรอภาพ/อุปกรณ์และบริการจริง ดูรายงานด้านบน

@@ -1,5 +1,19 @@
 <!-- lang:en -->
 
+## Native Collections K01 keyboard correction — 2026-10-29
+
+- User authorized fixing the observed defect and requested actual before/after screenshots. Changed only `Mobile/src/NativeRetentionView.tsx`: Android height behavior and existing safe-area top offset in both collection wrappers; iOS behavior preserved. Physical regression on the exact baseline fails (buttons1866–2010 behind IME1524), final passes (1086–1230); native Save works without manual IME dismissal.
+- Final Z Flip4/Android16 also passes edit, search/add and13-row-list multiline-create regressions with actual native taps and fixture SQL persistence.268/268, types, realHTTP/Nest/SQL integration and ARM64 release/vital build(19s/316tasks) pass. No mocked prop-only test substituted for IME behavior.
+- Final isolated APK hash and installedhash `ce07cdd8572053cc016328ae28b6335e0df043a3d75eea713489916480f6bd99`; original beforeimage and final afterimage copied byte-identically into docs. [Fix/evidence report](Mobile/docs/2026-10-29-native-keyboard-fix.md), raw ledger `qa/native-keyboard-fix-20261029/`. No commit/push/deploy or production/account change.
+- ภาษาไทย: แก้ K01ตามคำสั่งแล้ว เพิ่มAndroidheightและsafe-area offsetเฉพาะCollections ภาพก่อน–หลังจากZ Flip4จริง ตัวเดิมgeometryล้มเหลว ตัวสุดท้ายผ่านและกดบันทึกได้ขณะkeyboardเปิด ตรวจแก้ไข/ค้นหา/รายการยาวพร้อมข้อความหลายบรรทัดผ่าน tests268/types/integration/buildผ่าน บันทึกภาพและhashครบ เก็บlocalไม่commit/push/deploy
+
+## Native Phase 5 physical-device QA — 2026-10-29
+
+- Checked source `5a48595` on Galaxy Z Flip4 / Android 16 using isolated `com.mangadock.mobile.phase5qa`, embedded ARM64 release JS and real local HTTP/Nest/PostgreSQL retention fixtures; Auth/catalog were synthetic. Existing personal app/session untouched. Local and installed APK SHA-256 match `b2dffcdaa4e6895a91c47ba2c487e3824f1db2301e318fa2164c27b13087af4e`.
+- Fifteen scenario groups passed: populated Collections CRUD/search/multiline/scroll; Following/Personalized/pagination/post Back; share sheet/cancel; cold/warm links/login destination/session restore/invalid UUID; logout and private guest denial. **K01 fails:** empty-list first-create Save/Cancel cannot scroll above Samsung Keyboard. Repeated swipes keep Save at y1905–1971; IME dismiss makes saving succeed. Source uses iOS-only KeyboardAvoidingView behavior. No product fix applied; native keyboard acceptance stays open.
+- Fresh Mobile268/268, types, HTTP/Nest/SQL integration and release/vital build pass. 44 original PNG/XML captures local in `qa/native-device-20261029`; selected unmodified screenshots and [report](Mobile/docs/2026-10-29-native-phase5-device-qa.md) retained. No production service/Push, external message, personal data write, commit/push/merge/deploy.
+- ภาษาไทย: ตรวจ Native Phase5 บน Z Flip4 จริงด้วยแอป QA แยกและ Backend/SQL ในเครื่อง ผ่าน15กลุ่ม พบ1ข้อ K01 ฟอร์มชุดแรกเมื่อรายการว่างเลื่อนปุ่มพ้น Samsung Keyboard ไม่ได้ ปิดคีย์บอร์ดจึงบันทึกได้ ทำซ้ำแล้ว มี44ภาพจริงพร้อมXML Tests268/types/integration/buildผ่านแต่ไม่จับบั๊กนี้ ยังไม่แก้source ไม่ปิดkeyboard acceptance ไม่แตะบัญชีหรือproduction ไม่commit/push/deploy
+
 ## Native Phase 5 follow-up — 2026-10-24
 
 - Continued the pushed Phase 5 head `a790711` in `C:/Users/woral/md-phase5-mobile`. Added Native Collections CRUD/search/items/private-public/share, personal Following/ranked feeds, UUID collection routes, destination-preserving login and account/cancellation isolation. Existing post/spoiler component and six tabs retained. No new runtime dependency, Backend contract, remote migration/deployment or push configuration.

@@ -14,6 +14,7 @@ Phase 5 has Web Collections/feeds and server contracts, while Mobile renders nat
 - Put Collections beneath Library and personal feeds beneath Community, preserving six existing bottom destinations. Reuse native post rendering and spoiler behavior. Preserve the feed when opening/returning from a post and preserve the intended retention destination through guest login.
 - Extend the existing product-link parser with feed/collections and UUID collection destinations. Share installed-app `mangadock://collections/<uuid>` URLs only for public collections. HTTPS universal links and installation fallbacks require a separate domain association decision.
 - Keep rollout flags, real service configuration and schema unchanged. New UI uses existing Mobile tokens; no new runtime package is required.
+- Android Collections use a keyboard-resized viewport with the existing top safe-area offset, independently of collection count. Empty-list geometry is a physical acceptance gate; mocked host-widget tests cannot certify IME overlap. [29 October correction and device evidence](../../Mobile/docs/2026-10-29-native-keyboard-fix.md). / Androidย่อviewportตามkeyboardและชดเชยsafe-areaจริงโดยไม่พึ่งจำนวนคอลเลกชัน ต้องตรวจรายการว่างบนเครื่องจริง
 
 ## Alternatives considered
 

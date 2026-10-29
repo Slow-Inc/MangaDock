@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type {
   createRetention,
   CollectionInput,
@@ -104,6 +105,7 @@ export function NativeCollectionsView({
   onAccount(): void;
   onBook(id: string): void;
 }) {
+  const { top } = useSafeAreaInsets();
   const state = useSyncExternalStore(retention.subscribe, retention.snapshot);
   const session = useSyncExternalStore(
     runtime.session.subscribe,
@@ -236,7 +238,8 @@ export function NativeCollectionsView({
     return (
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "android" ? top : 0}
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -405,7 +408,8 @@ export function NativeCollectionsView({
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "android" ? top : 0}
     >
       <FlatList
         data={state.collections}
