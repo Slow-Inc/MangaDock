@@ -275,4 +275,24 @@ describe('buildMitConfig() — provider-aware translator section', () => {
     expect(cfg.translator.api_key).toBe('sk-local');
     expect(cfg.translator.api_url).toBe('http://localhost:11434/v1');
   });
+
+  it('MIT_OWN_TRANSLATOR=1: custom provider stays in the Backend, MIT keeps its own translator (#1177)', () => {
+    const cfg = JSON.parse(
+      buildMitConfig(
+        {
+          ...MIT_BASE,
+          LLM_PROVIDER: 'custom',
+          LLM_API_KEY: 'sk-local',
+          LLM_BASE_URL: 'http://localhost:11434/v1',
+          MIT_OWN_TRANSLATOR: '1',
+        } as NodeJS.ProcessEnv,
+        'JPN',
+        'THA',
+        'ja',
+      ),
+    );
+    expect(cfg.translator.translator).toBeUndefined();
+    expect(cfg.translator.api_key).toBeUndefined();
+    expect(cfg.translator.api_url).toBeUndefined();
+  });
 });
