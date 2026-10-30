@@ -192,6 +192,11 @@ export function buildJobKey(
  *                           — (#1006) a vertical Japanese source may use a block up to 1.5x the
  *                             source column so the Thai font is larger (measured 20-42% on the
  *                             real JP pages); a layout change, so opt-in.
+ *
+ * #1177 translator ownership (opt-in; unset = config identical to before):
+ *   MIT_OWN_TRANSLATOR=1    — a non-gemini LLM_PROVIDER configures only the Backend's text LLM
+ *                             (descriptions); MIT keeps the translator from its own .env instead
+ *                             of being switched to `chatgpt` with the Backend's key.
  */
 export function buildMitConfig(
   env: NodeJS.ProcessEnv,
@@ -254,7 +259,7 @@ export function buildMitConfig(
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
       ...(temperature !== undefined ? { temperature } : {}),
-      ...(provider !== 'gemini'
+      ...(provider !== 'gemini' && !flagEnv('MIT_OWN_TRANSLATOR')
         ? {
             translator: 'chatgpt',
             api_key: env.LLM_API_KEY,
