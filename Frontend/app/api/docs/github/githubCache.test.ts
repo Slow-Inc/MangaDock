@@ -73,6 +73,15 @@ describe('githubCache', () => {
     expect(calls.length).toBe(3);
   });
 
+  test('a 404 or 410 is an answer about the resource: the old copy is dropped and the status passes through', async () => {
+    const { cache, advance } = setup([res(200, 'was here', '"a"'), res(404, '{"message":"Not Found"}'), res(200, 'back', '"b"')]);
+    await cache.get('u');
+    advance(1500);
+    const gone = await cache.get('u');
+    expect([gone.status, gone.cache]).toEqual([404, 'error']);
+    expect((await cache.get('u')).cache).toBe('miss'); // nothing left to serve; asked again
+  });
+
   test('with nothing cached an error keeps its status and is not remembered', async () => {
     const { cache, calls } = setup([res(403, '{"message":"rate limit"}'), res(200, '[2]', '"b"')]);
     const first = await cache.get('u');

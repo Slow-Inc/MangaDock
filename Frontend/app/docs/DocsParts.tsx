@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import GradientHeading from '../components/ui/GradientHeading';
 import { DOT_FIELD, shimmerDelay } from '../components/skeletonDots';
 import { viewToPath, type ViewState } from './routes';
+import { useLang } from './lang-context';
 
 // Small shared pieces of the docs area: real links, the page header and the loading skeleton.
 
@@ -71,9 +72,10 @@ export function PageHeader({ crumbs, title, children, navigate }: {
 
 /** Skeleton rows on the dot field + a quiet pulse (the Strata skeleton), staggered so the shimmer travels. */
 export function LoadingRows({ rows = 6 }: { rows?: number }) {
+  const lang = useLang();
   return (
     <div role="status" aria-live="polite" className="space-y-3">
-      <span className="sr-only">กำลังโหลด</span>
+      <span className="sr-only">{lang === 'th' ? 'กำลังโหลด' : 'Loading'}</span>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} style={shimmerDelay(i)} className={`h-[4.25rem] animate-pulse rounded-2xl bg-fill ${DOT_FIELD}`} />
       ))}

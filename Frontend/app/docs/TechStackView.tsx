@@ -605,7 +605,7 @@ function TechDetailPanel({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
-              <h1 className="text-[22px] font-semibold text-ink tracking-tight leading-snug">
+              <h1 className="text-[22px] font-semibold text-ink leading-snug">
                 {tech.name}
               </h1>
               {tech.version && (
@@ -752,7 +752,7 @@ export default function TechStackView() {
       <div className="pb-6 border-b border-line">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[26px] font-semibold text-ink tracking-tight leading-tight">
+            <h1 className="text-[26px] font-semibold text-ink leading-tight">
               Tech Stack
             </h1>
             <p className="text-[14px] text-ink-2 mt-1.5 leading-relaxed">

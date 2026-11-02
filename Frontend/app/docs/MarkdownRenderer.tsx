@@ -215,7 +215,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
     <div className="code-monokai theme-dark my-6 overflow-hidden rounded-2xl border border-line bg-[var(--mk-bg)] text-[var(--mk-fg)]">
       <div className="flex min-h-11 items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--mk-fg)_10%,transparent)] pl-4 pr-1.5">
         <span className="font-mono text-[11px] text-[var(--mk-comment)]">{lang === 'text' ? 'code' : lang}</span>
-        <CopyButton value={copy} label="Copy" className="!min-h-8 !border-transparent !bg-transparent !px-3 !text-xs" />
+        <CopyButton value={copy} label="Copy" className="!min-h-11 sm:!min-h-8 !border-transparent !bg-transparent !px-3 !text-xs" />
       </div>
       <pre tabIndex={0} aria-label={`${lang} code`} className="overflow-x-auto p-4 font-mono text-[12.5px] leading-[1.7] whitespace-pre sm:text-[13px]">
         <code>

@@ -60,7 +60,11 @@ export function createGithubCache(opts: {
         remember(url, { body, etag: res.headers.get('etag'), ts: now() });
         return { status: 200, body, cache: 'miss' };
       }
-      return stale() ?? { status: res.status, body, cache: 'error' };
+      // GitHub failing or limiting us (5xx, 403, 429): the old copy is better than nothing. Any other status is an
+      // answer about the resource itself (a deleted issue is 404/410): forget the old copy and pass the status on.
+      if (res.status >= 500 || res.status === 403 || res.status === 429) return stale() ?? { status: res.status, body, cache: 'error' };
+      store.delete(url);
+      return { status: res.status, body, cache: 'error' };
     } catch {
       return stale() ?? { status: 502, body: JSON.stringify({ error: 'GitHub request failed' }), cache: 'error' };
     }

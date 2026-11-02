@@ -40,10 +40,10 @@ export default function TranslationNotice({ status, failed, showOriginal, onTogg
       <p className="min-w-0 flex-1 text-[0.8125rem] leading-snug text-ink-2">{message}</p>
       <div className="flex shrink-0 gap-2">
         {(status === 'failed' || status === 'partial') && !showOriginal && (
-          <Pill size="sm" onClick={onRetry} className="!min-h-9">{th ? 'ลองใหม่' : 'Retry'}</Pill>
+          <Pill size="sm" onClick={onRetry} className="!min-h-11 sm:!min-h-9">{th ? 'ลองใหม่' : 'Retry'}</Pill>
         )}
         {status !== 'failed' && (
-          <Pill size="sm" selected={showOriginal} onClick={onToggle} className="!min-h-9">
+          <Pill size="sm" selected={showOriginal} onClick={onToggle} className="!min-h-11 sm:!min-h-9">
             {showOriginal ? (th ? 'ดูฉบับแปล' : 'Show translation') : (th ? 'ดูต้นฉบับ' : 'Show original')}
           </Pill>
         )}

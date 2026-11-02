@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { DisclosureGlyph } from '../components/ui/Disclosure';
 
 /**
  * The one way anything in the docs folds and unfolds. The box grows and shrinks between 0fr and 1fr (the
@@ -21,7 +22,7 @@ export default function Collapse({ open, children, className = '' }: { open: boo
   );
 }
 
-/** A row that folds its content: the look of ui/Disclosure (hairline, +/- circle), with the fold animated. */
+/** A row that folds its content: the look of ui/Disclosure (hairline, its +/- glyph), with the fold animated. */
 export function AnimatedDisclosure({ summary, children, defaultOpen = false }: { summary: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -33,10 +34,7 @@ export function AnimatedDisclosure({ summary, children, defaultOpen = false }: {
         className="group flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 py-3 text-left text-ink"
       >
         <span className="min-w-0">{summary}</span>
-        <span aria-hidden className="relative h-7 w-7 shrink-0 rounded-full border border-line transition-colors duration-[var(--t1)] group-hover:border-ink-3">
-          <span className="absolute left-1/2 top-1/2 h-px w-3 -translate-x-1/2 -translate-y-1/2 bg-ink-2" />
-          <span className={`absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-ink-2 transition-transform duration-[var(--t2)] ease-[var(--ease)] ${open ? 'scale-y-0' : ''}`} />
-        </span>
+        <DisclosureGlyph open={open} />
       </button>
       <Collapse open={open}>
         <div className="pb-5 text-ink-2">{children}</div>

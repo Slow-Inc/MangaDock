@@ -26,7 +26,7 @@ import DocBody, { INITIAL_UNITS } from './DocBody';
 import { DocLink, DotCorner, LoadingRows, PageHeader, SheetOpenContext } from './DocsParts';
 import { filterLangBlocks, headingsOfUnits, readingMinutes, splitParts } from './markdown';
 import { pathToView, viewToPath, viewTitle, DOCS_BASE, type ViewState } from './routes';
-import { githubBlobUrl } from './resolveHref';
+import { githubBlobUrl, REPO_URL } from './resolveHref';
 import { relativeDate, labelFg } from './utils';
 import { cacheOrFetch, TTL } from '../lib/apiCache';
 
@@ -415,7 +415,7 @@ function IssueDetailView({ number, navigate }: { number: number; navigate: Navig
               <Author user={issue.user} />
               <span>{th(lang, `เปิดเมื่อ ${relativeDate(issue.created_at)}`, `Opened ${relativeDate(issue.created_at)}`)}</span>
               <span>{th(lang, `อัปเดต ${relativeDate(issue.updated_at)}`, `Updated ${relativeDate(issue.updated_at)}`)}</span>
-              <a href={issue.html_url} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 text-accent hover:underline"><ExternalLink aria-hidden size={11} /> GitHub</a>
+              <a href={issue.html_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 sm:min-h-8 items-center gap-1 text-accent hover:underline"><ExternalLink aria-hidden size={11} /> GitHub</a>
             </Meta>
           </PageHeader>
 
@@ -567,7 +567,7 @@ function BranchesView({ navigate }: { navigate: Navigate }) {
               </span>
               <span className="font-mono text-[11px] text-ink-3">{b.commit.sha.slice(0, 7)}</span>
               <a
-                href={`https://github.com/Slow-Inc/MangaDock/tree/${b.name}`}
+                href={`${REPO_URL}/tree/${b.name}`}
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`${b.name} on GitHub`}

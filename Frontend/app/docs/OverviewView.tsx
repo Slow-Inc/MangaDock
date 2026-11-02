@@ -426,7 +426,7 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
       {/* Hero */}
       <div id="ov-hero" className="mb-10">
         <p className="text-[12px] text-ink-2 mb-3">{lang === 'th' ? 'เอกสาร › ภาพรวมระบบ' : 'Docs › System Overview'}</p>
-        <h1 className="text-[28px] font-bold text-ink mb-3 tracking-tight leading-tight">{lang === 'th' ? 'ภาพรวมระบบ MangaDock' : 'MangaDock System Overview'}</h1>
+        <h1 className="text-[28px] font-bold text-ink mb-3 leading-tight">{lang === 'th' ? 'ภาพรวมระบบ MangaDock' : 'MangaDock System Overview'}</h1>
         <p className="text-[15px] text-ink-2 leading-7 max-w-[65ch]">
           {lang === 'th'
             ? 'MangaDock ประกอบด้วย 3 service หลักที่ทำงานร่วมกัน — Frontend รับ request จากผู้ใช้, Backend จัดการ logic และ cache, MIT ประมวลผล AI แปลภาพมังงะ โดยทั้งหมดใช้ Supabase เป็นฐานข้อมูลกลาง'
