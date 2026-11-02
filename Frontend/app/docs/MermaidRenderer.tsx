@@ -86,7 +86,7 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
 
   if (error) {
     return (
-      <pre className="p-4 overflow-x-auto text-[13px] font-mono text-[rgba(248,249,251,0.8)] bg-[#0f1118] leading-relaxed whitespace-pre rounded-lg border border-black/[0.08]">
+      <pre className="theme-dark my-6 overflow-x-auto rounded-2xl border border-line bg-surface p-4 font-mono text-[13px] leading-relaxed whitespace-pre text-ink">
         <code>{chart}</code>
       </pre>
     );
@@ -95,10 +95,14 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
   return (
     <div 
       ref={containerRef} 
-      className="mermaid-wrapper my-6 p-6 w-full bg-[#0d1117] border border-[#30363d] rounded-xl overflow-x-auto -mx-6 md:-mx-12 px-6 md:px-12"
-      style={{ width: 'calc(100% + 3rem)' }}
+      // An always-dark island that scrolls inside its own box: on a phone the diagram keeps a readable
+      // width (min 560px) and pans, instead of shrinking to fit or widening the page.
+      className="mermaid-wrapper theme-dark my-6 w-full overflow-x-auto rounded-2xl border border-line bg-surface p-4 md:p-6 [&_svg]:h-auto [&_svg]:min-w-[560px]"
+      tabIndex={0}
+      role="region"
+      aria-label="diagram"
       data-mermaid-chart={chart}
-      dangerouslySetInnerHTML={{ __html: svg || '<span class="text-xs text-[#86868b] font-medium">กำลังวาดแผนผัง... / Rendering diagram...</span>' }}
+      dangerouslySetInnerHTML={{ __html: svg || '<span class="font-mono text-xs text-ink-3">กำลังวาดแผนผัง... / Rendering diagram...</span>' }}
     />
   );
 }

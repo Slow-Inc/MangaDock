@@ -7,6 +7,7 @@ import { FlowDiagram } from './FlowDiagram';
 import { resolveStep, DOMAIN_COLORS } from './engine';
 import type { SimScenario, DomainColor, NodeState } from './engine';
 import { useLang } from '../lang-context';
+import Collapse from '../Collapse';
 
 // ─── Reduced motion hook ─────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export function SimulatorPanel({
   useEffect(() => { setTechOpen(false); }, [step]);
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-black/[0.07]">
+    <div className="rounded-2xl overflow-hidden border border-line">
       {/* Header bar */}
       <div className="bg-[#1c1c1e] px-6 py-4 flex items-center gap-3 border-b border-white/[0.06]">
         <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} aria-hidden="true" />
@@ -207,15 +208,7 @@ export function SimulatorPanel({
               {lang === 'th' ? 'รายละเอียดเชิงเทคนิค' : 'Technical details'}
             </button>
 
-            <AnimatePresence>
-              {techOpen && (
-                <motion.div
-                  initial={reducedMotion ? false : { opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={reducedMotion ? undefined : { opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="overflow-hidden"
-                >
+            <Collapse open={techOpen}>
                   <div className="mt-3 p-4 rounded-xl bg-white/[0.04] border border-white/[0.07] space-y-2">
                     {lang === 'th' ? (
                       <>
@@ -228,9 +221,7 @@ export function SimulatorPanel({
                       </>
                     )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            </Collapse>
           </div>
         )}
       </div>

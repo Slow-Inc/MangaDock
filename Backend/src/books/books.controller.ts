@@ -202,8 +202,16 @@ export class BooksController {
   // Public, and may spend a paid provider key: rate-limited per client + globally (#801).
   @UseGuards(TranslateThrottleGuard)
   @Get('translate')
-  translateDescription(@Query('text') text: string) {
-    return this.booksService.translateDescription(text ?? '');
+  translateDescription(
+    @Query('text') text: string,
+    // Optional, for the docs site: `to=en` and/or `kind=doc`. Absent = the original description to Thai.
+    @Query('to') to?: string,
+    @Query('kind') kind?: string,
+  ) {
+    return this.booksService.translateDescription(text ?? '', {
+      to: to === 'en' ? 'en' : 'th',
+      kind: kind === 'doc' ? 'doc' : 'description',
+    });
   }
 
   @UseGuards(TurnstileGuard)
