@@ -304,6 +304,80 @@ describe('translateDescription() — openai provider', () => {
   });
 });
 
+describe('translateDescription() - docs site options (to / kind)', () => {
+  function make(reply: string) {
+    const cache = {
+      get: jest.fn().mockResolvedValue(null),
+      setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
+    };
+    const llm = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getDescriptionModel: jest.fn().mockReturnValue('m1'),
+      complete: jest.fn().mockResolvedValue(reply),
+    } as unknown as LlmService;
+    const svc = new LandingService(
+      cache as any,
+      { enabled: false } as any,
+      {} as any,
+      {} as any,
+      () => 'http://localhost',
+      { LLM_PROVIDER: 'openai', LLM_API_KEY: 'k' } as NodeJS.ProcessEnv,
+      llm,
+    );
+    return { svc, cache, llm };
+  }
+  const thai = 'ระบบนี้เก็บรูปภาพทั้งหมดไว้บนเซิร์ฟเวอร์และส่งต่อให้ผู้ใช้';
+
+  it('default call keeps the original prompt and the original cache key', async () => {
+    const { svc, cache, llm } = make('คำแปล');
+    await svc.translateDescription('Some English description here');
+    expect(
+      (llm.complete as jest.Mock).mock.calls[0][0] as string,
+    ).toContain('manga/book description to Thai');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:th:v5:/,
+    );
+  });
+
+  it('to=en translates Thai text to English with its own cache key', async () => {
+    const { svc, cache, llm } = make('This system stores every image.');
+    const r = await svc.translateDescription(thai, { to: 'en', kind: 'doc' });
+    expect(r).toMatchObject({
+      translated: true,
+      translatedText: 'This system stores every image.',
+    });
+    const prompt = (llm.complete as jest.Mock).mock.calls[0][0] as string;
+    expect(prompt).toContain('technical documentation (Markdown) to English');
+    expect(prompt).toContain('[[CODE_n]]');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:en:doc:v1:/,
+    );
+  });
+
+  it('to=en leaves text that has no Thai alone (nothing to translate)', async () => {
+    const { svc, llm } = make('x');
+    const english = 'Already English, with `code` and a [link](http://a.b).';
+    await expect(
+      svc.translateDescription(english, { to: 'en', kind: 'doc' }),
+    ).resolves.toEqual({ translatedText: english, translated: false });
+    expect(llm.complete).not.toHaveBeenCalled();
+  });
+
+  it('to=th with kind=doc uses the doc prompt and a separate cache key', async () => {
+    const { svc, cache, llm } = make('คำแปลเอกสาร');
+    await svc.translateDescription('The cache has three tiers.', {
+      to: 'th',
+      kind: 'doc',
+    });
+    expect(
+      (llm.complete as jest.Mock).mock.calls[0][0] as string,
+    ).toContain('technical documentation (Markdown) to Thai');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:th:doc:v1:/,
+    );
+  });
+});
+
 describe('translateDescription() — reports the model that produced the text', () => {
   const text = 'Some English description here and more text';
 

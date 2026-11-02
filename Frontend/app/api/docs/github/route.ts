@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createGithubCache } from './githubCache';
+import { parseGithubParams } from './githubParams';
 
 const OWNER = 'Slow-Inc';
 const REPO = 'MangaDock';
@@ -11,13 +13,24 @@ const GH_HEADERS: Record<string, string> = {
   ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
 };
 
+// One cache per server process. `cache: 'no-store'` keeps Next's own data cache out of the way —
+// githubCache does the revalidating (ETag), and a second layer would answer before GitHub is asked.
+const github = createGithubCache({
+  fetchUpstream: (url, headers) => fetch(url, { headers: { ...GH_HEADERS, ...headers }, cache: 'no-store' }),
+});
+
+// What the browser (and any CDN) may keep: a fresh answer for 2 min, usable for 15 more while it
+// revalidates in the background — so a reload or a second tab does not come back here at all.
+const CACHE_CONTROL = {
+  stale: 'public, max-age=30', // GitHub is failing: serve the old copy, ask again soon
+  error: 'no-store', // never let an error be remembered
+  fresh: 'public, max-age=120, s-maxage=300, stale-while-revalidate=900', // hit / revalidated / miss
+} as const;
+
 export async function GET(req: NextRequest) {
-  const p = req.nextUrl.searchParams;
-  const type = p.get('type') ?? '';
-  const state = p.get('state') ?? 'all';
-  const page = p.get('page') ?? '1';
-  const per_page = p.get('per_page') ?? '30';
-  const number = p.get('number') ?? '';
+  const params = parseGithubParams(req.nextUrl.searchParams);
+  if (!params) return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+  const { type, state, page, per_page, number } = params;
 
   const urls: Record<string, string> = {
     issues: `${BASE}/issues?state=${state}&page=${page}&per_page=${per_page}`,
@@ -33,16 +46,9 @@ export async function GET(req: NextRequest) {
   const url = urls[type];
   if (!url) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
 
-  try {
-    const res = await fetch(url, {
-      headers: GH_HEADERS,
-      next: { revalidate: 300 },
-    });
-    const data = await res.json();
-    return NextResponse.json(data, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
-    });
-  } catch {
-    return NextResponse.json({ error: 'GitHub request failed' }, { status: 500 });
-  }
+  const { status, body, cache } = await github.get(url);
+  return new NextResponse(body, {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': cache === 'stale' || cache === 'error' ? CACHE_CONTROL[cache] : CACHE_CONTROL.fresh, 'X-Docs-Cache': cache },
+  });
 }

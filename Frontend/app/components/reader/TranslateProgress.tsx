@@ -1,7 +1,7 @@
 "use client";
 
 import Mascot from "../mascot/Mascot";
-import { stageSegments, type StageInfo } from "../../lib/translationStages";
+import { stageSegments, type SegmentState, type StageInfo } from "../../lib/translationStages";
 
 /**
  * Staged progress for an MIT translation (redesign spec, Epic B #774): the reader's droid at work, the five
@@ -14,14 +14,17 @@ export default function TranslateProgress({
   elapsedSec,
   subline,
   failed,
+  segments: given,
 }: {
   title: string;
   stage: StageInfo | null;
   elapsedSec: number;
   subline: string | null;
   failed: number;
+  /** Another kind of translation (the docs site) draws its own steps instead of the five MIT stages. */
+  segments?: SegmentState[];
 }) {
-  const segments = stageSegments(stage);
+  const segments = given ?? stageSegments(stage);
   return (
     <div
       role="status"

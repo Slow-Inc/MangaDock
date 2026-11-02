@@ -20,6 +20,29 @@ const landingTtl = (p: LandingPayload) =>
 
 const THAI = /[\u0E00-\u0E7F]/;
 
+export interface TranslateOptions {
+  to?: 'th' | 'en';
+  /** `doc` = technical documentation in Markdown (the docs site); default = a manga description. */
+  kind?: 'description' | 'doc';
+}
+
+/** The description prompt is unchanged; a doc keeps code, paths, URLs and the caller's `[[CODE_n]]` markers verbatim. */
+export function buildTranslatePrompt(
+  text: string,
+  to: 'th' | 'en',
+  doc: boolean,
+): string {
+  const lang = to === 'th' ? 'Thai' : 'English';
+  if (!doc && to === 'th') {
+    return `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Keep the Markdown formatting exactly: links stay as [text](url) with the URL unchanged, and bold, lists and horizontal rules stay where they are:\n\n${text}`;
+  }
+  const what = doc ? 'technical documentation (Markdown)' : 'text';
+  const keep = doc
+    ? ' Do not translate inline code, file paths, command lines, identifiers, URLs, or any line of the form [[CODE_n]]; copy those exactly. Keep well-known technical terms (API, cache, endpoint, commit, token) in English where developers normally do.'
+    : '';
+  return `Translate the following ${what} to ${lang}. Output ONLY the ${lang} translation. Do not include any reasoning, explanations, thoughts, or notes. Keep the Markdown formatting exactly: headings, lists, tables, bold and horizontal rules stay where they are, and links stay as [text](url) with the URL unchanged.${keep}\n\n${text}`;
+}
+
 /** A line of the translation (not leaked English reasoning): mostly Thai, or a Markdown link/rule line. */
 function isTranslationLine(line: string): boolean {
   if (line.trim() === '') return true; // paragraph breaks keep the Markdown structure
@@ -233,7 +256,11 @@ export class LandingService {
    *  the field existed — callers must not guess it. */
   async translateDescription(
     text: string,
+    opts: TranslateOptions = {},
   ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
+    // Default = the original behaviour (a manga description to Thai); `to`/`kind` serve the docs site.
+    const to = opts.to === 'en' ? 'en' : 'th';
+    const doc = opts.kind === 'doc';
     if (!this.llmService.isConfigured())
       return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
@@ -242,8 +269,10 @@ export class LandingService {
       return { translatedText: text, translated: false };
 
     // Detect if already Thai — skip if >25% Thai chars
-    const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-    if (thaiChars / text.length > 0.25)
+    // (Target English: skip instead when the text has almost no Thai.)
+    const thaiRatio =
+      (text.match(/[\u0E00-\u0E7F]/g) ?? []).length / text.length;
+    if (to === 'th' ? thaiRatio > 0.25 : thaiRatio < 0.02)
       return { translatedText: text, translated: false };
 
     const provider = this.env.LLM_PROVIDER ?? 'gemini';
@@ -254,7 +283,11 @@ export class LandingService {
     // The whole text, hashed: GET /books/translate is public, and a key from only the first bytes let any
     // text that opens like a book's description overwrite that book's cached translation for everyone.
     const fingerprint = createHash('sha256').update(text).digest('hex');
-    const cacheKey = `translate:th:v5:${models.join('|')}:${fingerprint}`;
+    // The original (description to Thai) key is untouched, so its cached translations survive.
+    const cacheKey =
+      to === 'th' && !doc
+        ? `translate:th:v5:${models.join('|')}:${fingerprint}`
+        : `translate:${to}:${doc ? 'doc' : 'desc'}:v1:${models.join('|')}:${fingerprint}`;
     const cached = await this.cache.get<{
       translatedText: string;
       translated: boolean;
@@ -262,7 +295,7 @@ export class LandingService {
     }>(cacheKey);
     if (cached) return cached.data;
 
-    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Keep the Markdown formatting exactly: links stay as [text](url) with the URL unchanged, and bold, lists and horizontal rules stay where they are:\n\n${text}`;
+    const prompt = buildTranslatePrompt(text, to, doc);
 
     for (const modelName of models) {
       try {
@@ -272,7 +305,7 @@ export class LandingService {
         // A leaked reasoning block (fallback): keep the translation's lines - Thai text plus the Markdown
         // that carries no Thai (link lines, rules) - and drop the English reasoning. Only an explicit
         // THOUGHTS marker triggers it: '* **' is ordinary Markdown (a bold bullet), not a leak (#802).
-        if (translatedText.includes('THOUGHTS:')) {
+        if (to === 'th' && translatedText.includes('THOUGHTS:')) {
           const kept = translatedText.split('\n').filter(isTranslationLine);
           if (kept.some((l) => THAI.test(l)))
             translatedText = kept

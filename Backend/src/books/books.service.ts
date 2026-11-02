@@ -24,7 +24,7 @@ import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
 import { MangaCatalogService } from './manga-catalog.service';
-import { LandingService } from './landing.service';
+import { LandingService, type TranslateOptions } from './landing.service';
 import { LlmService } from './llm.service';
 import {
   type LandingBook,
@@ -492,8 +492,9 @@ export class BooksService {
 
   translateDescription(
     text: string,
+    opts?: TranslateOptions,
   ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
-    return this.landing.translateDescription(text);
+    return this.landing.translateDescription(text, opts);
   }
 
   getLandingBooks(forceLocal = false): Promise<LandingPayload> {

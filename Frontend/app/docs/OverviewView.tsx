@@ -10,7 +10,7 @@ type Color = 'indigo' | 'amber' | 'emerald' | 'sky' | 'neutral';
 const colorMap: Record<Color, { border: string; bg: string; text: string; dot: string; badge: string }> = {
   indigo:  { border: 'border-indigo-500/35',  bg: 'bg-indigo-500/[0.07]',   text: 'text-indigo-300',  dot: 'bg-indigo-400',  badge: 'bg-indigo-500/20 text-indigo-300' },
   amber:   { border: 'border-amber-500/35',   bg: 'bg-amber-500/[0.07]',    text: 'text-amber-300',   dot: 'bg-amber-400',   badge: 'bg-amber-500/20 text-amber-300' },
-  emerald: { border: 'border-emerald-500/35', bg: 'bg-emerald-500/[0.07]',  text: 'text-emerald-300', dot: 'bg-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
+  emerald: { border: 'border-emerald-500/35', bg: 'bg-ok/[0.07]',  text: 'text-emerald-300', dot: 'bg-emerald-400', badge: 'bg-ok/20 text-emerald-300' },
   sky:     { border: 'border-sky-500/35',     bg: 'bg-sky-500/[0.07]',      text: 'text-sky-300',     dot: 'bg-sky-400',     badge: 'bg-sky-500/20 text-sky-300' },
   neutral: { border: 'border-white/[0.12]',   bg: 'bg-white/[0.04]',        text: 'text-white/60',    dot: 'bg-white/30',    badge: 'bg-white/10 text-white/50' },
 };
@@ -49,8 +49,8 @@ function SectionTitle({ color, title, sub }: { color: Color; title: string; sub:
     <div className="flex items-start gap-3 mb-6">
       <span className={`w-2 h-2 rounded-full mt-2 shrink-0 ${c.dot}`} aria-hidden="true" />
       <div>
-        <h2 className="text-[20px] font-semibold text-[#1d1d1f]">{title}</h2>
-        <p className="text-[13px] text-[#6e6e73] mt-0.5">{sub}</p>
+        <h2 className="text-[20px] font-semibold text-ink">{title}</h2>
+        <p className="text-[13px] text-ink-2 mt-0.5">{sub}</p>
       </div>
     </div>
   );
@@ -63,9 +63,9 @@ function Pill({ label, color = 'neutral' }: { label: string; color?: Color }) {
 
 function InfoRow({ term, desc }: { term: string; desc: string }) {
   return (
-    <div className="flex gap-3 py-2 border-b border-black/[0.06] last:border-0">
-      <span className="text-[12px] font-mono text-[#6e6e73] shrink-0 min-w-[140px]">{term}</span>
-      <span className="text-[13px] text-[#374151] leading-snug">{desc}</span>
+    <div className="flex gap-3 py-2 border-b border-line last:border-0">
+      <span className="text-[12px] font-mono text-ink-2 shrink-0 min-w-[140px]">{term}</span>
+      <span className="text-[13px] text-ink-2 leading-snug">{desc}</span>
     </div>
   );
 }
@@ -180,7 +180,7 @@ function MITDiagram() {
       <div className="p-5 rounded-xl bg-[#1c1c1e] border border-emerald-500/20">
         <p className="text-[11px] font-mono text-emerald-400/50 mb-5">{lang === 'th' ? 'MIT — Two-Process Model (แยกกันทำงาน)' : 'MIT — Two-Process Model'}</p>
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 p-4 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.05]">
+          <div className="flex-1 p-4 rounded-xl border border-emerald-500/25 bg-ok/[0.05]">
             <p className="text-[13px] font-semibold text-emerald-300 mb-3">Web Server :5003</p>
             <div className="space-y-1.5 text-[12px] text-white/55">
               <div>{lang === 'th' ? 'รับ HTTP request จาก Backend' : 'Receives HTTP requests from Backend'}</div>
@@ -199,7 +199,7 @@ function MITDiagram() {
             </div>
           </div>
 
-          <div className="flex-1 p-4 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.05]">
+          <div className="flex-1 p-4 rounded-xl border border-emerald-500/25 bg-ok/[0.05]">
             <p className="text-[13px] font-semibold text-emerald-300 mb-3">GPU Worker :5004</p>
             <div className="space-y-1.5 text-[12px] text-white/55">
               <div>{lang === 'th' ? 'รัน ML pipeline ทั้งหมด' : 'Runs the entire ML pipeline'}</div>
@@ -243,7 +243,7 @@ function MITDiagram() {
 
           {/* Side info */}
           <div className="flex-1 space-y-3 pt-2">
-            <div className="p-3 rounded-lg bg-emerald-500/[0.05] border border-emerald-500/20">
+            <div className="p-3 rounded-lg bg-ok/[0.05] border border-emerald-500/20">
               <p className="text-[12px] font-semibold text-emerald-300 mb-2">{lang === 'th' ? 'Patch คืออะไร?' : 'What is a Patch?'}</p>
               <p className="text-[12px] text-white/50 leading-5">
                 {lang === 'th'
@@ -301,13 +301,13 @@ function MITDiagram() {
 function MITConfigTable() {
   const lang = useLang();
   return (
-    <div className="my-4 rounded-xl overflow-hidden border border-black/[0.08]">
+    <div className="my-4 rounded-xl overflow-hidden border border-line">
       <table className="w-full text-sm border-collapse">
         <tbody>
-          <tr className="bg-[#f5f5f7]">
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-[#6e6e73] border-b border-black/[0.08] w-48">Env Variable</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-[#6e6e73] border-b border-black/[0.08]">Default</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-[#6e6e73] border-b border-black/[0.08]">{lang === 'th' ? 'คำอธิบาย' : 'Description'}</th>
+          <tr className="bg-raised">
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-ink-2 border-b border-line w-48">Env Variable</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-ink-2 border-b border-line">Default</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-ink-2 border-b border-line">{lang === 'th' ? 'คำอธิบาย' : 'Description'}</th>
           </tr>
           {[
             { env: 'TRANSLATOR_TYPE', def: 'api', desc: lang === 'th' ? 'api = Third-Party API · local = Local LLM บน GPU' : 'api = Third-Party API · local = Local LLM on GPU' },
@@ -320,10 +320,10 @@ function MITConfigTable() {
             { env: 'MIT_WEBHOOK_MAX_RETRIES', def: '3', desc: lang === 'th' ? 'retry webhook กี่ครั้งก่อน dead-letter (3 retries = 4 attempts รวม)' : 'Webhook retry count before dead-letter (3 retries = 4 attempts total)' },
             { env: 'MIT_WEBHOOK_RETRY_BACKOFF_MS', def: '500', desc: 'base backoff ms — doubles each retry: 500 → 1,000 → 2,000 ms' },
           ].map(({ env, def, desc }, i) => (
-            <tr key={env} className={i % 2 === 1 ? 'bg-[#fafafa]' : ''}>
-              <td className="px-4 py-2.5 font-mono text-[12px] text-emerald-700 border-b border-black/[0.05]">{env}</td>
-              <td className="px-4 py-2.5 font-mono text-[12px] text-[#6e6e73] border-b border-black/[0.05]">{def}</td>
-              <td className="px-4 py-2.5 text-[12px] text-[#374151] border-b border-black/[0.05] leading-5">{desc}</td>
+            <tr key={env} className={i % 2 === 1 ? 'bg-raised' : ''}>
+              <td className="px-4 py-2.5 font-mono text-[12px] text-ok border-b border-line">{env}</td>
+              <td className="px-4 py-2.5 font-mono text-[12px] text-ink-2 border-b border-line">{def}</td>
+              <td className="px-4 py-2.5 text-[12px] text-ink-2 border-b border-line leading-5">{desc}</td>
             </tr>
           ))}
         </tbody>
@@ -335,8 +335,8 @@ function MITConfigTable() {
 function QuantizationExplainer() {
   const lang = useLang();
   const lightCard: Record<string, { border: string; bg: string; text: string }> = {
-    emerald: { border: 'border-emerald-200', bg: 'bg-emerald-50',    text: 'text-emerald-700' },
-    neutral: { border: 'border-black/[0.08]', bg: 'bg-[#f5f5f7]',   text: 'text-[#374151]' },
+    emerald: { border: 'border-ok/30', bg: 'bg-ok/10',    text: 'text-ok' },
+    neutral: { border: 'border-line', bg: 'bg-raised',   text: 'text-ink-2' },
   };
   const levels = [
     { label: 'bf16 / fp16', vram: '~8 GB', note: lang === 'th' ? 'คุณภาพสูงสุด' : 'Best quality', color: 'emerald' },
@@ -346,14 +346,14 @@ function QuantizationExplainer() {
   ];
   return (
     <div className="my-4 space-y-3">
-      <p className="text-[11px] text-[#6e6e73]">{lang === 'th' ? 'ตัวเลขสำหรับ Qwen3.5-4B (default local model)' : 'Numbers for Qwen3.5-4B (default local model)'}</p>
+      <p className="text-[11px] text-ink-2">{lang === 'th' ? 'ตัวเลขสำหรับ Qwen3.5-4B (default local model)' : 'Numbers for Qwen3.5-4B (default local model)'}</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {levels.map(l => {
           const lc = lightCard[l.color];
           return (
             <div key={l.label} className={`p-3 rounded-lg border ${lc.border} ${lc.bg} text-center`}>
               <div className={`text-[13px] font-mono font-bold ${lc.text}`}>{l.label}</div>
-              <div className="text-[11px] text-[#6e6e73] mt-2 space-y-0.5">
+              <div className="text-[11px] text-ink-2 mt-2 space-y-0.5">
                 <div>VRAM ≈ {l.vram}</div>
                 <div className="text-[10px]">{l.note}</div>
               </div>
@@ -361,9 +361,9 @@ function QuantizationExplainer() {
           );
         })}
       </div>
-      <div className="p-3 rounded-lg bg-[#f5f5f7] border border-black/[0.08] text-[12px] text-[#6e6e73] leading-5">
-        <span className="text-[#374151]">Qwen2-1.5B</span> (lighter option): bf16 ~3 GB · int4 ~0.8 GB — {lang === 'th' ? 'เหมาะสำหรับ GPU <8 GB หรือต้องการเหลือ VRAM ให้ inpainting' : 'good for GPUs <8 GB or when you need VRAM headroom for inpainting'} ·
-        <span className="text-[#374151]"> Qwen3.5-8B</span> (qwen3_big): fp8 ~8 GB
+      <div className="p-3 rounded-lg bg-raised border border-line text-[12px] text-ink-2 leading-5">
+        <span className="text-ink-2">Qwen2-1.5B</span> (lighter option): bf16 ~3 GB · int4 ~0.8 GB — {lang === 'th' ? 'เหมาะสำหรับ GPU <8 GB หรือต้องการเหลือ VRAM ให้ inpainting' : 'good for GPUs <8 GB or when you need VRAM headroom for inpainting'} ·
+        <span className="text-ink-2"> Qwen3.5-8B</span> (qwen3_big): fp8 ~8 GB
       </div>
     </div>
   );
@@ -425,9 +425,9 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
     <div className="max-w-[760px]">
       {/* Hero */}
       <div id="ov-hero" className="mb-10">
-        <p className="text-[12px] text-[#6e6e73] mb-3">{lang === 'th' ? 'เอกสาร › ภาพรวมระบบ' : 'Docs › System Overview'}</p>
-        <h1 className="text-[28px] font-bold text-[#1d1d1f] mb-3 tracking-tight leading-tight">{lang === 'th' ? 'ภาพรวมระบบ MangaDock' : 'MangaDock System Overview'}</h1>
-        <p className="text-[15px] text-[#6e6e73] leading-7 max-w-[65ch]">
+        <p className="text-[12px] text-ink-2 mb-3">{lang === 'th' ? 'เอกสาร › ภาพรวมระบบ' : 'Docs › System Overview'}</p>
+        <h1 className="text-[28px] font-bold text-ink mb-3 tracking-tight leading-tight">{lang === 'th' ? 'ภาพรวมระบบ MangaDock' : 'MangaDock System Overview'}</h1>
+        <p className="text-[15px] text-ink-2 leading-7 max-w-[65ch]">
           {lang === 'th'
             ? 'MangaDock ประกอบด้วย 3 service หลักที่ทำงานร่วมกัน — Frontend รับ request จากผู้ใช้, Backend จัดการ logic และ cache, MIT ประมวลผล AI แปลภาพมังงะ โดยทั้งหมดใช้ Supabase เป็นฐานข้อมูลกลาง'
             : 'MangaDock consists of 3 core services — Frontend handles user requests, Backend manages business logic and caching, MIT runs the AI manga translation pipeline. All services share Supabase as the central database.'}
@@ -437,12 +437,12 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
       {/* Top-level diagram */}
       <TopLevelDiagram />
 
-      <hr className="border-black/[0.08] my-10" />
+      <hr className="border-line my-10" />
 
       {/* ── Frontend ── */}
       <section id="ov-frontend" className="mb-12">
         <SectionTitle color="indigo" title="Frontend" sub="Next.js 16 + React 19 · port 4000" />
-        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
+        <p className="text-[15px] text-ink-2 leading-7 mb-4">
           {lang === 'th'
             ? 'Web app ที่ผู้ใช้เห็นโดยตรง ทุก API call ผ่าน proxy route ภายใน Next.js ก่อน ทำให้ token ไม่เดินทางข้าม network edge และสามารถเปลี่ยน backend URL ได้โดยไม่ต้อง redeploy frontend'
             : 'The client-facing web app. Every API call routes through a Next.js proxy first, keeping tokens off the network edge and allowing the backend URL to change without a frontend redeploy.'}
@@ -450,24 +450,24 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
         <FrontendDiagram />
         <div className="flex flex-wrap gap-2 mt-4">
           {['Next.js 16 App Router', 'React 19', 'Tailwind CSS', 'Framer Motion', 'Lenis Scroll', 'Supabase SSR'].map(t => (
-            <span key={t} className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">{t}</span>
+            <span key={t} className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/25">{t}</span>
           ))}
         </div>
       </section>
 
-      <hr className="border-black/[0.08] my-10" />
+      <hr className="border-line my-10" />
 
       {/* ── Backend ── */}
       <section id="ov-backend" className="mb-12">
         <SectionTitle color="amber" title="Backend" sub="NestJS 11 · port 4001" />
-        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
+        <p className="text-[15px] text-ink-2 leading-7 mb-4">
           {lang === 'th'
             ? 'API server กลาง จัดการ logic ทั้งหมด ตั้งแต่ manga catalog, community forum, wallet ไปจนถึงการส่งงานแปลให้ MIT จุดเด่นที่สุดคือระบบ cache 3 ชั้นที่ออกแบบมาเพื่อ horizontal scaling'
             : 'Central API server managing all business logic — manga catalog, community forum, wallet, and dispatching translation jobs to MIT. The standout feature is a 3-layer cache designed for horizontal scaling.'}
         </p>
 
         <div className="mb-5">
-          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-3">{lang === 'th' ? 'Modules หลัก' : 'Core Modules'}</p>
+          <p className="text-[14px] font-semibold text-ink mb-3">{lang === 'th' ? 'Modules หลัก' : 'Core Modules'}</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {[
               { name: 'books', desc: 'manga catalog, chapter, pages' },
@@ -477,37 +477,37 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
               { name: 'unlock', desc: 'chapter unlock + HWID check' },
               { name: 'cache', desc: 'L1/L2/L3 orchestration, leader' },
             ].map(m => (
-              <div key={m.name} className="p-3 rounded-lg bg-[#faf7f0] border border-amber-200">
-                <div className="text-[13px] font-mono text-amber-700 font-semibold">{m.name}</div>
-                <div className="text-[11px] text-[#6e6e73] mt-0.5">{m.desc}</div>
+              <div key={m.name} className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="text-[13px] font-mono text-amber-600 font-semibold">{m.name}</div>
+                <div className="text-[11px] text-ink-2 mt-0.5">{m.desc}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[14px] font-semibold text-[#1d1d1f] mb-3">{lang === 'th' ? 'ระบบ Cache (Multi-Layer)' : 'Cache System (Multi-Layer)'}</p>
-        <p className="text-[13px] text-[#6e6e73] leading-6 mb-2">
+        <p className="text-[14px] font-semibold text-ink mb-3">{lang === 'th' ? 'ระบบ Cache (Multi-Layer)' : 'Cache System (Multi-Layer)'}</p>
+        <p className="text-[13px] text-ink-2 leading-6 mb-2">
           {lang === 'th'
             ? 'แทนที่จะ query Supabase ทุกครั้ง Backend มีชั้น cache 3 ระดับ — ยิ่งชั้นสูง ยิ่งเร็ว ยิ่งชั้นต่ำ ยิ่งคงทน'
             : 'Instead of querying Supabase on every request, Backend has 3 cache layers — higher layers are faster, lower layers are more durable.'}
         </p>
-        <div className="my-5 p-4 rounded-xl bg-[#f5f5f7] border border-black/[0.08] flex items-start gap-3">
+        <div className="my-5 p-4 rounded-xl bg-raised border border-line flex items-start gap-3">
           <span className="text-[16px] shrink-0 mt-0.5">⚡</span>
-          <p className="text-[13px] text-[#374151] leading-6">
+          <p className="text-[13px] text-ink-2 leading-6">
             {lang === 'th' ? (
-              <><span className="font-medium text-[#1d1d1f]">Cache Simulation</span> ย้ายไปอยู่ที่ tab{' '}
+              <><span className="font-medium text-ink">Cache Simulation</span> ย้ายไปอยู่ที่ tab{' '}
               {onOpenSimulations ? (
-                <button onClick={onOpenSimulations} className="text-[#0071e3] hover:underline font-medium">Simulations</button>
+                <button onClick={onOpenSimulations} className="text-accent hover:underline font-medium">Simulations</button>
               ) : (
-                <span className="font-medium text-[#0071e3]">Simulations</span>
+                <span className="font-medium text-accent">Simulations</span>
               )}{' '}
               แล้ว — รวม 9 scenarios ครบทุก Read / Write / Translation flow พร้อมคำอธิบาย EN+TH และ technical details</>
             ) : (
-              <><span className="font-medium text-[#1d1d1f]">Cache Simulation</span> has moved to the{' '}
+              <><span className="font-medium text-ink">Cache Simulation</span> has moved to the{' '}
               {onOpenSimulations ? (
-                <button onClick={onOpenSimulations} className="text-[#0071e3] hover:underline font-medium">Simulations</button>
+                <button onClick={onOpenSimulations} className="text-accent hover:underline font-medium">Simulations</button>
               ) : (
-                <span className="font-medium text-[#0071e3]">Simulations</span>
+                <span className="font-medium text-accent">Simulations</span>
               )}{' '}
               tab — 9 scenarios covering every Read / Write / Translation flow with EN+TH descriptions and technical details.</>
             )}
@@ -522,12 +522,12 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
         </div>
       </section>
 
-      <hr className="border-black/[0.08] my-10" />
+      <hr className="border-line my-10" />
 
       {/* ── MIT ── */}
       <section id="ov-mit" className="mb-12">
         <SectionTitle color="emerald" title="MIT — Manga Image Translator" sub="Python (FastAPI) · port 5003 + 5004" />
-        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
+        <p className="text-[15px] text-ink-2 leading-7 mb-4">
           {lang === 'th'
             ? 'Python ML service ที่แปลภาพมังงะ รับ page image แล้วส่งกลับ Patches (PNG เล็กๆ พร้อม coordinates) ซึ่ง Frontend นำไป overlay ทับ original image แทนที่จะส่งทั้งหน้าที่แปลแล้ว ช่วยลด bandwidth และ latency'
             : 'Python ML service that translates manga images. Receives a page image and returns Patches (small PNGs with coordinates) that the Frontend overlays on the original image, rather than sending the full translated page — reducing bandwidth and latency.'}
@@ -535,8 +535,8 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
         <MITDiagram />
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">{lang === 'th' ? 'Batch Translation Flow (แปลทั้ง Chapter)' : 'Batch Translation Flow'}</p>
-          <p className="text-[13px] text-[#6e6e73] leading-6 mb-3">
+          <p className="text-[14px] font-semibold text-ink mb-2">{lang === 'th' ? 'Batch Translation Flow (แปลทั้ง Chapter)' : 'Batch Translation Flow'}</p>
+          <p className="text-[13px] text-ink-2 leading-6 mb-3">
             {lang === 'th'
               ? 'เมื่อผู้ใช้สั่งแปลทั้ง chapter Backend ส่ง request แบบ fire-and-forget MIT แปลทีละหน้าและส่ง webhook callback กลับมาพร้อม HMAC signature ผู้ใช้รับผลผ่าน SSE แบบ real-time ทีละหน้า'
               : 'When a user requests a full chapter translation, Backend fires a fire-and-forget request to MIT. MIT translates page by page, sending HMAC-signed webhook callbacks. Users receive results via SSE in real time, one page at a time.'}
@@ -557,36 +557,36 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
         </div>
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">{lang === 'th' ? 'Quantization — ปรับ VRAM vs คุณภาพ' : 'Quantization — VRAM vs Quality Trade-off'}</p>
-          <p className="text-[13px] text-[#6e6e73] leading-5 mb-3">
+          <p className="text-[14px] font-semibold text-ink mb-2">{lang === 'th' ? 'Quantization — ปรับ VRAM vs คุณภาพ' : 'Quantization — VRAM vs Quality Trade-off'}</p>
+          <p className="text-[13px] text-ink-2 leading-5 mb-3">
             โมเดล ML เก็บ weight ด้วยความละเอียดต่างกัน — ยิ่ง bit น้อย ยิ่งประหยัด VRAM และเร็วขึ้น แต่คุณภาพอาจลดลงเล็กน้อย
           </p>
           <QuantizationExplainer />
         </div>
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">Environment Variables หลัก</p>
+          <p className="text-[14px] font-semibold text-ink mb-2">Environment Variables หลัก</p>
           <MITConfigTable />
         </div>
       </section>
 
-      <hr className="border-black/[0.08] my-10" />
+      <hr className="border-line my-10" />
 
       {/* ── Supabase ── */}
       <section id="ov-supabase" className="mb-12">
         <SectionTitle color="sky" title="Supabase" sub="PostgreSQL + Auth-as-a-Service" />
-        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
+        <p className="text-[15px] text-ink-2 leading-7 mb-4">
           ทำหน้าที่ 2 อย่าง: เป็น Auth provider (JWT, OAuth) และ long-term database สำหรับข้อมูลถาวร ขณะที่ Redis เป็น source of truth ณ runtime Supabase คือที่ที่ข้อมูลอยู่จริงๆ ในระยะยาว
         </p>
         <SupabaseDiagram />
       </section>
 
-      <hr className="border-black/[0.08] my-10" />
+      <hr className="border-line my-10" />
 
       {/* Engineering principles */}
       <section id="ov-t4" className="mb-8">
-        <h2 className="text-[20px] font-semibold text-[#1d1d1f] mb-4">T4-STANDARD Pillars</h2>
-        <p className="text-[13px] text-[#6e6e73] mb-4 leading-6">หลักการวิศวกรรมที่ทีมยึดถือทุก feature</p>
+        <h2 className="text-[20px] font-semibold text-ink mb-4">T4-STANDARD Pillars</h2>
+        <p className="text-[13px] text-ink-2 mb-4 leading-6">หลักการวิศวกรรมที่ทีมยึดถือทุก feature</p>
         <div className="space-y-1">
           {[
             { n: '1', name: 'Idempotent Pipelines', desc: 'ทุก operation (Upload, Vote, Unlock) retry-safe ไม่ duplicate แม้รันซ้ำ' },
@@ -596,11 +596,11 @@ export default function OverviewView({ onOpenSimulations }: { onOpenSimulations?
             { n: '5', name: 'Zero-Trust Assets', desc: 'ทุก chapter image ต้องผ่าน HWID verification + 1-hour window' },
             { n: '6', name: 'Observability', desc: 'ทุก request log structured JSON รวม IP, User-Agent สำหรับ audit trail' },
           ].map(p => (
-            <div key={p.n} className="flex gap-4 py-3 border-b border-black/[0.06] last:border-0">
-              <span className="text-[12px] font-mono text-[#86868b] w-5 shrink-0 pt-0.5">{p.n}.</span>
+            <div key={p.n} className="flex gap-4 py-3 border-b border-line last:border-0">
+              <span className="text-[12px] font-mono text-ink-3 w-5 shrink-0 pt-0.5">{p.n}.</span>
               <div>
-                <span className="text-[13px] font-medium text-[#1d1d1f]">{p.name}</span>
-                <span className="text-[13px] text-[#6e6e73] ml-2">— {p.desc}</span>
+                <span className="text-[13px] font-medium text-ink">{p.name}</span>
+                <span className="text-[13px] text-ink-2 ml-2">— {p.desc}</span>
               </div>
             </div>
           ))}

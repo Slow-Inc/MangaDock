@@ -9,9 +9,11 @@ interface Props {
   src: string;
   alt: string;
   onClose: () => void;
+  /** The dialog's accessible name; defaults to the cover wording the book popup uses. */
+  label?: string;
 }
 
-export default function CoverLightbox({ src, alt, onClose }: Props) {
+export default function CoverLightbox({ src, alt, onClose, label }: Props) {
   const { visible, close } = useModalTransition(true, { duration: 300, onClosed: onClose });
   // Focus in on open, Tab stays inside, focus back to the enlarge button on close (#843).
   const rootRef = useRef<HTMLDivElement>(null);
@@ -34,7 +36,7 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-label={`ปก ${alt}`}
+      aria-label={label ?? `ปก ${alt}`}
       className={`fixed inset-0 z-300 outline-none flex items-center justify-center p-6 transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}

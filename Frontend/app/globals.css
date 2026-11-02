@@ -481,3 +481,17 @@ body::-webkit-scrollbar-thumb:active {
   max-width: 100% !important;
 }
 
+
+/* Code in the docs: Monokai Classic (Sublime), the same in every theme — a code block is an always-dark island.
+   Colours only; the highlighter (docs/highlight.ts) maps token types onto them. */
+.code-monokai {
+  --mk-bg: #272822;
+  --mk-fg: #f8f8f2;
+  --mk-comment: #75715e;
+  --mk-string: #e6db74;
+  --mk-number: #ae81ff;
+  --mk-keyword: #f92672;
+  --mk-func: #a6e22e;
+  --mk-type: #66d9ef;
+  --mk-param: #fd971f;
+}
