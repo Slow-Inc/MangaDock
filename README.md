@@ -1,6 +1,46 @@
 <!-- lang:en -->
 # MangaDock
 
+<p align="center"><b>Read manga that has no Thai edition.</b> AI translates the text inside each page and sets the Thai back into the speech bubbles, right in the reader.<br>
+<a href="https://hayateotsu.space">Live site</a> · <a href="https://hayateotsu.space/docs">Docs portal</a> · <a href="https://hayateotsu.space/docs/simulations">System simulations</a></p>
+
+![An English page and the same page translated to Thai by MangaDock](docs/images/readme-en-th.png)
+
+| | measured |
+|---|---|
+| Translation server, multi-GPU | 22 s → **4.36 s per page** (5 workers, −80 %) |
+| A whole episode, translated async | first page readable at **~14 s** instead of ~43 s (14 pages) |
+| Where a page's time goes | **83 %** is the LLM call (11.05 of 13.4 s); GPU work is ~17 % |
+| Thai layout match (One-Punch Man pages) | **40–50 % → 90–95 %** with word-aware line breaking |
+| Cache leader crash | stuck dirty queue **38 s → 17 s** |
+| Tests passing | 1,014 backend (98 suites) · 235 mobile · 169 cache |
+
+<sub>Measured on an RTX 4070 SUPER 12 GB + RTX 5060 Ti 16 GB, benchmarks of 2026-10-25 to 2026-10-27 in <code>docs/reports/benchmarks/</code>.</sub>
+
+## What it is
+
+A manga reading platform with in-page AI translation (English → Thai is the main pair), a community forum, a creator studio for translators and publishers, a coin wallet and an Android app. It started as MIT, a translator we wrote because the series we wanted had no Thai edition; MangaDock turns it into a place to read, where a page is translated while you read the one before it.
+
+Built by [T4 Labs](https://github.com/Slow-Inc) as a Special Project, Mathematics for Computer Science, Faculty of Applied Science, KMUTNB (academic year 2569): วรลภย์ ดอกคำ and ธีรุตม์ ดอกกฐิน, advised by Assoc. Prof. Dr. กนกวรรณ สิทธิเถกิงเกียรติ.
+
+## How a page is translated
+
+| # | stage | how |
+|---|---|---|
+| 1 | Detect | DBNet finds text, YOLOv8-seg finds the bubbles, AnimeText finds sound effects |
+| 2 | Group | lines merged per bubble, read right-to-left, top-to-bottom |
+| 3 | OCR | 48px OCR first; Hayai and a vision LLM recover handwriting and misreads |
+| 4 | Translate | an LLM, one request per page; a glossary keeps names consistent; Pipeline Doctor checks every segment came back |
+| 5 | Inpaint | LaMa on every page; FLUX.2 Klein only where the background is complex (hair, line art) |
+| 6 | Render | Thai word segmentation (newmm), the largest font that fits, edges drawn at 4× and scaled down |
+
+- **Patches, not pages.** Only the translated regions are sent, as PNG patches with coordinates normalised to 0–1, so they land in place at any screen size and every pixel outside the mask stays the original.
+- **Async episodes.** The backend sends the uncached pages to MIT, gets `202 Accepted`, and each page arrives by webhook and reaches the reader over SSE as soon as it is done.
+- **Translate once, share with everyone.** L1 in-process, L2 Redis as the source of truth, L3 disk as backup; a leader holds a Redis lock (12.5 s lease, renewed every 5 s) and flushes the dirty queue.
+- **Coins that cannot be charged twice.** An unlock runs in one SQL function (`ON CONFLICT` → `already_unlocked`); Xendit top-ups are HMAC-checked, re-verified with Xendit, and unique per reference.
+
+## Repository layout
+
 MangaDock is split into 3 main parts:
 
 1. Frontend: Next.js web app
@@ -214,6 +254,46 @@ npx jest -c jest.ci.config.js --runInBand   # the exact CI command
 
 <!-- lang:th -->
 # MangaDock
+
+<p align="center"><b>อ่านมังงะที่ไม่มีฉบับภาษาไทยได้ทันที</b> AI แปลข้อความในภาพแต่ละหน้า แล้ววางคำแปลไทยกลับลงในกรอบคำพูด ตรงในหน้าอ่านเลย<br>
+<a href="https://hayateotsu.space">เว็บที่ใช้งานจริง</a> · <a href="https://hayateotsu.space/docs">Docs portal</a> · <a href="https://hayateotsu.space/docs/simulations">Simulation ของระบบ</a></p>
+
+![หน้าต้นฉบับภาษาอังกฤษ และหน้าเดียวกันที่ MangaDock แปลเป็นภาษาไทย](docs/images/readme-en-th.png)
+
+| | ผลที่วัดได้ |
+|---|---|
+| เซิร์ฟเวอร์แปล แบบ Multi-GPU | 22 วินาที → **4.36 วินาทีต่อหน้า** (5 worker, −80 %) |
+| แปลทั้งตอนแบบ Async | อ่านหน้าแรกได้ที่ **~14 วินาที** แทนการรอ ~43 วินาที (ตอน 14 หน้า) |
+| เวลาต่อหน้าหมดไปที่ไหน | **83 %** อยู่ที่การเรียก LLM (11.05 จาก 13.4 วินาที) ส่วนที่ใช้ GPU ราว 17 % |
+| ความตรงของการจัดวางภาษาไทย (หน้า One-Punch Man) | **40–50 % → 90–95 %** ด้วยการตัดบรรทัดตามคำ |
+| Leader ของ Cache ล่ม | Dirty Queue ค้าง **38 → 17 วินาที** |
+| ชุดทดสอบที่ผ่าน | Backend 1,014 รายการ (98 suites) · Mobile 235 · Cache 169 |
+
+<sub>วัดบน RTX 4070 SUPER 12 GB + RTX 5060 Ti 16 GB จาก benchmark วันที่ 2026-10-25 ถึง 2026-10-27 ใน <code>docs/reports/benchmarks/</code></sub>
+
+## MangaDock คืออะไร
+
+แพลตฟอร์มอ่านมังงะที่แปลข้อความในภาพด้วย AI (คู่ภาษาหลักคืออังกฤษ → ไทย) พร้อมฟอรัมชุมชน Creator Studio สำหรับนักแปลและผู้เผยแพร่ ระบบเหรียญ และแอป Android จุดเริ่มต้นคือ MIT ระบบแปลที่เราเขียนเองเพราะเรื่องที่อยากอ่านไม่มีฉบับไทย แต่ใช้ยาก MangaDock จึงทำให้เป็นที่อ่านในที่เดียว และแปลหน้าถัดไประหว่างที่ผู้อ่านอ่านหน้าก่อนหน้าอยู่
+
+พัฒนาโดย [T4 Labs](https://github.com/Slow-Inc) เป็นโครงงานพิเศษ สาขาวิชาคณิตศาสตร์เชิงวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์ประยุกต์ มจพ. ปีการศึกษา 2569 คณะผู้จัดทำ วรลภย์ ดอกคำ และธีรุตม์ ดอกกฐิน อาจารย์ที่ปรึกษา รศ.ดร.กนกวรรณ สิทธิเถกิงเกียรติ
+
+## การแปลหนึ่งหน้า
+
+| # | ขั้น | วิธี |
+|---|---|---|
+| 1 | Detect | DBNet หาข้อความ, YOLOv8-seg หากรอบคำพูด, AnimeText หา SFX |
+| 2 | Group | รวมบรรทัดในกรอบเดียวกัน เรียงขวา→ซ้าย บน→ล่าง |
+| 3 | OCR | ใช้ OCR 48px เป็นหลัก แล้วให้ Hayai กับ Vision-LLM กู้ตัวเขียนมือและคำที่อ่านผิด |
+| 4 | Translate | แปลด้วย LLM ส่งทั้งหน้าในคำขอเดียว ใช้ Glossary คุมชื่อเฉพาะ และ Pipeline Doctor ตรวจว่าได้คำแปลครบทุก segment |
+| 5 | Inpaint | ลบข้อความด้วย LaMa ทุกหน้า ใช้ FLUX.2 Klein เฉพาะจุดที่พื้นหลังซับซ้อน (เส้นผม ลายเส้น) |
+| 6 | Render | ตัดคำไทยด้วย newmm เลือกขนาดตัวอักษรใหญ่ที่สุดที่พอดีกรอบ วาดบน Canvas ใหญ่ 4 เท่าแล้วย่อเพื่อให้ขอบคม |
+
+- **ส่ง Patch ไม่ใช่ทั้งหน้า** ส่งเฉพาะบริเวณที่แปลเป็น PNG พร้อมพิกัดสัดส่วน 0–1 จึงวางตรงที่เดิมได้ทุกขนาดจอ และพิกเซลนอก mask เหมือนต้นฉบับทุกไบต์
+- **แปลทั้งตอนแบบ Async** Backend ส่งเฉพาะหน้าที่ยังไม่มีใน cache ให้ MIT ซึ่งตอบ `202 Accepted` ทันที หน้าไหนแปลเสร็จก็ส่งกลับผ่าน webhook และถึงผู้อ่านผ่าน SSE
+- **แปลครั้งเดียว ผู้อ่านทุกคนใช้ร่วมกัน** L1 อยู่ใน process, L2 Redis เป็นแหล่งข้อมูลหลัก, L3 Disk เป็นสำรอง โดยมี Leader ถือ Redis lock (อายุ 12.5 วินาที ต่ออายุทุก 5 วินาที) คอย flush Dirty Queue
+- **หักเหรียญซ้ำไม่ได้** การปลดล็อกทำใน SQL function เดียว (`ON CONFLICT` → `already_unlocked`) การเติมเหรียญผ่าน Xendit ตรวจ HMAC ถาม Xendit ซ้ำว่าจ่ายจริง และ reference ต้องไม่ซ้ำ
+
+## โครงสร้าง Repository
 
 MangaDock เป็นระบบที่แยกออกเป็น 3 ส่วนหลัก:
 
