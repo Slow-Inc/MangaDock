@@ -23,6 +23,10 @@ A manga reading platform with in-page AI translation (English → Thai is the ma
 
 Built by [T4 Labs](https://github.com/Slow-Inc) as a Special Project, Mathematics for Computer Science, Faculty of Applied Science, KMUTNB (academic year 2569): วรลภย์ ดอกคำ and ธีรุตม์ ดอกกฐิน, advised by Assoc. Prof. Dr. กนกวรรณ สิทธิเถกิงเกียรติ.
 
+## Architecture
+
+![MangaDock system architecture: clients through a Cloudflare tunnel to Next.js, a multi-node NestJS backend with a Redis-elected leader, the MIT GPU translation server with five workers, and the L1/L2/L3 cache with Supabase and R2](docs/images/architecture.png)
+
 ## How a page is translated
 
 | # | stage | how |
@@ -276,6 +280,10 @@ npx jest -c jest.ci.config.js --runInBand   # the exact CI command
 แพลตฟอร์มอ่านมังงะที่แปลข้อความในภาพด้วย AI (คู่ภาษาหลักคืออังกฤษ → ไทย) พร้อมฟอรัมชุมชน Creator Studio สำหรับนักแปลและผู้เผยแพร่ ระบบเหรียญ และแอป Android จุดเริ่มต้นคือ MIT ระบบแปลที่เราเขียนเองเพราะเรื่องที่อยากอ่านไม่มีฉบับไทย แต่ใช้ยาก MangaDock จึงทำให้เป็นที่อ่านในที่เดียว และแปลหน้าถัดไประหว่างที่ผู้อ่านอ่านหน้าก่อนหน้าอยู่
 
 พัฒนาโดย [T4 Labs](https://github.com/Slow-Inc) เป็นโครงงานพิเศษ สาขาวิชาคณิตศาสตร์เชิงวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์ประยุกต์ มจพ. ปีการศึกษา 2569 คณะผู้จัดทำ วรลภย์ ดอกคำ และธีรุตม์ ดอกกฐิน อาจารย์ที่ปรึกษา รศ.ดร.กนกวรรณ สิทธิเถกิงเกียรติ
+
+## สถาปัตยกรรม
+
+![สถาปัตยกรรมของ MangaDock: ผู้ใช้เข้าผ่าน Cloudflare Tunnel ไปยัง Next.js, Backend NestJS แบบหลายโหนดที่เลือก Leader ด้วย Redis, เซิร์ฟเวอร์แปล MIT บน GPU 5 worker และ Cache L1/L2/L3 กับ Supabase และ R2](docs/images/architecture.png)
 
 ## การแปลหนึ่งหน้า
 
