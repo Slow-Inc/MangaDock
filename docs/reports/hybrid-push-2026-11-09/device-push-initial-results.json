@@ -1,0 +1,33 @@
+{
+  "environment": "Real Android/Expo/FCM; isolated Next/Nest/PGlite; synthetic Auth/catalog; no live Supabase writes",
+  "device": "SM-F721B / Android 16",
+  "results": [
+    {
+      "flow": "real Android notification permission granted from explicit settings action",
+      "result": "pass"
+    },
+    {
+      "flow": "real native Expo token acknowledged by isolated authenticated Backend",
+      "result": "pass"
+    },
+    {
+      "flow": "one own-device remote notification accepted by Expo",
+      "result": "pass",
+      "ticketId": "01a1be8e-8fd3-7636-b9d2-ef0ac1ecf62f"
+    },
+    {
+      "flow": "real FCM background notification posted by Android for com.mobile",
+      "result": "pass"
+    },
+    {
+      "flow": "real notification tap opens recipient-scoped Collections",
+      "result": "pass"
+    },
+    {
+      "flow": "Expo delivery receipt confirms FCM acceptance",
+      "result": "pass"
+    }
+  ],
+  "cleanupError": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'ปิดรับแจ้งเตือน', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button disabled type=\"button\" class=\"inline-flex items-center justify-center gap-2 rounded-full border font-medium whitespace-nowrap select-none transition-[transform,translate,scale,rotate,background-color,border-color,color] duration-[var(--t1)] ease-[var(--ease)] active:translate-y-px disabled:opacity-45 disabled:cursor-not-allowed disabled:active:translate-y-0 bg-surface text-ink border-line hover:border-ink min-h-11 px-5 text-[0.9375rem] group min-h-12\">ปิดรับแจ้งเตือน</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    52 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not enabled\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+  "observedAt": "2026-11-09T04:26:50.728Z"
+}

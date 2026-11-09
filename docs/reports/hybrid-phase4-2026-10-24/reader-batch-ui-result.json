@@ -1,0 +1,13 @@
+{
+  "boundary": "Physical Z Flip4, code 6 hybrid WebView, deployed reader UI, chapter de80c707-860e-4182-88ac-a958b1cdefa5 (26 pages), target EN, via the mobile 'more' menu.",
+  "steps": [
+    {"step": "แปลทั้งตอน from #reader-more-menu", "sseStatus": 201, "progress": "แปล (1/26)", "overlays": 2},
+    {"step": "KEYCODE_HOME for 15 s, relaunch from launcher", "pidBefore": "13278", "pidAfter": "13278", "progressAfterResume": "แปล (1/26) then later แปล (3/26)", "overlaysAfterResume": 10},
+    {"step": "หยุดแปล (3/26) from #reader-more-menu", "progressAfter": "none", "menuAfter": "แปลทั้งตอน", "overlaysAfterStop": 10, "overlaysAfter10s": 10}
+  ],
+  "screenshots": ["device/10-batch-progress-foreground.jpg", "device/11-batch-progress-after-background.jpg", "device/12-batch-stop-menu.jpg", "device/13-batch-after-stop.jpg"],
+  "notes": [
+    "The desktop-only top-bar trigger titled 'หยุดแปล' is hidden below the sm breakpoint; on phones the stop control is the more-menu item, which worked.",
+    "Throughput was roughly one page per ~10-20 s on the team's MIT; the batch continued while the app was backgrounded (same PID, no reload)."
+  ]
+}

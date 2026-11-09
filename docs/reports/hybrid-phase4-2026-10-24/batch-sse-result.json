@@ -1,0 +1,159 @@
+{
+  "chapterId": "phase4-qa-batch-1792854139808",
+  "firstStatus": 201,
+  "firstConnection": {
+    "events": [
+      {
+        "at": 820,
+        "comment": "connected"
+      },
+      {
+        "at": 4075,
+        "progress": "detection",
+        "pageIndex": 0
+      }
+    ],
+    "cancelled": true
+  },
+  "secondStatus": 201,
+  "secondConnection": {
+    "events": [
+      {
+        "at": 1096,
+        "comment": "connected"
+      },
+      {
+        "at": 1978,
+        "progress": "mask-generation",
+        "pageIndex": 0
+      },
+      {
+        "at": 2094,
+        "progress": "inpainting",
+        "pageIndex": 0
+      },
+      {
+        "at": 2364,
+        "progress": "rendering",
+        "pageIndex": 0
+      },
+      {
+        "at": 3002,
+        "pageIndex": 0,
+        "patches": 1,
+        "error": null,
+        "urls": [
+          "https://api.hayateotsu.space/uploads/patches/phase4-qa-batch-1792854139808/ANY__THA__default__p0__r0.png?v=8e0118b4bb06"
+        ],
+        "coordinatesValid": true
+      },
+      {
+        "at": 16117,
+        "comment": "ping"
+      },
+      {
+        "at": 31164,
+        "comment": "ping"
+      },
+      {
+        "at": 38332,
+        "progress": "detection",
+        "pageIndex": 0
+      },
+      {
+        "at": 38940,
+        "progress": "ocr",
+        "pageIndex": 0
+      },
+      {
+        "at": 39352,
+        "progress": "textline_merge",
+        "pageIndex": 0
+      },
+      {
+        "at": 39468,
+        "progress": "translating",
+        "pageIndex": 0
+      },
+      {
+        "at": 42325,
+        "progress": "mask-generation",
+        "pageIndex": 0
+      },
+      {
+        "at": 42439,
+        "progress": "inpainting",
+        "pageIndex": 0
+      },
+      {
+        "at": 42631,
+        "progress": "rendering",
+        "pageIndex": 0
+      },
+      {
+        "at": 43246,
+        "progress": "detection",
+        "pageIndex": 1
+      },
+      {
+        "at": 43857,
+        "progress": "ocr",
+        "pageIndex": 1
+      },
+      {
+        "at": 44646,
+        "progress": "textline_merge",
+        "pageIndex": 1
+      },
+      {
+        "at": 44781,
+        "progress": "translating",
+        "pageIndex": 1
+      },
+      {
+        "at": 46111,
+        "comment": "ping"
+      },
+      {
+        "at": 48776,
+        "progress": "mask-generation",
+        "pageIndex": 1
+      },
+      {
+        "at": 48894,
+        "progress": "inpainting",
+        "pageIndex": 1
+      },
+      {
+        "at": 49022,
+        "progress": "rendering",
+        "pageIndex": 1
+      },
+      {
+        "at": 49797,
+        "pageIndex": 1,
+        "patches": 1,
+        "error": null,
+        "urls": [
+          "https://api.hayateotsu.space/uploads/patches/phase4-qa-batch-1792854139808/ANY__THA__default__p1__r0.png?v=36053979ea4e"
+        ],
+        "coordinatesValid": true
+      }
+    ],
+    "cancelled": false
+  },
+  "completedPages": [
+    0,
+    1
+  ],
+  "images": [
+    {
+      "status": 200,
+      "png": true
+    },
+    {
+      "status": 200,
+      "png": true
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "boundary": "Owner-approved reversible community writes through the physical hybrid shell; all created content deleted.",
+  "postId": "b38e872e-3f16-413f-9584-400e0d240a21",
+  "steps": [
+    {
+      "step": "create post via composer UI",
+      "status": 201,
+      "postId": "b38e872e-3f16-413f-9584-400e0d240a21"
+    },
+    {
+      "step": "open post page",
+      "sseResponses": [
+        200
+      ]
+    },
+    {
+      "step": "upvote via UI",
+      "status": 201,
+      "upvoteLabel": "1"
+    },
+    {
+      "step": "comment via UI",
+      "status": 201,
+      "rendered": [
+        {
+          "tag": "P",
+          "liveRegion": false,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "step": "comment written outside the UI appears live",
+      "status": 201,
+      "liveVisible": true
+    },
+    {
+      "step": "background 20 s, resume, live comment",
+      "status": 201,
+      "path": "/community/p/b38e872e-3f16-413f-9584-400e0d240a21",
+      "resumedVisible": true
+    },
+    {
+      "step": "cleanup",
+      "cleanup": [
+        [
+          "comment",
+          204
+        ],
+        [
+          "comment",
+          204
+        ],
+        [
+          "comment",
+          204
+        ],
+        [
+          "post",
+          204
+        ]
+      ],
+      "postGetAfterDelete": 404
+    }
+  ]
+}

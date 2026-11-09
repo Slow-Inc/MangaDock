@@ -1,0 +1,13 @@
+{
+  "boundary": "Physical Z Flip4, code 7 hybrid shell, deployed https://hayateotsu.space; owner performed the Facebook credential step; no tokens, codes or identities recorded.",
+  "steps": [
+    {"step": "Sign out (Google account) via account menu", "signedInAfter": false, "note": "Web signOut uses the default Supabase scope, which the owner accepted."},
+    {"step": "Facebook start -> Chrome", "topActivity": "com.android.chrome/org.chromium.chrome.browser.ChromeTabbedActivity", "diagnostic": "native_oauth_start"},
+    {"step": "Back to app, native panel 'ยกเลิก'", "diagnostic": "native_oauth_cancelled", "webMessage": "ยกเลิกการเข้าสู่ระบบแล้ว", "screenshots": ["device/70-oauth-pending-panel.jpg", "device/71-oauth-after-cancel.jpg"]},
+    {"step": "Facebook full login by owner", "diagnostic": "native_oauth_callback_received", "signedIn": true, "provider": "facebook", "usersMe": 200},
+    {"step": "force-stop + relaunch", "pidChanged": true, "signedIn": true, "usersMe": 200},
+    {"step": "Account isolation after switching", "localFavouritesSubsetOfServer": true, "localLikedSubsetOfServer": true, "walletBalanceDiffersFromPreviousAccount": true},
+    {"step": "Cold OAuth callback with no pending request (process restarted, fake code)", "result": "native notice 'การเข้าสู่ระบบถูกขัดจังหวะ กรุณาเข้าสู่ระบบอีกครั้ง'; code never exchanged; existing session untouched", "screenshot": "device/60-cold-oauth-callback-notice.jpg"}
+  ],
+  "earlierEvidence": "Google PKCE login and restart persistence were accepted on 2026-10-24 by the previous session (see handoff); the Google session was intentionally signed out for this Facebook test."
+}

@@ -1,5 +1,11 @@
 # Backend (NestJS API)
 
+## Phase 5 development tests
+
+`npm run test:phase5` builds the Backend and runs the isolated PostgreSQL, Nest HTTP and push-worker integration cases. `npm run test:phase5-db` runs only the migration/function tests. These use PGlite and simulated Redis/Expo boundaries; no production credentials are needed. See the [implementation and release record](../docs/reports/phase5-2026-10-24/README.md) before applying migrations or enabling push.
+
+คำสั่ง `npm run test:phase5` build และทดสอบ PostgreSQL/Nest HTTP/Push worker ภายในเครื่อง ส่วน `npm run test:phase5-db` ตรวจเฉพาะ migration/function ใช้ PGlite และจำลอง Redis/Expo ไม่ต้องใช้ credentials จริง อ่าน[รายงานและขั้นตอนก่อนเปิดใช้](../docs/reports/phase5-2026-10-24/README.md) ก่อนลง migration หรือเปิด Push
+
 Backend สำหรับ MangaDock ใช้ NestJS เป็น API และ orchestration layer ของระบบ
 
 ## เทคโนโลยี
@@ -60,3 +66,11 @@ npm run cache:reset -- --dry-run # ดูว่าจะลบอะไรก่
 ```
 
 ลบเฉพาะ namespace `translate:manga-patches:*` เท่านั้น — cache ของ forum/search/mangadex/glossary ไม่โดนแตะ (logic การเลือกถูก unit-test ใน `src/cache/translation-cache-reset.ts`) หลังรันให้ restart backend เพื่อล้าง L1 in-memory ด้วย
+
+## Hybrid Phase 5 continuation (2026-10-26)
+
+The hybrid client uses the same retention/push contracts. Run `npm run test:phase5`
+for isolated migration, authorization and worker tests. Apply the reviewed
+retention and push migrations through the normal database workflow before
+deploying compatible services; leave `PUSH_DELIVERY_ENABLED=false` until provider,
+Redis and device acceptance. See [the delivery record](../Mobile/docs/2026-10-26-hybrid-phase5.md).

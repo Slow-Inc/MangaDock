@@ -1,50 +1,17 @@
 {
+  "name": "Mobile",
+  "displayName": "Mobile",
   "expo": {
-    "name": "MangaDock",
-    "slug": "mangadock",
-    "scheme": "mangadock",
-    "version": "0.1.0",
-    "orientation": "portrait",
-    "userInterfaceStyle": "dark",
-    "ios": {
-      "bundleIdentifier": "com.mangadock.mobile",
-      "supportsTablet": true
-    },
+    "name": "MangaDock Hybrid",
+    "slug": "mangadock-hybrid",
     "android": {
-      "package": "com.mangadock.mobile",
-      "permissions": ["INTERNET"]
+      "package": "com.mobile"
     },
-    "plugins": [
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow MangaDock to select manga images for upload.",
-          "savePhotosPermission": false,
-          "granularPermissions": ["photo"]
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ],
-      "expo-sharing",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow MangaDock to select images for existing profile, Community and Studio uploads.",
-          "cameraPermission": false,
-          "microphonePermission": false
-        }
-      ]
-    ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "ed3651c9-dd60-4cec-9ffe-96362f90727a"
       }
-    }
+    },
+    "owner": "saza31255za"
   }
 }

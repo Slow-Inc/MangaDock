@@ -1,0 +1,12 @@
+{
+  "environment": "Real Android/Expo/FCM; isolated Next/Nest/PGlite; synthetic Auth/catalog; no live Supabase writes",
+  "device": "SM-F721B / Android 16",
+  "results": [
+    {
+      "flow": "test device opted out; isolated registration removed and native reset attempted",
+      "result": "pass"
+    }
+  ],
+  "installedSha256": "88f7b3ecd287928ef41483be12f430563e7829d21f962fc8a9d31a53697f520e",
+  "observedAt": "2026-11-09T07:59:26.489Z"
+}

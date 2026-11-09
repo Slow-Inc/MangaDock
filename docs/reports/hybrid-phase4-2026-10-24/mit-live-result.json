@@ -1,0 +1,12 @@
+{
+  "status": 201,
+  "elapsedMs": 19812,
+  "patchCount": 1,
+  "coordinatesValid": true,
+  "images": [
+    {
+      "status": 200,
+      "png": true
+    }
+  ]
+}

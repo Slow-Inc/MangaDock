@@ -1,0 +1,14 @@
+{
+  "device": "Android 16 / API 36 emulator",
+  "version": "1.2.0-phase5-beta.1",
+  "code": 8,
+  "origin": "https://hayateotsu.space",
+  "webViewBridge": true,
+  "pushEnabled": false,
+  "contentRendered": true,
+  "hasNavigation": false,
+  "noNativeFatal": true,
+  "noJsError": true,
+  "scope": "Native/WebView startup only. Deployed website unavailable; no product-flow acceptance.",
+  "deployedSiteResult": "Cloudflare Tunnel error 1033"
+}

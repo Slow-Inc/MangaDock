@@ -308,3 +308,15 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **เอกสารอ้างอิงสำหรับ Implementation:** [Realtime Broadcast](https://supabase.com/docs/guides/realtime/broadcast) · [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization) · [Supabase Queues](https://supabase.com/docs/guides/queues/pgmq) · [Edge Function + Expo Push](https://supabase.com/docs/guides/functions/examples/push-notifications)
 
 <!-- lang:end -->
+# Hybrid Phase 5 branch update — 2026-10-26
+
+**Implemented on `feat/mobile-hybrid-phase5-20261026`, based on pushed hybrid
+Phase 4 `69badd5f`:** Following/personalized feed, shareable reading collections,
+durable push Backend and Android OS bridge in the existing WebView shell.
+Production rollout remains pending. The 2026-10-22 default-branch audit below
+is historical; it does not describe this implementation branch.
+
+[Implementation, validation and next gates](Mobile/docs/2026-10-26-hybrid-phase5.md).
+
+ภาษาไทย: Phase 5 มี source บน branch hybrid แล้ว ยังรอ migration/deployment,
+provider และการตรวจรับ Push จริงก่อนเปิดใช้งาน ตาราง audit เดิมด้านล่างเป็นข้อมูลย้อนหลัง

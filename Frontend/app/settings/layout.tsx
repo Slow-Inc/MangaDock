@@ -14,6 +14,7 @@ const NAV = [
   { href: "/settings/security", label: "ความปลอดภัย" },
   { href: "/settings/content",  label: "เนื้อหา" },
   { href: "/settings/stats",    label: "สถิติการอ่าน" },
+  { href: "/settings/notifications", label: "การแจ้งเตือน" },
   { href: "/settings/danger",   label: "โซนอันตราย", danger: true },
 ];
 

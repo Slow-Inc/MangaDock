@@ -1,0 +1,9 @@
+{
+  "boundary": "Physical Z Flip4, code 7, /settings/profile 'อัปโหลดรูป' (input type=file, image/*) tapped with real adb touch; no file selected, nothing uploaded.",
+  "rounds": [
+    {"round": 1, "afterTap": "com.google.android.photopicker/com.android.photopicker.PhotopickerGetContentActivity", "afterBack": "com.mobile/.MainActivity"},
+    {"round": 2, "afterTap": "com.google.android.photopicker/com.android.photopicker.PhotopickerGetContentActivity", "afterBack": "com.mobile/.MainActivity"}
+  ],
+  "processSurvived": true,
+  "note": "Picker screenshots were deleted because they showed the owner's personal photo library. Reopening after cancel proves the WebView file-chooser callback was released."
+}

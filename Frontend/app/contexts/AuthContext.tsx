@@ -1,4 +1,5 @@
 "use client";
+import { cleanupHybridPush } from "../lib/hybridPushLifecycle";
 
 import React, {
   createContext,
@@ -714,6 +715,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await cleanupHybridPush();
     await Promise.all([flushNow(), flushHistoryNow()]);
     resetClientStateForIdentityChange();
     await supabase.auth.signOut();
@@ -882,6 +884,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteAccount = async (): Promise<void> => {
     if (!user) throw new Error("ไม่พบผู้ใช้");
+    await cleanupHybridPush();
     const token = await getIdToken();
     if (!token) throw new Error("ไม่พบ token");
     // Backend handles deleting all data + auth user via Admin SDK

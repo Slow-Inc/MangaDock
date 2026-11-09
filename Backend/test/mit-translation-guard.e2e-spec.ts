@@ -6,6 +6,7 @@ import { BooksService } from '../src/books/books.service';
 import { StatsIncrementService } from '../src/cache/stats-increment.service';
 import { generateClearanceToken } from '../src/auth/turnstile.guard';
 import { TURNSTILE_TEST_SECRET } from '../src/auth/turnstile.config';
+import { RedisService } from '../src/cache/redis.service';
 
 /**
  * #227 — every endpoint that triggers the expensive MIT translation pipeline
@@ -40,6 +41,7 @@ describe('MIT translation endpoints — TurnstileGuard (e2e)', () => {
       providers: [
         { provide: BooksService, useValue: booksServiceMock },
         { provide: StatsIncrementService, useValue: { increment: jest.fn() } },
+        { provide: RedisService, useValue: { incrWithTtl: jest.fn().mockResolvedValue(1) } },
       ],
     }).compile();
 

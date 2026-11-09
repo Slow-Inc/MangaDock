@@ -1,0 +1,22 @@
+{
+  "status": 201,
+  "elapsedMs": 881,
+  "patchCount": 2,
+  "geometryValid": true,
+  "overlays": [
+    {
+      "loaded": true,
+      "left": "21.3853%",
+      "top": "32.598%",
+      "width": "19.9567%",
+      "height": "20.4657%"
+    },
+    {
+      "loaded": true,
+      "left": "70.6926%",
+      "top": "36.1213%",
+      "width": "18.1385%",
+      "height": "21.0478%"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "MangaDock-1.2.0-phase5-beta.1-code8-arm64-x86_64.apk",
+  "version": "1.2.0-phase5-beta.1",
+  "code": 8,
+  "package": "com.mobile",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "bytes": 48264854,
+  "sha256": "164f22280cb3db6946601e3103cb23172d2eed28573ca2dbcdd02c3c608eda4c",
+  "signing": "existing QA/debug",
+  "pushEnabled": false,
+  "base": "69badd5f",
+  "productionDeployment": false
+}

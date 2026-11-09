@@ -1,0 +1,112 @@
+{
+  "environment": "Real Android/Expo/FCM; isolated Next/Nest/PGlite; synthetic Auth/catalog; no live Supabase writes",
+  "device": "SM-F721B / Android 16",
+  "results": [],
+  "installedSha256": "88f7b3ecd287928ef41483be12f430563e7829d21f962fc8a9d31a53697f520e",
+  "bridge": [
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:1",
+      "action": "connect",
+      "at": 1794199363066
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:1",
+      "ok": true,
+      "at": 1794199363081
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:2",
+      "action": "session",
+      "at": 1794199363081
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:2",
+      "ok": true,
+      "at": 1794199363145
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:3",
+      "action": "presentation",
+      "at": 1794199363145
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:4",
+      "action": "ready",
+      "at": 1794199363145
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:3",
+      "ok": true,
+      "at": 1794199363185
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:4",
+      "ok": true,
+      "at": 1794199363185
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:5",
+      "action": "presentation",
+      "at": 1794199363186
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:6",
+      "action": "permission",
+      "at": 1794199363186
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:5",
+      "ok": true,
+      "at": 1794199363257
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:6",
+      "ok": true,
+      "at": 1794199363257
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:7",
+      "action": "token",
+      "at": 1794199363257
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:7",
+      "ok": true,
+      "at": 1794199363584
+    },
+    {
+      "kind": "request",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:8",
+      "action": "presentation",
+      "at": 1794199363655
+    },
+    {
+      "kind": "reply",
+      "id": "ca661512-2449-48ec-82a8-6d73cd305b30:8",
+      "ok": true,
+      "at": 1794199363659
+    }
+  ],
+  "ui": {
+    "flag": true,
+    "status": [
+      "เปิดรับแจ้งเตือนแล้ว"
+    ],
+    "alerts": []
+  },
+  "observedAt": "2026-11-09T04:42:58.788Z"
+}

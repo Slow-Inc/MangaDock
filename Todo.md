@@ -145,3 +145,10 @@
 - [ ]  [Frontend] แชร์คอลเล็กชันการอ่านส่วนตัว
 - [ ]  [Backend/Mobile] Push Notification Framework (ระดับ OS)
 <!-- lang:end -->
+## Hybrid Phase 5 resume — 2026-10-26
+
+- Source implementation: [hybrid Phase 5 record](Mobile/docs/2026-10-26-hybrid-phase5.md).
+- Remaining rollout: review/apply retention then push migrations; deploy compatible
+  Backend/Frontend; supply existing EAS/Firebase for `com.mobile`; accept remote OS
+  delivery/receipts and account/offline lifecycle; validate real Redis and signing.
+- Broad baseline test debt and limitations are recorded in the delivery report.

@@ -1,0 +1,14 @@
+{
+    "observedAt":  "2026-11-09T08:20:14.3490673Z",
+    "nativeTests":  99,
+    "nativeSuites":  18,
+    "webPushTests":  20,
+    "authCacheTests":  12,
+    "frontendTypes":  "pass",
+    "focusedFrontendLint":  "pass",
+    "frontendBuildId":  "iKngvR46jDRA1tOeWYd5Y",
+    "finalBuildManifestPresent":  true,
+    "directNodeTestAttempt":  "ERR_MODULE_NOT_FOUND on extensionless TS imports; Bun runner verified",
+    "paymentExcluded":  true,
+    "productionDeliveryEnabledByTask":  false
+}

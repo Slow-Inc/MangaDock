@@ -29,6 +29,7 @@ import { ContentReportsModule } from './content-reports/content-reports.module';
 import { CheckinModule } from './checkin/checkin.module';
 
 import { validate } from './common/env.validation';
+import { RetentionModule } from './retention/retention.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { validate } from './common/env.validation';
       isGlobal: true,
       validate,
     }),
+    RetentionModule,
     SupabaseModule,
     ContentModule,
     StorageModule,

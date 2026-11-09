@@ -3,6 +3,7 @@ import { Anuphan, Instrument_Serif, Inter, JetBrains_Mono } from "next/font/goog
 import "./globals.css";
 import { ToastProvider } from "./contexts/ToastContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { HybridPushProvider } from "./components/HybridPushProvider";
 import SupabaseGuard from "./components/SupabaseGuard";
 import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
@@ -43,11 +44,13 @@ export default function RootLayout({
         <SmoothScrolling>
           <ToastProvider>
             <AuthProvider>
+              <HybridPushProvider>
               <SupabaseGuard />
               {children}
               <DailyCheckinModal />
               <ContentLevelSync />
               <DevImageCacheToggle />
+              </HybridPushProvider>
             </AuthProvider>
           </ToastProvider>
         </SmoothScrolling>

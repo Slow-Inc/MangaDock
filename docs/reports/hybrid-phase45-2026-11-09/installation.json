@@ -1,0 +1,19 @@
+﻿{
+    "observedAt":  "2026-11-09T03:48:35.035Z",
+    "device":  "SM-F721B / Android 16",
+    "package":  "com.mobile",
+    "versionName":  "1.2.0-phase5-beta.3",
+    "versionCode":  10,
+    "artifact":  "Mobile/build/phase45-20261109/hybrid-phase5.apk",
+    "installedSha256":  "65e3e5e335d35eb24adfc3ea452f93a039d346707eb2e43ebea1433452c8ed81",
+    "matchesArtifact":  true,
+    "installSession":  1275920733,
+    "installCommit":  "Success",
+    "appLaunched":  true,
+    "webViewOrigin":  "https://hayateotsu.space",
+    "webViewPath":  "/",
+    "documentReadyState":  "complete",
+    "dataCleared":  false,
+    "productionDeployed":  false,
+    "pushEnabled":  false
+}

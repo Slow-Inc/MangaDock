@@ -1,0 +1,23 @@
+{
+  "firebaseProjectId": "mangadock-push-20261109",
+  "firebaseProjectNumber": "1065474131120",
+  "firebaseAndroidAppId": "1:1065474131120:android:a3cbdcbe4912555d89a775",
+  "androidPackage": "com.mobile",
+  "easOwner": "saza31255za",
+  "easSlug": "mangadock-hybrid",
+  "easProjectId": "ed3651c9-dd60-4cec-9ffe-96362f90727a",
+  "easProjectUrl": "https://expo.dev/accounts/saza31255za/projects/mangadock-hybrid",
+  "fcmV1AssignedToApp": true,
+  "serviceAccountRole": "roles/firebasecloudmessaging.admin",
+  "supabaseAuthOrDatabaseMigrated": false,
+  "cloudBuildStarted": false,
+  "privateKeysCommitted": false,
+  "billingLinkPerformed": false,
+  "serverDeliveryEnabledByThisTask": false,
+  "finalNativeTests": 99,
+  "finalWebPushTests": 20,
+  "authCacheRegressions": 12,
+  "realOwnDeviceDeliveryVerified": true,
+  "sameProcessReloadAndOptOutVerified": true,
+  "nativeRegistrationOwnerCleared": true
+}

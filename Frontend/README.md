@@ -64,3 +64,13 @@ bun run dev
 ## Authentication
 
 Frontend ใช้ Supabase Client SDK สำหรับ authentication (Google OAuth) และส่ง Supabase session token ไปยัง backend ที่แต่ละ request ผ่าน `Authorization: Bearer <token>` header
+
+## Hybrid Phase 5 continuation (2026-10-26)
+
+`/feed`, `/collections` and `/settings/notifications` reuse the existing Strata UI
+and web Supabase session. The notification controls connect to the Android shell
+only in configured builds; no permission prompt occurs on startup. Run
+`bun test app/lib/hybridPushController.test.ts` and `npm run test:auth` for push
+lifecycle and auth/cache regressions. Browser QA uses `scripts/phase5-browser.cjs`
+with `PHASE5_USE_PROXY=true`; setup and release gates are in the
+[delivery record](../Mobile/docs/2026-10-26-hybrid-phase5.md).
