@@ -1,0 +1,32 @@
+﻿[
+    {
+        "file":  "hybrid-phase5.apk",
+        "bytes":  48264958,
+        "sha256":  "65e3e5e335d35eb24adfc3ea452f93a039d346707eb2e43ebea1433452c8ed81",
+        "versionName":  "1.2.0-phase5-beta.3",
+        "versionCode":  10,
+        "package":  "com.mobile",
+        "pushEnabled":  false,
+        "signing":  "Android Debug / QA",
+        "abis":  [
+                     "arm64-v8a",
+                     "x86_64"
+                 ],
+        "endpoint":  "https://hayateotsu.space"
+    },
+    {
+        "file":  "hybrid-phase5-local-qa.apk",
+        "bytes":  48264958,
+        "sha256":  "8ee061f9ddf3d84726ee9ede1ba10825a8a13d683702339133530fb0be5242d4",
+        "versionName":  "1.2.0-phase5-beta.3",
+        "versionCode":  10,
+        "package":  "com.mobile",
+        "pushEnabled":  false,
+        "signing":  "Android Debug / QA",
+        "abis":  [
+                     "arm64-v8a",
+                     "x86_64"
+                 ],
+        "endpoint":  "http://127.0.0.1:4016"
+    }
+]

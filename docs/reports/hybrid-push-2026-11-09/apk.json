@@ -1,0 +1,47 @@
+[
+  {
+    "path": "Mobile/build/push-setup-20261109/hybrid-phase5-push.apk",
+    "frontend": "https://hayateotsu.space",
+    "pushEnabled": true,
+    "bytes": 48267946,
+    "sha256": "0a306652710c7ce5137b9adbc0545714807f51a3b8e04eef7da41415fa14adb2",
+    "package": "com.mobile",
+    "versionName": "1.2.0-phase5-beta.4",
+    "versionCode": 11,
+    "abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "signing": "existing Android Debug / QA"
+  },
+  {
+    "path": "Mobile/build/push-setup-20261109/hybrid-phase5-push-local-qa-final.apk",
+    "frontend": "http://127.0.0.1:4016",
+    "pushEnabled": true,
+    "bytes": 48267946,
+    "sha256": "88f7b3ecd287928ef41483be12f430563e7829d21f962fc8a9d31a53697f520e",
+    "package": "com.mobile",
+    "versionName": "1.2.0-phase5-beta.4",
+    "versionCode": 11,
+    "abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "signing": "existing Android Debug / QA"
+  },
+  {
+    "path": "Mobile/build/push-setup-20261109/hybrid-phase5-push-off-rollback.apk",
+    "frontend": "https://hayateotsu.space",
+    "pushEnabled": false,
+    "bytes": 48265050,
+    "sha256": "335449555457fcf350c9ec1d48d74615ef13697121c7ee3fa83ed966c1fcc20b",
+    "package": "com.mobile",
+    "versionName": "1.2.0-phase5-beta.4",
+    "versionCode": 11,
+    "abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "signing": "existing Android Debug / QA"
+  }
+]

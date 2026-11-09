@@ -1,4 +1,17 @@
 {
   "name": "Mobile",
-  "displayName": "Mobile"
+  "displayName": "Mobile",
+  "expo": {
+    "name": "MangaDock Hybrid",
+    "slug": "mangadock-hybrid",
+    "android": {
+      "package": "com.mobile"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ed3651c9-dd60-4cec-9ffe-96362f90727a"
+      }
+    },
+    "owner": "saza31255za"
+  }
 }

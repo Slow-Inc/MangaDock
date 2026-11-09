@@ -1,5 +1,25 @@
 # Hybrid Phase 5 implementation and resume point — 2026-10-26
 
+**Push configuration update (2026-11-09):** owner authorized new Firebase/EAS
+projects. `com.mobile` now has Firebase FCM v1 credentials assigned in EAS;
+Supabase remains the Auth/data backend. Beta.4/code11 has native Push enabled.
+Real Flip4 token registration, background delivery, tap, receipt and reload/opt-out
+passed with isolated web/API/Auth fixtures. Native ownership cleanup was verified.
+Production web/API/schema rollout and remaining account/release gates still apply;
+server sending was not enabled. [Configuration, APKs and evidence](../../docs/reports/hybrid-push-2026-11-09/README.md).
+
+**Latest continuation (2026-11-09):** owner authorized hybrid Phase 4–5 with only
+payment excluded; Push is back in scope. Fixed permission/account-change races,
+built beta.3/code10, passed 14 isolated flows on Flip4 and 9 browser groups.
+Live Phase 5 routes still return 404; compatible rollout, existing EAS/Firebase
+and remote push/remaining role-release acceptance are pending.
+[Current report, artifacts and rollback](../../docs/reports/hybrid-phase45-2026-11-09/README.md).
+
+**Previous continuation (2026-10-30):** payment and notifications deferred by the
+owner; Feed/Collections and lifecycle acceptance on isolated Android WebView,
+responsive fixes and original screenshots. Physical phone and production rollout
+remain pending. [Current report](../../docs/reports/hybrid-phase5-2026-10-30/README.md).
+
 Branch: `feat/mobile-hybrid-phase5-20261026`, directly based on pushed hybrid
 Phase 4 `69badd5f`. Native Phase 5 Mobile sources and the dirty `md-hybrid-phase45`
 worktree were not used as the base or overwritten.

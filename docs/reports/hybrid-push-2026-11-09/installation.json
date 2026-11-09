@@ -1,0 +1,16 @@
+{
+    "observedAt":  "2026-11-09T08:23:20.2328405Z",
+    "device":  "SM-F721B / Android 16",
+    "package":  "com.mobile",
+    "versionName":  "1.2.0-phase5-beta.4",
+    "versionCode":  11,
+    "installSession":  111925825,
+    "result":  "Success",
+    "installedSha256":  "0a306652710c7ce5137b9adbc0545714807f51a3b8e04eef7da41415fa14adb2",
+    "installMode":  "adb install --no-streaming -r",
+    "dataCleared":  false,
+    "securitySettingsChanged":  false,
+    "playProtect":  "One-time APK scan allowed through actual Play Protect dialog; no automatic upload preference enabled",
+    "priorStreamingSession":  1611298464,
+    "priorStreamingSessionAbandoned":  true
+}

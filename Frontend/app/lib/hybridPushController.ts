@@ -176,7 +176,17 @@ export function createPushNotifications(options: {
     const uid = owner;
     if (!uid) return;
     publish({ ...state, busy: true, error: null });
-    const allowed = await options.platform.permission(prompt);
+    const permissionRequest = new AbortController();
+    request = permissionRequest;
+    let allowed: boolean;
+    try {
+      allowed = await bounded(
+        () => options.platform.permission(prompt),
+        permissionRequest.signal,
+      );
+    } finally {
+      if (request === permissionRequest) request = null;
+    }
     if (!current(id)) return;
     if (!allowed) {
       await release();

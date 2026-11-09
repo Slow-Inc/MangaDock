@@ -1,0 +1,146 @@
+﻿[
+    {
+        "path":  "apk.json",
+        "sha256":  "6c1c150b406917cd6041bb7f33dd004a2ab4d37bac844bd49db13dc7d6400a4a"
+    },
+    {
+        "path":  "browser-results.json",
+        "sha256":  "dc642a66b789e12881ae7637ae1c594e2bf07b08648087614d1927133383cb63"
+    },
+    {
+        "path":  "collection-1280.png",
+        "sha256":  "c96f19c0e0eec12678a59a2bfeb20d5a639f89ebb5069d2cf4183cdb8f5cc4fe"
+    },
+    {
+        "path":  "collection-390.png",
+        "sha256":  "f23e3156b29888606c63ad25991671e197069408712b48032a044b26115abda4"
+    },
+    {
+        "path":  "collection-long-detail-320.png",
+        "sha256":  "8a25afac6ed1ab4f99c32e7248d788e31f55e6b717af266fe32b1ef71e020111"
+    },
+    {
+        "path":  "collection-long-name-320.png",
+        "sha256":  "edab07b044fc3e03c9a5275d387da27be43db364af3d35d5e32c6b5ae3919c8f"
+    },
+    {
+        "path":  "collections-navigation-1024.png",
+        "sha256":  "eaa2131f0f774b0ff2fc2ce62876146c5c6a5e1e505706327401da3d8ebd357c"
+    },
+    {
+        "path":  "collections-navigation-1280.png",
+        "sha256":  "1d2ba0bd262b5cae24a8e84227209be7ba4bbf1dbb3ab84c7ead56d8e6e41a6e"
+    },
+    {
+        "path":  "collections-navigation-768.png",
+        "sha256":  "455947de8a0428cd4953da48ad3e97fd923ed37f8792a19a93eab73950c8c21a"
+    },
+    {
+        "path":  "feed-1280.png",
+        "sha256":  "27fdc89c2bb20832ecff09b5b35338efbff0a22d9d05db5d0fa624121c033270"
+    },
+    {
+        "path":  "feed-390.png",
+        "sha256":  "285b28c588d3a777708a35c7f305b7d5ad441c7cff684b43606d894de2c9af45"
+    },
+    {
+        "path":  "installation.json",
+        "sha256":  "4638fad4839a809456ac2354e860d5e973622c6b44722c3bc6f98021c95ac7db"
+    },
+    {
+        "path":  "physical/00-following-after-unfollow.png",
+        "sha256":  "348841060ba76bb4ae6f996510dd2420b4df6c5056ed63ab0176512db34bdfde"
+    },
+    {
+        "path":  "physical/01-following-feed.png",
+        "sha256":  "a5d116e8dc9035415acb6e714d3140fa416658ffc2d8fabdebd9d0bdc51eaa5d"
+    },
+    {
+        "path":  "physical/02-following-second-page.png",
+        "sha256":  "3c817906cc631686653363e10b4b0dbfb34ba27799167580426c6a1ac160cbab"
+    },
+    {
+        "path":  "physical/03-personalized-feed.png",
+        "sha256":  "928ed10c8d8896b5ec5c472929e4c2d0c5c44b39a1bdb65dae305c4ac924ad03"
+    },
+    {
+        "path":  "physical/04-create-private-collection.png",
+        "sha256":  "796d540f9e608e51c9943504f16954f61333ebae9a2991597d01b008426280cc"
+    },
+    {
+        "path":  "physical/05-collection-with-manga.png",
+        "sha256":  "07adb98896c5b17d30ee1d5b93e79ed90c7e7b01b9bd457bc723be5ed4ac3943"
+    },
+    {
+        "path":  "physical/06-public-collection-shared.png",
+        "sha256":  "dc9dae4c6674b1096ac50e26c300bf5ccef2866c66cf27e87198558a3dc71374"
+    },
+    {
+        "path":  "physical/07-collection-after-background-reload.png",
+        "sha256":  "56d0f58f2b43155081ff07c11248b00b5a23702a61fc117e5d665c9c14ab8cb9"
+    },
+    {
+        "path":  "physical/08-public-collection-guest.png",
+        "sha256":  "4994957d737b61638a24d46b33734680040937af2698eeb8b8f15a510e3fbcd7"
+    },
+    {
+        "path":  "physical/09-private-link-revoked.png",
+        "sha256":  "590077527c8c298cd976a7725805b5fd8074866e1ae68a7a2f85252083bbadc1"
+    },
+    {
+        "path":  "physical/10-collection-removed.png",
+        "sha256":  "6764b286cb9e26d35ed3eb3c8548398fa2740433645ce4e2b49d1d17627ac3d2"
+    },
+    {
+        "path":  "physical/11-feed-warm-deep-link.png",
+        "sha256":  "eaa1a582ede92fd27c1bad61a6cb398d2ae99876508d388a5a2fdbf9070f9980"
+    },
+    {
+        "path":  "physical/12-collections-cold-deep-link.png",
+        "sha256":  "26c49fdd57a36f069c703f8330d9f1ebc5cb583c5275cc58740e05bf0b3b07bc"
+    },
+    {
+        "path":  "physical/13-collections-landscape.png",
+        "sha256":  "8a9fff6e77a1d81a1092caea7741bc969860716aa36d9e0defe4e7e971d45091"
+    },
+    {
+        "path":  "physical/14-network-failure-native-retry.png",
+        "sha256":  "b966e28d3494a6e48283b2d04cfdd18c4a510efaa2789d9af95965a1a081389c"
+    },
+    {
+        "path":  "physical/15-network-restored.png",
+        "sha256":  "206ac7f00a419fde4d046b4198951c2533f4366943d06934f2d0734aa442b140"
+    },
+    {
+        "path":  "physical/16-live-target.png",
+        "sha256":  "f1aa316e7bc8e7a4f178979d4c464f263d9cbb4b54ad11a65e19dd9d5eea5103"
+    },
+    {
+        "path":  "physical/live-webview.json",
+        "sha256":  "51d8ace339599234362293d47cef0c56bd7d251b50d1dcd851e7e6a7778b9884"
+    },
+    {
+        "path":  "physical/results.json",
+        "sha256":  "29e046912c1753fccbb2762ec4ce0588e44a9ac3537fe575e1aae63e19cdfb50"
+    },
+    {
+        "path":  "physical/shell-results.json",
+        "sha256":  "fd9a859c5b3bd8a0e49d2827d99b963e4286c105ef6e83b227aa875285ef8690"
+    },
+    {
+        "path":  "push-settings-1280.png",
+        "sha256":  "c112feed79efb04d3224ebbbae380eca939490e98e63088daeaf71a0affbd894"
+    },
+    {
+        "path":  "push-settings-390.png",
+        "sha256":  "4be3559dce5801fc8512896a48c0298295de4b46d50a8d9c624123ea95f585dd"
+    },
+    {
+        "path":  "README.md",
+        "sha256":  "7c3ca92e8e25a1f3e2f62f8335194e5914723486ffc8f1cf2d39a813b358dbf5"
+    },
+    {
+        "path":  "verification.json",
+        "sha256":  "5fd5368d5c84be667d12cf6d74ce9bbe0f5dd309089c4172628884c3be5f7f47"
+    }
+]

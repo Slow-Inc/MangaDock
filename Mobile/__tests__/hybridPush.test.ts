@@ -1,5 +1,6 @@
 import {createHybridPushHost, parsePushRequest, type PushRequest} from '../src/hybridPush';
 import {NativeModules} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const mockStore = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({__esModule: true, default: {
@@ -105,6 +106,74 @@ test('reading the same FCM token does not start an endless registration refresh 
     receive({data: 'token-2'});
     receive({data: 'token-2'});
     expect(f.events.filter(event => event.event === 'refresh')).toHaveLength(1);
+  } finally { f.host.dispose(); }
+});
+
+test('account hydration during connect does not cancel the document handshake', async () => {
+  const f = fixture();
+  try {
+    const connect = f.request('connect');
+    const session = f.request('session', {uid: 'reader-a'});
+    await Promise.all([connect, session]);
+    expect(f.events.find(event => event.id === '1')).toMatchObject({ok: true, result: {deviceId: 'device-id'}});
+  } finally { f.host.dispose(); }
+});
+
+test('account hydration while announcing ready still completes the document handshake', async () => {
+  const f = fixture();
+  try {
+    await f.request('connect');
+    const ready = f.request('ready');
+    const session = f.request('session', {uid: 'reader-a'});
+    await Promise.all([ready, session]);
+    expect(f.events.find(event => event.id === '2')).toMatchObject({ok: true});
+  } finally { f.host.dispose(); }
+});
+
+test('navigation cancels queued connect and ready messages from the previous document', async () => {
+  const f = fixture();
+  try {
+    const connect = f.request('connect');
+    const ready = f.request('ready');
+    f.host.suspend();
+    await Promise.all([connect, ready]);
+    expect(f.events.find(event => event.id === '1')).toMatchObject({ok: false});
+    expect(f.events.find(event => event.id === '2')).toMatchObject({ok: false});
+  } finally { f.host.dispose(); }
+});
+
+test('an account change while the notification channel is being created stops the permission request', async () => {
+  let finish!: () => void;
+  mockNotifications.setNotificationChannelAsync.mockImplementationOnce(() => new Promise<void>(resolve => {finish = resolve;}));
+  const f = fixture();
+  try {
+    await f.request('session', {uid: 'reader-a'});
+    const permission = f.request('permission', {prompt: true});
+    for (let step = 0; !finish && step < 30; step++) await Promise.resolve();
+    expect(finish).toBeDefined();
+    const logout = f.request('session', {uid: null});
+    finish();
+    await Promise.all([permission, logout]);
+    expect(mockNotifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockNotifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(f.events.find(event => event.id === '2')).toMatchObject({ok: false});
+  } finally { f.host.dispose(); }
+});
+
+test('an account change while ownership is being saved cannot start token acquisition', async () => {
+  let finish!: () => void;
+  jest.mocked(AsyncStorage.setItem).mockImplementationOnce(() => new Promise<void>(resolve => {finish = resolve;}));
+  const f = fixture();
+  try {
+    await f.request('session', {uid: 'reader-a'});
+    const token = f.request('token');
+    for (let step = 0; !finish && step < 30; step++) await Promise.resolve();
+    expect(finish).toBeDefined();
+    const logout = f.request('session', {uid: null});
+    finish();
+    await Promise.all([token, logout]);
+    expect(mockNotifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
+    expect(f.events.find(event => event.id === '2')).toMatchObject({ok: false});
   } finally { f.host.dispose(); }
 });
 

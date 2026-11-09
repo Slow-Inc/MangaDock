@@ -1,0 +1,2 @@
+# Preserve captured evidence bytes and SHA-256 values across operating systems.
+* -text whitespace=cr-at-eol

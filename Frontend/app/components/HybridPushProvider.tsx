@@ -6,7 +6,7 @@ import {useAuth} from "../contexts/AuthContext";
 import {supabase} from "../lib/supabase";
 import {createPushNotifications, type PushState} from "../lib/hybridPushController";
 import type {NotificationDestination} from "../lib/hybridPushLinks";
-import {createHybridPushTransport, hybridPushAvailable} from "../lib/hybridPushTransport";
+import {createHybridPushTransport, hybridPushAvailable, retryPushHandshake} from "../lib/hybridPushTransport";
 import {registerHybridPushCleanup} from "../lib/hybridPushLifecycle";
 
 type Controller = ReturnType<typeof createPushNotifications>;
@@ -61,13 +61,15 @@ export function HybridPushProvider({children}: {children: ReactNode}) {
     transportRef.current = transport;
     void (async () => {
       try {
-        const {deviceId, registrationOwner} = await transport.request<{deviceId: string; registrationOwner?: string | null}>("connect");
-        if (disposed) return;
-        // WebView storage can be cleared independently of native storage. Preserve
-        // the OS cleanup marker so an off preference cannot leave a hidden binding.
-        if (registrationOwner && !localStorage.getItem("mangadock_push_registration_owner"))
-          localStorage.setItem("mangadock_push_registration_owner", registrationOwner);
-        await transport.request("session", {uid: owner.current});
+        const {deviceId} = await retryPushHandshake(async () => {
+          const connection = await transport.request<{deviceId: string; registrationOwner?: string | null}>("connect");
+          if (disposed) throw new Error("ยกเลิกการเชื่อมต่อแอป");
+          // Preserve native cleanup ownership even if WebView storage was cleared.
+          if (connection.registrationOwner && !localStorage.getItem("mangadock_push_registration_owner"))
+            localStorage.setItem("mangadock_push_registration_owner", connection.registrationOwner);
+          await transport.request("session", {uid: owner.current});
+          return connection;
+        }, () => disposed);
         if (disposed) return;
         const push = createPushNotifications({
           apiOrigin: new URL("/api/proxy/", location.origin).href,
@@ -85,7 +87,12 @@ export function HybridPushProvider({children}: {children: ReactNode}) {
           },
           storage: {getItem: async key => localStorage.getItem(key), setItem: async (key, value) => { localStorage.setItem(key, value); }},
           platform: {
-            permission: prompt => transport.request<boolean>("permission", {prompt}),
+            permission: async prompt => {
+              const uid = owner.current;
+              await transport.request("session", {uid});
+              if (disposed || owner.current !== uid) throw new Error("บัญชีเปลี่ยนระหว่างตั้งค่าแจ้งเตือน กรุณาลองอีกครั้ง");
+              return transport.request<boolean>("permission", {prompt});
+            },
             token: () => transport.request<string>("token"),
             unregister: () => transport.request<void>("reset"),
             preview: () => transport.request<void>("preview"),
@@ -104,7 +111,7 @@ export function HybridPushProvider({children}: {children: ReactNode}) {
         });
         setController(push);
         update();
-        await transport.request("ready");
+        await retryPushHandshake(() => transport.request("ready"), () => disposed);
         if (!disposed) await push.refresh();
       } catch {
         if (!disposed) setState({status: "error", busy: false, error: "บริการแจ้งเตือนยังไม่พร้อม กรุณาเปิดแอปใหม่แล้วลองอีกครั้ง"});

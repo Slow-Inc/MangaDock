@@ -4,6 +4,22 @@ type ShellWindow = Window & {
   ReactNativeWebView?: { postMessage(message: string): void };
 };
 
+export async function retryPushHandshake<T>(
+  work: () => Promise<T>,
+  isDisposed: () => boolean,
+): Promise<T> {
+  // A late WebView load-start can invalidate an otherwise valid startup request.
+  for (let attempt = 0; ; attempt++) {
+    if (isDisposed()) throw new Error("ยกเลิกการเชื่อมต่อแอป");
+    try {
+      return await work();
+    } catch (error) {
+      if (isDisposed() || attempt >= 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
+}
+
 export function hybridPushAvailable() {
   return typeof window !== "undefined" && (window as ShellWindow).__MANGA_DOCK_PUSH_ENABLED__ === true;
 }

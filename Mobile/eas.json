@@ -1,0 +1,8 @@
+{
+  "cli": {
+    "version": ">= 27.5.0"
+  },
+  "build": {
+    "production": {}
+  }
+}

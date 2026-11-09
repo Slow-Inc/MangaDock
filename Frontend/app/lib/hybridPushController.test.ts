@@ -43,6 +43,7 @@ async function setup(
     externalFetch?: typeof fetch;
     unregister?: () => Promise<void>;
     acquireToken?: () => Promise<string>;
+    acquirePermission?: (prompt: boolean) => Promise<boolean>;
   } = {},
 ) {
   const calls: Array<{
@@ -86,7 +87,9 @@ async function setup(
     platform: {
       permission: async (prompt) => {
         permissions.push(prompt);
-        return allowed;
+        return options.acquirePermission
+          ? options.acquirePermission(prompt)
+          : allowed;
       },
       token: async () =>
         options.acquireToken ? options.acquireToken() : token,
@@ -301,6 +304,44 @@ test("a registration acknowledgement after logout cannot re-enable the previous 
       ["PUT", "DELETE"],
     );
   } finally {
+    f.dispose();
+  }
+});
+
+test("logout releases the operation queue while OS permission is still pending", async () => {
+  let resolvePermission!: (allowed: boolean) => void;
+  let started!: () => void;
+  const beginning = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const f = await setup({
+    acquirePermission: () => {
+      started();
+      return new Promise<boolean>((resolve) => {
+        resolvePermission = resolve;
+      });
+    },
+  });
+  const enabling = f.push.enable();
+  try {
+    await beginning;
+    await f.auth.app.signOut();
+    let refreshed = false;
+    const refreshing = f.push.refresh().then(() => {
+      refreshed = true;
+    });
+    for (let step = 0; step < 100 && !refreshed; step++) await Promise.resolve();
+    assert.equal(
+      refreshed,
+      true,
+      "logout must not wait for the OS permission dialog",
+    );
+    await refreshing;
+    assert.equal(f.push.snapshot().status, "signedOut");
+    assert.deepEqual(f.calls, []);
+  } finally {
+    resolvePermission(false);
+    await enabling;
     f.dispose();
   }
 });

@@ -1,0 +1,65 @@
+﻿{
+    "date":  "2026-11-09",
+    "scope":  "hybrid Phase 4–5, payment excluded; current user override of stale Cache Phase 2 brief",
+    "mobileTests":  {
+                        "passed":  96,
+                        "suites":  18
+                    },
+    "webPushTests":  {
+                         "passed":  17
+                     },
+    "authCacheTests":  {
+                           "passed":  12
+                       },
+    "backendPhase5Tests":  {
+                               "passed":  19
+                           },
+    "backendFullTests":  {
+                             "suites":  114,
+                             "node":  "v22.23.4",
+                             "passed":  1179
+                         },
+    "browserGroups":  9,
+    "physicalFeatureFlows":  10,
+    "physicalLifecycleFlows":  4,
+    "physicalNativeHeaderRequests":  24,
+    "productionProbe":  {
+                            "date":  "2026-11-09",
+                            "method":  "unauthenticated GET",
+                            "results":  [
+                                            {
+                                                "path":  "/feed",
+                                                "status":  404
+                                            },
+                                            {
+                                                "path":  "/collections",
+                                                "status":  404
+                                            },
+                                            {
+                                                "path":  "/settings/notifications",
+                                                "status":  404
+                                            },
+                                            {
+                                                "path":  "/api/proxy/feed",
+                                                "status":  404
+                                            }
+                                        ]
+                        },
+    "emulator":  {
+                     "windowsFault":  "qemu-system-x86_64-headless.exe / 0xc0000005",
+                     "accepted":  false,
+                     "error":  "error: closed / device offline"
+                 },
+    "remotePushAccepted":  false,
+    "paymentActions":  0,
+    "productionChanges":  0,
+    "fullPhase45Accepted":  false,
+    "remaining":  [
+                      "compatible web/API deployment and current schema inspection/migration workflow",
+                      "existing EAS/Firebase configuration and remote push acceptance",
+                      "outstanding non-payment Phase 4 role/security/release gates"
+                  ],
+    "finalLiveApkInstalled":  true,
+    "observedLiveWebViewOrigin":  "https://hayateotsu.space",
+    "originalPngFiles":  28
+}

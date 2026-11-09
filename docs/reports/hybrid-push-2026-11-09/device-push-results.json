@@ -1,0 +1,33 @@
+{
+  "environment": "Real Android/Expo/FCM; isolated Next/Nest/PGlite; synthetic Auth/catalog; no live Supabase writes",
+  "device": "SM-F721B / Android 16",
+  "results": [
+    {
+      "flow": "real native Expo token acknowledged by isolated authenticated Backend",
+      "result": "pass"
+    },
+    {
+      "flow": "one own-device remote notification accepted by Expo",
+      "result": "pass",
+      "ticketId": "01a1bf53-1810-718d-b465-16ef2168036c"
+    },
+    {
+      "flow": "real FCM background notification posted by Android for com.mobile",
+      "result": "pass"
+    },
+    {
+      "flow": "real notification tap opens recipient-scoped Collections",
+      "result": "pass"
+    },
+    {
+      "flow": "Expo delivery receipt confirms FCM acceptance",
+      "result": "pass"
+    },
+    {
+      "flow": "test device opted out; isolated registration removed and native reset attempted",
+      "result": "pass"
+    }
+  ],
+  "installedSha256": "88f7b3ecd287928ef41483be12f430563e7829d21f962fc8a9d31a53697f520e",
+  "observedAt": "2026-11-09T08:01:03.150Z"
+}

@@ -28,6 +28,7 @@ export function createHybridPushHost(send: (event: Record<string, unknown>) => v
   let present = false;
   let connected = false;
   let revision = 0;
+  let documentRevision = 0;
   let pending: Record<string, unknown> | null = null;
   let queue = Promise.resolve();
   let lastDeviceToken: string | null = null;
@@ -81,6 +82,7 @@ export function createHybridPushHost(send: (event: Record<string, unknown>) => v
       case 'permission': {
         if (!owner) return false;
         await notifications.setNotificationChannelAsync(CHANNEL, {name: 'ข่าวสาร MangaDock', importance: notifications.AndroidImportance.DEFAULT});
+        if (!owner || expected !== revision) return false;
         let permission = await notifications.getPermissionsAsync();
         if (!permission.granted && message.prompt && permission.canAskAgain && expected === revision)
           permission = await notifications.requestPermissionsAsync();
@@ -89,6 +91,7 @@ export function createHybridPushHost(send: (event: Record<string, unknown>) => v
       case 'token': {
         if (!owner || expected !== revision) throw new Error('No current owner');
         await AsyncStorage.setItem(OWNER_KEY, owner);
+        if (!owner || expected !== revision) throw new Error('Account changed');
         const token = await notifications.getExpoPushTokenAsync({projectId: NativeModules.MangaDockAuthConfig.easProjectId});
         if (expected !== revision) throw new Error('Account changed');
         if (token.type !== 'expo' || typeof token.data !== 'string') throw new Error('Invalid token');
@@ -110,19 +113,23 @@ export function createHybridPushHost(send: (event: Record<string, unknown>) => v
       }
       if (message.action === 'reset' || (message.action === 'presentation' && !message.on)) present = false;
       const expected = revision;
+      const expectedDocument = documentRevision;
+      // Auth may hydrate while the document's connect/ready handshake is queued.
+      const accountBound = !['connect', 'ready', 'session', 'reset'].includes(message.action);
+      const stale = () => expectedDocument !== documentRevision || (accountBound && expected !== revision);
       queue = queue.then(async () => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-          if (expected !== revision && !['session', 'reset'].includes(message.action)) throw new Error('Stale request');
+          if (stale()) throw new Error('Stale request');
           const result = await Promise.race([execute(message, expected), new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Timeout')), 7000); })]);
-          if (expected !== revision && !['session', 'reset'].includes(message.action)) throw new Error('Account changed');
+          if (stale()) throw new Error('Account changed');
           send({id: message.id, ok: true, result});
         } catch { send({id: message.id, ok: false}); }
         finally { clearTimeout(timer); }
       });
       return queue;
     },
-    suspend() { connected = false; present = false; revision++; owner = null; },
-    dispose() { connected = false; present = false; revision++; responses.remove(); tokens.remove(); foreground.remove(); notifications.setNotificationHandler(null); },
+    suspend() { connected = false; present = false; revision++; documentRevision++; owner = null; },
+    dispose() { connected = false; present = false; revision++; documentRevision++; responses.remove(); tokens.remove(); foreground.remove(); notifications.setNotificationHandler(null); },
   };
 }

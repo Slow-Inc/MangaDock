@@ -1,0 +1,57 @@
+{
+  "at": "2026-11-09T03:35:02.502Z",
+  "device": {
+    "type": "physical",
+    "model": "SM-F721B",
+    "android": "16"
+  },
+  "environment": "Isolated Next proxy + Nest services + real PGlite PostgreSQL migrations; synthetic auth/catalog fixtures; native Android WebView and bridge are real",
+  "excluded": [
+    "payment",
+    "notifications"
+  ],
+  "installedSha256": "8ee061f9ddf3d84726ee9ede1ba10825a8a13d683702339133530fb0be5242d4",
+  "results": [
+    {
+      "flow": "warm feed deep link",
+      "result": "pass"
+    },
+    {
+      "flow": "cold collections deep link; identity survives process restart",
+      "result": "pass",
+      "identityStable": true
+    },
+    {
+      "flow": "landscape collections without horizontal overflow",
+      "result": "pass"
+    },
+    {
+      "flow": "lost frontend connection shows native retry; restored connection returns to collections",
+      "result": "pass"
+    }
+  ],
+  "traffic": [
+    {
+      "path": "/api/proxy/feed?mode=following&offset=0&limit=20",
+      "method": "GET",
+      "status": 200,
+      "hardwareIdPresent": true,
+      "client": "android-mobile-shell"
+    },
+    {
+      "path": "/api/proxy/collections",
+      "method": "GET",
+      "status": 200,
+      "hardwareIdPresent": true,
+      "client": "android-mobile-shell"
+    },
+    {
+      "path": "/api/proxy/collections",
+      "method": "GET",
+      "status": 200,
+      "hardwareIdPresent": true,
+      "client": "android-mobile-shell"
+    }
+  ],
+  "pageErrors": []
+}

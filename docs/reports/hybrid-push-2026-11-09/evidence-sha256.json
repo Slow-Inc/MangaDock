@@ -1,0 +1,77 @@
+[
+    {
+        "file":  "01-enabled-native-push.png",
+        "bytes":  191150,
+        "sha256":  "96f7788a0bf1d1614ad2507519f30092c24f11e5673737e5591277c49b4839bd"
+    },
+    {
+        "file":  "02-disabled-after-test.png",
+        "bytes":  186261,
+        "sha256":  "3af0cd197a8d312fefbee7428db7161a23023634e7522acf84ddaed7de9c24ab"
+    },
+    {
+        "file":  "03-live-target.png",
+        "bytes":  1689671,
+        "sha256":  "f520792eab7cdfed9d372fabe710a2a5139d159e377de8106ad7929e65f1cda9"
+    },
+    {
+        "file":  "apk.json",
+        "bytes":  1373,
+        "sha256":  "30a82ae40b001982337b334a2a746e2962a92e13938622cc8d21010cf1870726"
+    },
+    {
+        "file":  "device-push-cleanup.json",
+        "bytes":  443,
+        "sha256":  "d90262bff5c8556c56e6f7868568fdf0217c617a9c811fce21d075717827cde9"
+    },
+    {
+        "file":  "device-push-initial-results.json",
+        "bytes":  2456,
+        "sha256":  "cc1c0b923093d615163efef52a1f6f7f20039c770b074dfd9cfc7a9db03a0565"
+    },
+    {
+        "file":  "device-push-native-fix-results.json",
+        "bytes":  2497,
+        "sha256":  "832118b5492e6e3eae5d7008246825ff8b8ae25d55d08b27c5dc81c0be9dce22"
+    },
+    {
+        "file":  "device-push-results.json",
+        "bytes":  1057,
+        "sha256":  "ad9ba0b1ca5e6545246e199b9378b7ee6443e225473fe255bdc96227e36211e3"
+    },
+    {
+        "file":  "device-push-trace.json",
+        "bytes":  2714,
+        "sha256":  "f9b644ace1696ec9bddd8e64f75b5617e9030141535121f81ee6593df287c604"
+    },
+    {
+        "file":  "installation.json",
+        "bytes":  688,
+        "sha256":  "82aeace3bef8b489bdadb46719a164f004dd700ed0c38bc716868f561c108767"
+    },
+    {
+        "file":  "live-webview.json",
+        "bytes":  220,
+        "sha256":  "df06e4a617c94d3ee3e36bc59cedf7b4eaf3bcdf487ccc9c9384061680075cd6"
+    },
+    {
+        "file":  "native-cleanup.json",
+        "bytes":  122,
+        "sha256":  "56aa8f679feda8a5d73ba4c513b83a002f4dbca426f48da2880c0d5538ea8eb7"
+    },
+    {
+        "file":  "README.md",
+        "bytes":  11225,
+        "sha256":  "e6d7a4ab8d7f6963547e868cf7df7d6a26df6d4baf8f8e7d51601b74268e8771"
+    },
+    {
+        "file":  "setup.json",
+        "bytes":  900,
+        "sha256":  "a531644743eb56aade7468f96dfea1f134d5afd832cb87de818c4d26ce664e19"
+    },
+    {
+        "file":  "verification.json",
+        "bytes":  503,
+        "sha256":  "975b3b1c009335538d9c9c7cf47be3ee096e24400ab9c36badefcd258dc20aac"
+    }
+]
