@@ -13,6 +13,7 @@ import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import { useFeedStream } from "../hooks/useForumStream";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
@@ -82,6 +83,8 @@ function CommunityContent() {
   // Modal Smooth Scrolling
   const modalScrollRef = useRef<HTMLDivElement>(null);
   useLocalLenis(modalScrollRef, 'vertical', showCreateModal);
+  const createDialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(createDialogRef, closeModal, showCreateModal);
 
   // Sync state when URL params change
   useEffect(() => {
@@ -407,7 +410,8 @@ function CommunityContent() {
       {/* Create Post Modal — bottom sheet on mobile, centered dialog on desktop */}
       {showCreateModal && (
         <div
-          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-scrim/80 transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
+          ref={createDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="สร้างโพสต์ใหม่"
+          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-scrim/80 outline-none transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
           <div className={`
@@ -428,7 +432,7 @@ function CommunityContent() {
 
             <header className="px-5 py-4 sm:p-6 border-b border-line flex items-center justify-between shrink-0">
               <h2 className="text-lg sm:text-xl font-bold text-ink">สร้างโพสต์ใหม่</h2>
-              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-fill hover:bg-raised text-ink-2 hover:text-ink transition-all">
+              <button onClick={closeModal} aria-label="ปิด" className="w-8 h-8 flex items-center justify-center rounded-full bg-fill hover:bg-raised text-ink-2 hover:text-ink transition-all">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6L18 18" />
                 </svg>
@@ -468,7 +472,7 @@ function CommunityContent() {
 
               <div>
                 <label className="block text-[10px] font-black text-ink-3 uppercase mb-2">หัวข้อ</label>
-                <input
+                <input aria-label="หัวข้อ"
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
@@ -482,7 +486,7 @@ function CommunityContent() {
 
               <div>
                 <label className="block text-[10px] font-black text-ink-3 uppercase mb-2">เนื้อหา</label>
-                <textarea
+                <textarea aria-label="เนื้อหา"
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   maxLength={FORUM_LIMITS.content}

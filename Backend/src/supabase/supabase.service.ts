@@ -4,12 +4,18 @@ import { createHash } from 'crypto';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
 const VERIFY_CACHE_TTL_MS = 60_000;
+/**
+ * Database (PostgREST) budget for `reads` (#863): with the upstream slow, a read gives up and its page shows a
+ * retryable error instead of hanging for the full 30 s client timeout.
+ */
+export const SUPABASE_READ_TIMEOUT_MS = 8_000;
 const VERIFY_CACHE_MAX = 5_000;
 
 @Injectable()
 export class SupabaseService implements OnModuleInit {
   private readonly logger = new Logger(SupabaseService.name);
   private supabaseClient!: SupabaseClient;
+  private readClient!: SupabaseClient;
 
   // Token-hash cache: key = SHA-256(token), value = cached identity + expiry.
   // Raw tokens are NEVER stored; only their hash.
@@ -32,18 +38,29 @@ export class SupabaseService implements OnModuleInit {
       );
     }
 
+    const auth = { autoRefreshToken: false, persistSession: false };
     this.supabaseClient = createClient(url, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+      auth,
+    }) as SupabaseClient;
+    this.readClient = createClient(url, serviceRoleKey, {
+      auth,
+      db: { timeout: SUPABASE_READ_TIMEOUT_MS },
+    }) as SupabaseClient;
 
     this.logger.log(`Supabase initialized: ${url}`);
   }
 
   get client(): SupabaseClient {
     return this.supabaseClient;
+  }
+
+  /**
+   * The same project for READS only, with a database timeout (#863). Not for writes: an aborted request can still
+   * commit on the server, and the caller would report a failure for a write that happened. Auth checks
+   * (`verifyAccessToken`) and wallet/unlock stay on `client`.
+   */
+  get reads(): SupabaseClient {
+    return this.readClient;
   }
 
   async verifyAccessToken(accessToken: string): Promise<SupabaseAuthUser> {

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
+import { apiFetch } from "../../lib/apiFetch";
+import { levelKey, useContentLevel } from "../../lib/contentLevel";
 import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
@@ -28,6 +30,7 @@ export default function GenrePage(genre: Genre) {
 }
 
 function GenrePageInner({ slug, label: genreLabel }: Genre) {
+  const level = useContentLevel(); // 18+ level: its own results and cache entry (#1102)
   const router = useRouter();
   usePageTitle(genreLabel);
 
@@ -50,9 +53,9 @@ function GenrePageInner({ slug, label: genreLabel }: Genre) {
       setError(false);
     });
     cacheOrFetch<{ items: GridBook[]; total: number }>(
-      `genre:${slug}:${page}`,
+      `genre:${slug}:${page}${levelKey(level)}`,
       async () => {
-        const r = await fetch(`${API_BASE}/books/genre/${slug}?page=${page}&limit=${PAGE_SIZE}`);
+        const r = await apiFetch(`${API_BASE}/books/genre/${slug}?page=${page}&limit=${PAGE_SIZE}`);
         if (!r.ok) throw new Error();
         return r.json();
       },
@@ -66,7 +69,7 @@ function GenrePageInner({ slug, label: genreLabel }: Genre) {
       .catch(() => { if (!superseded) setError(true); })
       .finally(() => { if (!superseded) setLoading(false); });
     return () => { superseded = true; };
-  }, [slug, page, retryCount]);
+  }, [slug, page, retryCount, level]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // A ?page= past the end (an old link, a typo) moves to the last page once the total is known

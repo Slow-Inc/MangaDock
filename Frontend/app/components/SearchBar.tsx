@@ -48,7 +48,7 @@ export default function SearchBar() {
             : "pointer-events-none w-0 opacity-0"
         }`}
       >
-        <input
+        <input aria-label="ค้นหาหนังสือ"
           ref={inputRef}
           type="text"
           value={query}

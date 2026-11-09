@@ -110,3 +110,26 @@ def test_until_stages_skip_no_text_finishes_and_reverts():
     assert finished is True
     assert driver.reverted is True
     assert driver.events == ['detection', 'ocr', 'progress:skip-no-text']
+
+
+def test_worker_slot_lock_covers_detection_and_ocr_only():
+    """#1123: the FIFO front-stage lock serialises the GPU stages (detect, OCR); textline merge (CPU, ~0.5 s of panel
+    sort) runs outside it so it overlaps the next page's detection. Measured: chapter median 16.0 -> 15.0 s, max
+    23.7 -> 17.6 s over 7 runs each."""
+    from manga_translator.request_scope import request_scope
+    region = types.SimpleNamespace(text='hi')
+    lock = asyncio.Lock()
+    held = {}
+
+    class LockSpy(FakeDriver):
+        async def _run_stage(self, name, fn, fallback):
+            held[name] = lock.locked()
+            return await super()._run_stage(name, fn, fallback)
+
+    driver = LockSpy({'detection': (['tl'], None, None), 'ocr': ['tl'], 'textline_merge': [region]})
+
+    async def main():
+        async with request_scope(stage_lock=lock):
+            return await mt.MangaTranslator._run_until_translation_stages(driver, _ctx(), _config())
+    _run(main())
+    assert held == {'detection': True, 'ocr': True, 'textline_merge': False}

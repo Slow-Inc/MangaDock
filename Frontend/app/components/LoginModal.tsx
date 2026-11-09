@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getDisposableEmailError, normalizeEmail } from "../lib/emailValidation";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import Loader from "./ui/Loader";
 
 type Mode = "login" | "register" | "forgot-password";
@@ -62,11 +63,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    if (isOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, close]);
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes, focus goes back to the opener
+  useModalDialog(overlayRef, close, mounted);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -183,8 +181,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   return createPortal(
     <div
       ref={overlayRef}
+      tabIndex={-1} role="dialog" aria-modal="true" aria-label={mode === "register" ? "สมัครสมาชิก" : mode === "forgot-password" ? "ลืมรหัสผ่าน" : "เข้าสู่ระบบ"}
       onClick={(e) => { if (e.target === overlayRef.current) close(); }}
-      className={`fixed inset-0 z-[300] flex items-end md:items-center justify-center md:p-4 bg-scrim/70 md:bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[300] outline-none flex items-end md:items-center justify-center md:p-4 bg-scrim/70 md:bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -356,6 +355,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Login */}
               <form
                 ref={loginRef}
+                inert={mode !== "login"} // the hidden panels stay laid out for the slide: keep them out of Tab (#1079)
                 onSubmit={handleLoginSubmit}
                 className={`transition-all duration-500 ${
                   mode === "login"
@@ -367,11 +367,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
-                    <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <input aria-label="อีเมล" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">รหัสผ่าน</label>
-                    <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required minLength={6} placeholder="••••••••" className={inputCls} />
+                    <input aria-label="รหัสผ่าน" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required minLength={6} placeholder="••••••••" className={inputCls} />
                   </div>
                   <div className="flex justify-end">
                     <button type="button" onClick={openForgotPassword} disabled={authLoading || !!socialLoading} className="text-xs text-ink-3 transition hover:text-ink-2 disabled:cursor-not-allowed disabled:opacity-50">
@@ -387,6 +387,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Forgot password */}
               <form
                 ref={forgotPasswordRef}
+                inert={mode !== "forgot-password"}
                 onSubmit={handleForgotPasswordSubmit}
                 className={`transition-all duration-500 ${
                   mode === "forgot-password"
@@ -402,7 +403,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
-                    <input type="email" value={forgotPasswordEmail} onChange={(e) => setForgotPasswordEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <input aria-label="อีเมล" type="email" value={forgotPasswordEmail} onChange={(e) => setForgotPasswordEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <button type="submit" disabled={authLoading || !!socialLoading} className={submitCls}>
                     {authLoading ? "กำลังส่งลิงก์รีเซ็ต..." : "รีเซ็ตรหัสผ่าน"}
@@ -413,6 +414,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Register */}
               <form
                 ref={registerRef}
+                inert={mode !== "register"}
                 onSubmit={handleRegisterSubmit}
                 className={`transition-all duration-500 ${
                   mode === "register"
@@ -424,19 +426,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">ชื่อผู้ใช้</label>
-                    <input type="text" value={registerName} onChange={(e) => setRegisterName(e.target.value)} required placeholder="ชื่อของคุณ" className={inputCls} />
+                    <input aria-label="ชื่อผู้ใช้" type="text" value={registerName} onChange={(e) => setRegisterName(e.target.value)} required placeholder="ชื่อของคุณ" className={inputCls} />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">อีเมล</label>
-                    <input type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
+                    <input aria-label="อีเมล" type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} required placeholder="your@email.com" className={inputCls} />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">รหัสผ่าน</label>
-                    <input type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required minLength={6} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputCls} />
+                    <input aria-label="รหัสผ่าน" type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required minLength={6} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputCls} />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-ink-2">ยืนยันรหัสผ่าน</label>
-                    <input type="password" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} required minLength={6} placeholder="กรอกรหัสผ่านอีกครั้ง" className={inputCls} />
+                    <input aria-label="ยืนยันรหัสผ่าน" type="password" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} required minLength={6} placeholder="กรอกรหัสผ่านอีกครั้ง" className={inputCls} />
                   </div>
                   <button type="submit" disabled={authLoading || !!socialLoading} className={submitCls}>
                     {authLoading ? "กำลังสมัคร..." : "สมัครสมาชิก"}

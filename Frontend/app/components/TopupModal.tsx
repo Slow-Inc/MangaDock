@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTopupCreate, TIERS } from "../hooks/useTopupCreate";
@@ -10,6 +10,7 @@ import { errMessage } from "@/lib/errMessage";
 import { PRIMARY_FILL } from "./ui/Button";
 import Mascot from "./mascot/Mascot";
 import Coin from "./ui/Coin";
+import { useModalDialog } from "../hooks/useDialogFocus";
 
 function formatCountdown(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -67,7 +68,7 @@ function QrStep({
     <>
       <div className="border-b border-line px-5 py-4 flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">สแกน QR เพื่อชำระเงิน</h2>
-        <button onClick={handleCancel} className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
+        <button onClick={handleCancel} aria-label="ยกเลิกการชำระเงิน" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
         {status === "paid" ? (
@@ -141,6 +142,11 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
     if (!isOpen) setQrData(null);
   }, [isOpen]);
 
+  // aria-modal (#1073): focus moves in, Tab stays inside, Escape closes as the scrim does (a pending payment stays
+  // pending, as it does on a scrim click), focus goes back to the opener
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalDialog(dialogRef, onClose, isOpen);
+
   if (!isOpen) return null;
 
   const onProceed = async () => {
@@ -152,7 +158,8 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 p-4"
+      ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={qrData ? "สแกน QR เพื่อชำระเงิน" : "เติมเหรียญ"}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-scrim/70 p-4 outline-none"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-xs rounded-2xl border border-line bg-surface shadow-2xl">
@@ -176,7 +183,7 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <p className="mt-0.5 text-xs text-ink-3">1 เหรียญ = 1 บาท • PromptPay QR</p>
                 </div>
               </div>
-              <button onClick={onClose} className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
+              <button onClick={onClose} aria-label="ปิด" className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
             </div>
             <div className="p-5">
               <div className="mb-3 grid grid-cols-3 gap-2">
@@ -195,7 +202,7 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                 ))}
               </div>
               <div className="mb-4">
-                <input
+                <input aria-label="จำนวนอื่น (ขั้นต่ำ 20)"
                   type="number"
                   min="20"
                   placeholder="จำนวนอื่น (≥20)"

@@ -1,0 +1,231 @@
+{
+ "page": "result/corpus2/en_Mairimashita__Iruma_kun_c3_p1.png",
+ "regions": [
+  {
+   "index": 0,
+   "xyxy": [
+    434,
+    144,
+    540,
+    284
+   ],
+   "src": "I- I DONT WANT THEM.",
+   "dst": "ฉ-ฉันท้อมัน",
+   "container": 0,
+   "container_box": [
+    367,
+    67,
+    602,
+    371
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 34,
+   "font_px": 34,
+   "dst_box": [
+    448.5,
+    152.8,
+    525.5,
+    275.2
+   ]
+  },
+  {
+   "index": 1,
+   "xyxy": [
+    603,
+    160,
+    664,
+    182
+   ],
+   "src": "AGAI-",
+   "dst": "อีกแ-",
+   "container": 1,
+   "container_box": [
+    592,
+    105,
+    675,
+    234
+   ],
+   "branch": "bubble_fit_tall",
+   "font_src_px": 22,
+   "font_px": 22,
+   "dst_box": [
+    608.8533487297922,
+    154.37794457274828,
+    656.8533487297922,
+    180.77794457274825
+   ]
+  },
+  {
+   "index": 2,
+   "xyxy": [
+    360,
+    835,
+    392,
+    858
+   ],
+   "src": "I..",
+   "dst": "ฉ-",
+   "container": 2,
+   "container_box": [
+    343,
+    766,
+    478,
+    896
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 23,
+   "font_px": 20,
+   "dst_box": [
+    366,
+    834.5,
+    386,
+    858.5
+   ]
+  },
+  {
+   "index": 3,
+   "xyxy": [
+    236,
+    946,
+    287,
+    982
+   ],
+   "src": "W-",
+   "dst": "ฉ-",
+   "container": 3,
+   "container_box": [
+    193,
+    892,
+    305,
+    1041
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 36,
+   "font_px": 30,
+   "dst_box": [
+    246.5,
+    946,
+    276.5,
+    982
+   ]
+  },
+  {
+   "index": 4,
+   "xyxy": [
+    401,
+    808,
+    464,
+    844
+   ],
+   "src": "SORRY CLARA.",
+   "dst": "ขอโทษนะ คลารา",
+   "container": 2,
+   "container_box": [
+    343,
+    766,
+    478,
+    896
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 17,
+   "font_px": 20,
+   "dst_box": [
+    394,
+    802,
+    471,
+    850
+   ]
+  },
+  {
+   "index": 5,
+   "xyxy": [
+    679,
+    857,
+    736,
+    917
+   ],
+   "src": "AH-DO YOU N LIKE THESE SNACKS?",
+   "dst": "อ-เธอชอบขนมพวกนี้ไหม?",
+   "container": 4,
+   "container_box": [
+    667,
+    752,
+    745,
+    1006
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 11,
+   "font_px": 20,
+   "dst_box": [
+    680.5,
+    827,
+    734.5,
+    947
+   ]
+  },
+  {
+   "index": 6,
+   "xyxy": [
+    678,
+    961,
+    716,
+    974
+   ],
+   "src": "THEN-",
+   "dst": "แล้ว-",
+   "container": 4,
+   "container_box": [
+    667,
+    752,
+    745,
+    1006
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 13,
+   "font_px": 20,
+   "dst_box": [
+    675.5,
+    955.5,
+    718.5,
+    979.5
+   ]
+  },
+  {
+   "index": 7,
+   "xyxy": [
+    641,
+    1004,
+    683,
+    1041
+   ],
+   "src": "T THATS NOT IT!",
+   "dst": "ที-ที่ฉันหมายถึงไม่ใช่แบบนั้น",
+   "container": 5,
+   "container_box": [
+    615,
+    982,
+    699,
+    1069
+   ],
+   "branch": "clean_layout",
+   "font_src_px": 11,
+   "font_px": 16,
+   "dst_box": [
+    626,
+    993.7,
+    698,
+    1051.3
+   ]
+  }
+ ],
+ "timing_ms": {
+  "wall": 6641,
+  "detection": 463,
+  "ocr": 552,
+  "textline_merge": 636,
+  "translation": 4546,
+  "mask_refinement": 87,
+  "inpainting": 174,
+  "rendering": 78
+ }
+}

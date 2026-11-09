@@ -24,7 +24,7 @@ _initialize_env()
 
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.responses import Response, StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -38,6 +38,9 @@ from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
+from server.win_process import contain_self
+from server.worker_slots import slots_from_env
+from server.worker_plan import exited_worker_ports, plan_extra_workers, worker_settings_from_env
 from server.path_utils import safe_result_folder
 from server import metrics, diagnostics, auth as dev_auth
 from server.status_snapshot import build_snapshot, to_messages
@@ -81,7 +84,8 @@ if RESULT_ROOT.exists():
 async def health():
     """Returns service status. Use this for liveness/readiness probes."""
     worker_count = len(executor_instances.list)
-    free_worker_count = executor_instances.free_executors()
+    # #1123: count workers, not slots (free_executors() counts free slots for the queue).
+    free_worker_count = sum(1 for x in executor_instances.list if x.in_flight == 0)
     return {
         "status": "ok" if worker_count > 0 else "starting",
         "workers": worker_count,
@@ -282,19 +286,15 @@ async def translate_json(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
     return to_translation(ctx)
 
-@app.post("/translate/bytes", response_class=StreamingResponse, tags=["api", "json"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
+@app.post("/translate/bytes", response_class=Response, tags=["api", "json"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def translate_bytes(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return Response(content=to_translation(ctx).to_bytes(), media_type="application/octet-stream")
 
-@app.post("/translate/image", response_description="the result image", tags=["api", "json"],response_class=StreamingResponse)
-async def image(req: Request, data: TranslateRequest) -> StreamingResponse:
+@app.post("/translate/image", response_description="the result image", tags=["api", "json"], response_class=Response)
+async def image(req: Request, data: TranslateRequest) -> Response:
     ctx = await get_ctx(req, data.config, data.image)
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    return Response(content=transform_to_image(ctx), media_type="image/png")
 
 @app.post("/translate/json/stream", response_class=StreamingResponse,tags=["api", "json"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_json(req: Request, data: TranslateRequest) -> StreamingResponse:
@@ -315,23 +315,19 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     ctx = await get_ctx(req, conf, img)
     return to_translation(ctx)
 
-@app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
+@app.post("/translate/with-form/bytes", response_class=Response, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
     img = await image.read()
     conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return Response(content=to_translation(ctx).to_bytes(), media_type="application/octet-stream")
 
-@app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"],response_class=StreamingResponse)
-async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+@app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"], response_class=Response)
+async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> Response:
     img = await image.read()
     conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    return Response(content=transform_to_image(ctx), media_type="image/png")
 
 
 @app.post("/translate/with-form/patches", response_description="JSON with per-region patch data", tags=["api", "form"])
@@ -565,7 +561,39 @@ def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
     return cmds
 
 
-def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+_WORKER_PROCS = []
+_WORKER_PORT_PROCS = {}   # port -> Popen, for the dead-worker watchdog
+_SIGNAL_HANDLERS_INSTALLED = False
+
+
+def _terminate_all_workers():
+    for proc in list(_WORKER_PROCS):
+        terminate_process(proc)
+
+
+def _install_worker_cleanup():
+    """Stop every worker this front spawned on process exit (idempotent registration).
+
+    uvicorn installs its own SIGINT/SIGTERM handlers when it runs, overriding any we set
+    earlier, so the signal path alone leaks a worker on Ctrl+C — atexit (plus the
+    __main__ finally) is the reliable backstop. terminate_process is idempotent, so the
+    overlap is safe.
+    """
+    global _SIGNAL_HANDLERS_INSTALLED
+    if _SIGNAL_HANDLERS_INSTALLED:
+        return
+    _SIGNAL_HANDLERS_INSTALLED = True
+    atexit.register(_terminate_all_workers)
+
+    def handle_exit_signals(signum, frame):
+        _terminate_all_workers()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, handle_exit_signals)
+    signal.signal(signal.SIGTERM, handle_exit_signals)
+
+
+def _spawn_worker(host: str, port: int, nonce: str, params: Namespace, device=None):
     # Fail loudly if the worker port is taken (usually an orphaned worker) instead
     # of letting the subprocess fail to bind and the front hang on /register (#193).
     ensure_worker_port_free('127.0.0.1', port, params.port)
@@ -573,34 +601,69 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     cmds = _build_worker_cmd(params, port, nonce)
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
-    proc = subprocess.Popen(cmds, cwd=parent)
-    print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} "
-          f"(front pid={os.getpid()} on {host}:{params.port})")
-    executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
-
-    # Clean up the worker on every exit path. uvicorn installs its own SIGINT/
-    # SIGTERM handlers when it runs, overriding the ones below, so the signal path
-    # alone leaks the worker on Ctrl+C — atexit (plus the __main__ finally) is the
-    # reliable backstop. terminate_process is idempotent, so the overlap is safe.
-    atexit.register(terminate_process, proc)
-
-    def handle_exit_signals(signum, frame):
-        terminate_process(proc)
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_exit_signals)
-    signal.signal(signal.SIGTERM, handle_exit_signals)
-
+    env = None
+    if device is not None:
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = str(device)
+    proc = subprocess.Popen(cmds, cwd=parent, env=env)
+    _WORKER_PROCS.append(proc)
+    _WORKER_PORT_PROCS[port] = proc
+    where = f"GPU {device}" if device is not None else "front GPU"
+    print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} ({where}; "
+          f"front pid={os.getpid()} on {host}:{params.port})")
+    executor_instances.register(ExecutorInstance(
+        ip='127.0.0.1', port=port, slots=slots_from_env(),
+        device=(env or os.environ).get('CUDA_VISIBLE_DEVICES')))
+    _install_worker_cleanup()
     return proc
 
+
+@app.on_event("startup")
+async def _start_worker_watchdog():
+    asyncio.create_task(_worker_watchdog())
+
+
+async def _worker_watchdog(interval_s: float = 5.0):
+    """Stop dispatching to a front-spawned worker whose process exited (Strata replicas: no routing to a dead engine)."""
+    while True:
+        await asyncio.sleep(interval_s)
+        for port in exited_worker_ports(_WORKER_PORT_PROCS):
+            if executor_instances.unregister(port):
+                print(f"MIT worker on :{port} exited (code {_WORKER_PORT_PROCS[port].poll()}) - removed from dispatch")
+
+
+def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    return _spawn_worker(host, port, nonce, params)
+
+
+def spawn_extra_workers(host: str, nonce: str, params: Namespace):
+    """Strata-style batch slots: MIT_WORKERS + MIT_WORKER_GPUS start extra workers on this front.
+
+    Optional and best-effort — a taken port or a failed spawn must never stop the primary
+    worker, so each plan entry is attempted independently and logged.
+    """
+    count, gpu_ids = worker_settings_from_env()
+    spawned = []
+    for spec in plan_extra_workers(params.port, count, gpu_ids):
+        try:
+            spawned.append(_spawn_worker(host, spec['port'], nonce, params, device=spec['device']))
+        except Exception as exc:  # noqa: BLE001 - an extra worker is an optimisation
+            print(f"MIT extra worker skipped on 127.0.0.1:{spec['port']}: {exc}")
+    return spawned
+
 def prepare(args):
+    # #1119 (Strata-xeno serve/winjob.py): the front joins a kill-on-close job before spawning, so every worker it
+    # starts dies with it even when it is force-killed; also opts the front out of EcoQoS.
+    contain_self()
     global nonce
     if args.nonce is None:
         nonce = os.getenv('MT_WEB_NONCE', generate_nonce())
     else:
         nonce = args.nonce
     if args.start_instance:
-        return start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        proc = start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        spawn_extra_workers('127.0.0.1', nonce, args)
+        return proc
     folder_name= "upload-cache"
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)

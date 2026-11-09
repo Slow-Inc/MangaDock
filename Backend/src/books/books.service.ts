@@ -24,7 +24,7 @@ import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
 import { MangaCatalogService } from './manga-catalog.service';
-import { LandingService } from './landing.service';
+import { LandingService, type TranslateOptions } from './landing.service';
 import { LlmService } from './llm.service';
 import {
   type LandingBook,
@@ -73,6 +73,8 @@ export function toPatchEntries(
     url: urls[i],
   }));
 }
+
+import { OFF_SCOPE, type RatingScope } from '../common/content-rating';
 
 @Injectable()
 export class BooksService {
@@ -445,8 +447,9 @@ export class BooksService {
   getMangaChapters(
     mangaId: string,
     forceLocal = false,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<MangaChapter[]> {
-    return this.catalog.getMangaChapters(mangaId, forceLocal);
+    return this.catalog.getMangaChapters(mangaId, forceLocal, scope);
   }
 
   getMangaChapterPages(
@@ -456,28 +459,42 @@ export class BooksService {
     return this.catalog.getMangaChapterPages(chapterId, forceLocal);
   }
 
-  getMangaPreview(mangaId: string): Promise<MangaPreview | null> {
-    return this.catalog.getMangaPreview(mangaId);
+  getMangaPreview(
+    mangaId: string,
+    scope: RatingScope = OFF_SCOPE,
+  ): Promise<MangaPreview | null> {
+    return this.catalog.getMangaPreview(mangaId, scope);
   }
 
   getMangaDetail(mangaId: string, forceLocal = false): Promise<MangaDetail> {
     return this.catalog.getMangaDetail(mangaId, forceLocal);
   }
 
-  getNewReleases(page = 1, limit = 28, tag?: string) {
-    return this.catalog.getNewReleases(page, limit, tag);
+  getNewReleases(
+    page = 1,
+    limit = 28,
+    tag?: string,
+    scope: RatingScope = OFF_SCOPE,
+  ) {
+    return this.catalog.getNewReleases(page, limit, tag, scope);
   }
 
-  getGenreManga(slug: string, page = 1, limit = 28) {
-    return this.catalog.getGenreManga(slug, page, limit);
+  getGenreManga(
+    slug: string,
+    page = 1,
+    limit = 28,
+    scope: RatingScope = OFF_SCOPE,
+  ) {
+    return this.catalog.getGenreManga(slug, page, limit, scope);
   }
 
   // ─── Orchestrated methods ─────────────────────────────────────────────────────
 
   translateDescription(
     text: string,
+    opts?: TranslateOptions,
   ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
-    return this.landing.translateDescription(text);
+    return this.landing.translateDescription(text, opts);
   }
 
   getLandingBooks(forceLocal = false): Promise<LandingPayload> {
@@ -494,6 +511,7 @@ export class BooksService {
     status?: 'ongoing' | 'completed' | 'hiatus',
     yearFrom?: number,
     yearTo?: number,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{ items: LandingBook[]; total: number }> {
     return this.catalog.searchBooks(
       query,
@@ -503,10 +521,15 @@ export class BooksService {
       status,
       yearFrom,
       yearTo,
+      scope,
     );
   }
 
   getRelated(id: string, limit = 10): Promise<LandingBook[]> {
     return this.catalog.getRelated(id, limit);
+  }
+
+  getContentRatings(ids: string[]) {
+    return this.catalog.getContentRatings(ids);
   }
 }

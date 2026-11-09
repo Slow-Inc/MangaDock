@@ -45,3 +45,23 @@ def test_chat_system_template_appends_prev_context_block():
     out = _Cfg(block).chat_system_template
     assert 'BASE TEMPLATE' in out and block in out                 # appended
     assert _Cfg(None).chat_system_template == 'BASE TEMPLATE'      # absent → unchanged
+
+
+def test_translator_config_carries_concise_bubbles_through_chatgpt_config_892():
+    """The Backend sends translator.concise_bubbles (#526); without this field Pydantic dropped it and the
+    flag was dead (#892). It rides the same chatgpt_config seam as the context fields."""
+    cfg = TranslatorConfig(concise_bubbles=True)
+    merged = cfg.chatgpt_config
+    assert merged is not None
+    assert merged.concise_bubbles is True
+
+
+def test_concise_bubbles_absent_keeps_chatgpt_config_none_892():
+    assert TranslatorConfig().chatgpt_config is None
+
+
+def test_concise_bubbles_coexists_with_context_892():
+    cfg = TranslatorConfig(concise_bubbles=True, series_context='SERIES')
+    merged = cfg.chatgpt_config
+    assert merged.concise_bubbles is True
+    assert merged.series_context == 'SERIES'

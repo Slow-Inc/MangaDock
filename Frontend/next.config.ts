@@ -37,6 +37,18 @@ const nextConfig: NextConfig = {
   // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN)
   // or via Cloudflare Tunnel (add hostname to NEXT_DEV_EXTRA_ORIGINS in .env.local).
   allowedDevOrigins: [...getLocalIPv4Addresses(), ...getExtraDevOrigins()],
+  // The /docs page scans the repository docs/ folder as UTF-8 text, so Next traces the
+  // whole tree into the serverless function and the benchmark screenshots alone pushed it
+  // past Vercel's 250 MB limit (#1064). The page never renders binaries, so drop them here.
+  outputFileTracingExcludes: {
+    "/docs": [
+      "../docs/**/*.png",
+      "../docs/**/*.jpg",
+      "../docs/**/*.jpeg",
+      "../docs/**/*.webp",
+      "../docs/**/*.gif",
+    ],
+  },
   async rewrites() {
     const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
     return [

@@ -6,14 +6,32 @@ from .config_gpt import ConfigGPT  # Import the `gpt_config` parsing parent clas
 
 try:
     import openai
-    import httpx
 except ImportError:
     openai = None
 import asyncio
 import time
+import weakref
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
-from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+from .keys import (CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL,
+                   CUSTOM_OPENAI_MODEL_CONF, CUSTOM_OPENAI_EXTRA_HEADERS)
+from ..extra_headers import parse_extra_headers
+from ..runtime_options import resolve_reasoning_effort
+from ..tls import ssl_context
+from ..anthropic_messages import anthropic_endpoint, anthropic_model, post_messages, protocol_from_env, to_anthropic_payload
+from ..response_protocol import post_responses, responses_endpoint, responses_model, to_responses_payload
+
+
+# #1119: Anthropic-protocol connection pools, one per event loop (see CustomOpenAiTranslator._anthropic_client)
+_ANTHROPIC_POOLS = weakref.WeakKeyDictionary()
+
+
+class EmptyContentError(Exception):
+    """#631: the gateway returned a completion whose ``message.content`` is ``None``
+    (the #623 dense-page failure mode — a qwen3-style model can emit only EOS/reasoning
+    and no content; thinking-off reduces but does not eliminate it). Raised instead of
+    returning ``None`` so the ``_translate`` retry loop treats it as a retryable server
+    fault — ``extract_capture_groups(None)`` would ``TypeError`` and 500 the whole page."""
 
 
 def resolve_enable_thinking(env=None) -> bool:
@@ -29,13 +47,75 @@ def resolve_enable_thinking(env=None) -> bool:
 
 
 def thinking_extra_body(enable_thinking: bool):
-    """``extra_body`` for ``chat.completions.create`` that suppresses qwen3-style
-    thinking when disabled (``chat_template_kwargs.enable_thinking=false`` — the
-    lever the 9arm/vLLM gateway honours; a top-level ``enable_thinking`` is
-    ignored). Returns ``None`` when thinking is enabled so the call is unchanged."""
+    """``extra_body`` for ``chat.completions.create`` intended to suppress qwen3-style
+    thinking when disabled (``chat_template_kwargs.enable_thinking=false``). Returns
+    ``None`` when thinking is enabled so the call is unchanged.
+
+    NOTE (measured 2026-07-12, qwen3.6-35b-a3b via 9arm): this lever is a NO-OP on that
+    gateway — enable_thinking=false / reasoning_effort=none / '/no_think' all still emit
+    ~4.3–6.4k chars of reasoning. It is kept for a genuinely toggleable model; on 9arm the
+    real mitigation is the reasoning-sized token budget (see resolve_max_completion_tokens),
+    NOT this lever."""
     if enable_thinking:
         return None
     return {'chat_template_kwargs': {'enable_thinking': False}}
+
+
+def resolve_max_completion_tokens(env=None, default: int = 4096, *, thinking: bool = False) -> int:
+    """#631: the completion-token cap for the translate call. qwen3.6 via the 9arm gateway
+    IGNORES every thinking-disable lever (chat_template_kwargs.enable_thinking / reasoning_effort
+    / '/no_think' — measured: ~6-8k chars of reasoning emitted regardless), so the completion
+    budget must fit reasoning + content. The old cap (``_MAX_TOKENS // 2`` = 2048) hit
+    ``finish=length`` with ``content=None`` on dense pages (#623's root, resurfaced).
+
+    Two SEPARATE caps so the reasoning overhead is budgeted explicitly:
+    - thinking OFF → ``CUSTOM_OPENAI_MAX_COMPLETION_TOKENS`` (default 4096; measured dense
+      page reasoning+content ≈ 2.7k even though we *ask* the gateway to stop thinking — it
+      won't, but 4096 still fits).
+    - thinking ON → ``CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS`` (default 8192), a larger
+      dedicated cap because an explicitly-thinking model reasons more/longer before it emits
+      content, so it needs extra headroom or the content is truncated to ``None``."""
+    if env is None:
+        env = os.environ
+    if thinking:
+        return _positive_int_env(env, 'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS', 8192)
+    return _positive_int_env(env, 'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS', default)
+
+
+def _positive_int_env(env, key: str, default: int) -> int:
+    """Parse ``env[key]`` as a positive int, falling back to ``default`` on missing/invalid/≤0."""
+    try:
+        v = int(str(env.get(key, '')).strip())
+        return v if v > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_numbered_translations(response: str, query_size: int):
+    """Map a ``<|i|>text`` response to EXACTLY ``query_size`` translations, BY INDEX.
+
+    #535 root: the former inline ``re.split(r'<\\|\\d+\\|>', ...)`` was positional (a dropped
+    index shifted every later bubble) and strict (a malformed ``<|10|`` with no closing ``>``
+    leaked into the text). Delegates to ``numbered_contract`` (index-based + malformed-marker
+    tolerant); falls back to a whole-body / newline split only when there is no marker at all."""
+    from .numbered_contract import contract_gap, normalize_numbered_output, _BLOCK_RE
+
+    if _BLOCK_RE.search(response or ''):
+        return [('' if t.startswith('[Missing item') else t)
+                for t in normalize_numbered_output(response, query_size)]
+    if query_size == 1:
+        return [(response or '').strip()]
+    parts = [t.strip() for t in re.split(r'\n', response or '') if t.strip()]
+    if len(parts) > query_size:
+        parts = parts[:query_size]
+    elif len(parts) < query_size:
+        parts = parts + [''] * (query_size - len(parts))
+    return parts
+
+
+#: #1141: models that refused the page image get text-only requests for the rest of the process
+_TEXT_ONLY_MODELS = set()
+_IMAGE_REFUSAL = re.compile(r'image|vision|multimodal|multi-modal', re.I)
 
 
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
@@ -65,7 +145,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         ConfigGPT.__init__(self, config_key=_CONFIG_KEY)
         self.model = model
         CommonTranslator.__init__(self)
-        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama") # required, but unused for ollama
+        # Optional gateway headers from CUSTOM_OPENAI_EXTRA_HEADERS (JSON object). OpenCode Go needs
+        # {"x-opencode-session": "<stable id>"} or it answers 400 MissingSessionID.
+        extra_headers = parse_extra_headers(CUSTOM_OPENAI_EXTRA_HEADERS)
+        if CUSTOM_OPENAI_EXTRA_HEADERS.strip() and not extra_headers:
+            self.logger.warning("CUSTOM_OPENAI_EXTRA_HEADERS is not a valid JSON object - ignored")
+        self._extra_headers = extra_headers or {}
+        client_kwargs = {'default_headers': extra_headers} if extra_headers else {}
+        # #1119: shared TLS context - building one per client costs ~140 ms of CPU on the event loop
+        client_kwargs['http_client'] = openai.DefaultAsyncHttpxClient(verify=ssl_context())
+        self.client = openai.AsyncOpenAI(api_key=api_key or CUSTOM_OPENAI_API_KEY or "ollama", **client_kwargs) # required, but unused for ollama
         self.client.base_url = api_base or CUSTOM_OPENAI_API_BASE
         self.token_count = 0
         self.token_count_last = 0
@@ -126,7 +215,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         if to_lang in self.chat_sample:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 self.chat_sample[to_lang][0],
                 'Assistant:',
@@ -137,7 +226,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         else:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 prompt,
             ])
@@ -152,12 +241,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             ratelimit_attempt = 0
             server_error_attempt = 0
             timeout_attempt = 0
+            contract_attempt = 0
             while True:
                 request_task = asyncio.create_task(self._request_translation(to_lang, prompt))
                 started = time.time()
                 while not request_task.done():
-                    await asyncio.sleep(0.1)
-                    if time.time() - started > self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2):
+                    # #1119: wake when the answer arrives (was a 0.1 s poll: up to 100 ms added to every call)
+                    limit = self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2)
+                    await asyncio.wait({request_task}, timeout=max(0.0, started + limit - time.time()))
+                    if not request_task.done() and time.time() - started > limit:
                         # Server takes too long to respond
                         if timeout_attempt >= self._TIMEOUT_RETRY_ATTEMPTS:
                             # Surface a structured, actionable failure (PRD #279, slice 1e)
@@ -179,6 +271,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         started = time.time()
                 try:
                     response = await request_task
+                    # #1026: index-based normalization cannot detect a MERGED/SPLIT line. Count the blocks
+                    # against the batch size and re-ask once; a mismatch here shifts every later balloon.
+                    from .numbered_contract import contract_gap
+                    if contract_gap(response, query_size) and contract_attempt < 2:
+                        contract_attempt += 1
+                        self.logger.warning(
+                            f'Numbered contract mismatch for {query_size} lines - retrying the batch '
+                            f'(attempt {contract_attempt})')
+                        await asyncio.sleep(0.5)
+                        continue
                     break
                 except openai.RateLimitError:  # Server returned ratelimit response
                     ratelimit_attempt += 1
@@ -195,6 +297,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         raise
                     self.logger.warning(f'Restarting request due to a server error. Attempt: {server_error_attempt}')
                     await asyncio.sleep(1)
+                except EmptyContentError:  # #631: gateway returned content=None (dense-page mode)
+                    server_error_attempt += 1
+                    if server_error_attempt >= self._RETRY_ATTEMPTS:
+                        self.logger.error(
+                            'Translator returned empty content (content=None) on every attempt — '
+                            'gateway/model dense-request failure (#623/#631).')
+                        raise
+                    self.logger.warning(f'Restarting request due to empty content (content=None). Attempt: {server_error_attempt}')
+                    await asyncio.sleep(1)
 
             # self.logger.debug('-- GPT Response --\n' + response)
             
@@ -203,41 +314,9 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             response=self.extract_capture_groups(response, rf"{self.rgx_capture}")
 
 
-            # Sometimes it will return line like "<|9>demo", and we need to fix it.
-            def add_pipe(match):
-                number = match.group(1)
-                return f"<|{number}|>"
-            response = re.sub(r"<\|?(\d+)\|?>", add_pipe, response)
-            
-
-            # self.logger.debug('-- GPT Response (filtered) --\n' + response)
-
-            # @NOTE: This should *should* be superflous now, due to `extract_capture_groups`:
-            # 
-            # Remove any text preceeding the first translation.
-            new_translations = re.split(r'<\|\d+\|>', 'pre_1\n' + response)[1:]
-            # new_translations = re.split(r'<\|\d+\|>', response)
-
-            # When there is only one query LLMs likes to exclude the <|1|>
-            if not new_translations:
-                new_translations = [response]
-
-            # Immediately clean leading and trailing whitespace from each translation text
-            new_translations = [t.strip() for t in new_translations]
-
-            # When there is only one query LLMs likes to exclude the <|1|> # Maybe it can be removed, but it causes no errors
-            if not new_translations[0].strip():
-                new_translations = new_translations[1:]
-
-            if len(new_translations) <= 1 and query_size > 1:
-                # Try splitting by newlines instead
-                new_translations = re.split(r'\n', response)
-
-            if len(new_translations) > query_size:
-                new_translations = new_translations[: query_size]
-            elif len(new_translations) < query_size:
-                new_translations = new_translations + [''] * (query_size - len(new_translations))
-
+            # #535: index-based, malformed-marker-tolerant parse (was a positional
+            # re.split that shifted on a dropped index and leaked '<|10|' fragments).
+            new_translations = parse_numbered_translations(response, query_size)
             translations.extend([t.strip() for t in new_translations])
 
         for t in translations:
@@ -249,8 +328,50 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         return translations
 
+    async def aclose_clients(self):
+        """#1123: close this instance's HTTP clients (called at the end of a worker-slot request scope). The Anthropic
+        pool is shared by every translator on the loop (#1119) and stays open."""
+        await self.client.close()
+
+    def _anthropic_client(self):
+        """#1119: one Anthropic-protocol connection pool per event loop, shared by the per-page translators of worker
+        slots - a fresh TCP + TLS connection to the gateway cost ~0.25-0.4 s per request against a warm one."""
+        import httpx
+        loop = asyncio.get_running_loop()
+        client = _ANTHROPIC_POOLS.get(loop)
+        if client is None or client.is_closed:
+            client = _ANTHROPIC_POOLS[loop] = httpx.AsyncClient(timeout=None, verify=ssl_context())
+        return client
+
+    async def _request_anthropic(self, messages, model, max_tokens):
+        """#1119: the same request on the Anthropic Messages protocol (CUSTOM_OPENAI_PROTOCOL=anthropic).
+
+        Errors map onto the retry loop's existing paths (see anthropic_messages.post_messages); timeouts stay with
+        the outer watchdog, so the client has none. extra_body knobs (thinking, reasoning_effort) are OpenAI-only and
+        are not sent here.
+        """
+        headers = {'Authorization': f'Bearer {self.client.api_key}', 'anthropic-version': '2023-06-01',
+                   **self._extra_headers}
+        return await post_messages(self._anthropic_client(), anthropic_endpoint(str(self.client.base_url)), headers,
+                                   to_anthropic_payload(messages, model, max_tokens))
+
+    async def _request_responses(self, messages, model, max_tokens):
+        """#1143: the same request on the OpenAI Responses protocol (CUSTOM_OPENAI_PROTOCOL=responses).
+
+        gpt-6-luna is served only here; the chat-completions endpoint answers ModelProtocolUnsupported. The HTTP
+        pool is the Anthropic one (same gateway, same TLS), and extra_body knobs are OpenAI-chat-only."""
+        headers = {'Authorization': f'Bearer {self.client.api_key}', **self._extra_headers}
+        return await post_responses(self._anthropic_client(), responses_endpoint(str(self.client.base_url)),
+                                    headers, to_responses_payload(messages, model, max_tokens))
+
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        # #1143 Track B5: scene notes from the per-page analyst ride in front of the numbered segments (empty
+        # string when MIT_VISION_CONTEXT is off, so the prompt is byte-identical to today).
+        from ..vision_context import current_vision_context
+        notes = current_vision_context()
+        if notes:
+            prompt = notes + '\n\n' + prompt
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
         # Add chat samples if available
         lang_chat_samples = self.get_chat_sample(to_lang)
@@ -258,38 +379,63 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             messages.append({'role': 'user', 'content': lang_chat_samples[0]})
             messages.append({'role': 'assistant', 'content': lang_chat_samples[1]})
 
-        messages.append({'role': 'user', 'content': prompt})
+        # #1141: the page image goes with the request, so the model sees speaker, gender and scene
+        from ..page_image import current_page_image, with_page_image
+        protocol = protocol_from_env()
+        anthropic = protocol == 'anthropic'
+        if anthropic:
+            sent_model = anthropic_model(self.model or CUSTOM_OPENAI_MODEL)
+        elif protocol == 'responses':
+            sent_model = responses_model(self.model or CUSTOM_OPENAI_MODEL)
+        else:
+            sent_model = self.model or CUSTOM_OPENAI_MODEL
+        # the first call of a page encodes it; a thread keeps the JPEG encode off the slots' shared event loop
+        page = await asyncio.to_thread(current_page_image) if sent_model not in _TEXT_ONLY_MODELS else None
+        messages.append({'role': 'user', 'content': with_page_image(prompt, page, protocol_from_env()) if page else prompt})
 
-        # #623: a reasoning model spends the whole completion budget on <think> and
-        # returns content=None, which #631 now turns into a retryable APIError. This is
-        # the root cause — opt out of thinking unless the deploy explicitly wants it.
-        extra_body = thinking_extra_body(resolve_enable_thinking())
-
-        response = await self.client.chat.completions.create(
+        create_kwargs = dict(
             model=self.model or CUSTOM_OPENAI_MODEL,
             messages=messages,
-            max_tokens=self._MAX_TOKENS // 2,
+            # #631: was `self._MAX_TOKENS // 2` (=2048) — not enough for qwen3.6's
+            # un-disableable reasoning (~2k tokens) + content on dense pages → finish=length,
+            # content=None, whole-page 500. See resolve_max_completion_tokens.
+            max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking()),
             temperature=self.temperature,
             top_p=self.top_p,
-            extra_body=extra_body,
         )
-
-        # #631: the gateway can return message.content = None (e.g. the model spent its
-        # token budget on a dense page). A None/non-string content must be a failed
-        # attempt through the existing retry/error handling (the `except openai.APIError`
-        # branch in _translate), not a TypeError from extract_capture_groups downstream.
-        content = response.choices[0].message.content
-        if not isinstance(content, str):
-            # finish_reason lives on the choice, not the message (openai SDK)
-            finish_reason = getattr(response.choices[0], 'finish_reason', None)
-            self.logger.warning(
-                f'API returned no usable text content (finish_reason={finish_reason}); '
-                f'treating as a failed attempt')
-            raise openai.APIError(
-                'translator returned no usable text content (message.content is not a string)',
-                request=httpx.Request('POST', str(self.client.base_url or 'unknown')),
-                body=None,
-            )
+        # #623: disable the model's native thinking (qwen3-style) unless the operator
+        # opts back in via CUSTOM_OPENAI_ENABLE_THINKING — otherwise a reasoning model
+        # burns the whole max_tokens budget on <think> and returns empty content on
+        # dense pages (verified: dense group 2048-tok exhausted → None; thinking off → 86 tok).
+        _extra = thinking_extra_body(resolve_enable_thinking())
+        # Optional reasoning budget for OpenAI-style reasoning models (OpenCode Go accepts it).
+        _effort = resolve_reasoning_effort()
+        if _effort:
+            _extra = dict(_extra or {})
+            _extra['reasoning_effort'] = _effort
+        if _extra is not None:
+            create_kwargs['extra_body'] = _extra
+        async def send():
+            if anthropic:
+                return await self._request_anthropic(messages, sent_model, create_kwargs['max_tokens'])
+            if protocol == 'responses':
+                return await self._request_responses(messages, sent_model, create_kwargs['max_tokens'])
+            return await self.client.chat.completions.create(**create_kwargs)
+        try:
+            response = await send()
+        except openai.APIError as e:
+            # #1141: a request the gateway refuses (400/422) with the image goes again as text. Only a refusal that
+            # names the image stops attaching it for this model; any other 400 (e.g. context length) is one-off.
+            refused = isinstance(e, (openai.BadRequestError, openai.UnprocessableEntityError)) or                 str(e).startswith(('Anthropic endpoint 400', 'Anthropic endpoint 422'))
+            if not page or not refused:
+                raise
+            if _IMAGE_REFUSAL.search(str(e)):
+                _TEXT_ONLY_MODELS.add(sent_model)
+                self.logger.warning(f'{sent_model} rejected the page image ({e}); sending text only from now on')
+            else:
+                self.logger.warning(f'request with the page image refused ({e}); retrying this one as text')
+            messages[-1]['content'] = prompt
+            response = await send()
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
@@ -306,9 +452,24 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         # not populate these fields; log 'n/a' rather than raise if absent.
         prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
         completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        # #1119: reasoning share + finish reason tell a thinking runaway from a looping answer.
+        reasoning_tokens = getattr(getattr(response.usage, 'completion_tokens_details', None), 'reasoning_tokens', None)
         self.logger.info(
             f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
-            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"} '
+            f'reasoning={reasoning_tokens if reasoning_tokens is not None else "n/a"} '
+            f'content_chars={len(response.choices[0].message.content or "")} '
+            f'finish={getattr(response.choices[0], "finish_reason", "?")}'
         )
 
+        content = response.choices[0].message.content
+        if content is None:
+            # #631: the gateway sometimes returns finish=stop with content=None on dense
+            # requests (#623 root; thinking-off reduces but does not eliminate it). Raise a
+            # retryable error — returning None would TypeError in extract_capture_groups
+            # and 500 the whole page.
+            raise EmptyContentError(
+                f'translator returned empty content (content=None, finish='
+                f'{getattr(response.choices[0], "finish_reason", "?")}, '
+                f'completion_tokens={completion_tokens})')
         return content

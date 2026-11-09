@@ -37,10 +37,6 @@ def merge_sfx_detections(ctx, result, device):
     return (textlines, mask_raw, mask)
 
 
-# --- #535 white-caption / empty-balloon rescue family (ported from landing render stack,
-# --- Stage C #548). Pure numpy/cv2; the pipeline wiring (merge_empty_balloons + call sites)
-# --- lands in a follow-up slice. ---
-
 def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int = 150):
     """#535 empty-balloon rescue (Otome "STARTING WITH…" box): DBNet can be blind to a
     clean typeset caption while the balloon detector still sees its BOX. A balloon that
@@ -70,10 +66,146 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     return out
 
 
+def _placeholder_quad(box):
+    """An empty textline over ``box`` that only exists for the VLM rescue — its OCR read is a
+    guess at a whole box, dropped when junk (#797)."""
+    from .utils.generic import Quadrilateral
+    x1, y1, x2, y2 = box
+    q = Quadrilateral(np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32), '', 1.0)
+    q.rescue_placeholder = True
+    return q
+
+
+def split_cross_balloon_lines(textlines, polygons):
+    """#1146: split a horizontal textline that runs across two balloons at the point it leaves the first one.
+
+    DBNet can box words of two neighbouring balloons as ONE line when their rows align (Haimiya ch. 6 p2:
+    `AND I DON'T` + `HOME AFTER` read as one line), and every later stage then interleaves the two speeches.
+    The cut sits in the middle of the stretch where the line's centre row is in both balloons, or in neither.
+    Pure geometry; lines inside one balloon are returned unchanged."""
+    import cv2
+    from .utils.generic import Quadrilateral
+    if not polygons:
+        return textlines
+    polys = [np.asarray(p, dtype=np.float32).reshape(-1, 1, 2) for p in polygons]
+
+    def inside(i, x, y):
+        return cv2.pointPolygonTest(polys[i], (float(x), float(y)), False) >= 0
+
+    out = []
+    for t in textlines:
+        x1, y1, x2, y2 = (float(v) for v in t.xyxy)
+        h = y2 - y1
+        if getattr(t, 'direction', 'h') != 'h' or x2 - x1 < 4 * h:
+            out.append(t)
+            continue
+        cy = (y1 + y2) / 2
+        left = [i for i in range(len(polys)) if inside(i, x1 + 1, cy)]
+        right = [i for i in range(len(polys)) if inside(i, x2 - 1, cy)]
+        pairs = [(a, b) for a in left for b in right if a != b and not inside(a, x2 - 1, cy) and not inside(b, x1 + 1, cy)]
+        if not pairs:
+            out.append(t)
+            continue
+        xs = np.arange(x1, x2, 2.0)
+
+        def overhang(pair):
+            """How much of the line lies beyond the first balloon of ``pair`` — the stretch that is really the
+            neighbour's text. A line that merely clips an overlapping balloon measures a few pixels here."""
+            inside_a = [x for x in xs if inside(pair[0], x, cy)]
+            return (x2 - max(inside_a)) if inside_a else (x2 - x1)
+
+        # #881 review: without this, a line that overhangs its OWN balloon by a few pixels (rotated text, an
+        # undersegmented balloon mask) was cut, and the last pixels of a real word became a line in the
+        # neighbour. Requiring a full line height outside the first balloon covers the ch. 6 p2 shape (100 px)
+        # and rejects the overhang case (8 px). The pair with the most outside text wins when 3+ balloons touch.
+        a, b = max(pairs, key=overhang)
+        if overhang((a, b)) < h:
+            out.append(t)
+            continue
+        mixed = [x for x in xs if inside(a, x, cy) == inside(b, x, cy)]   # in both, or in neither
+        cut = float(np.median(mixed)) if mixed else (x1 + x2) / 2
+        if cut - x1 < h or x2 - cut < h:
+            out.append(t)
+            continue
+        for lx1, lx2 in ((x1, cut), (cut, x2)):
+            q = Quadrilateral(np.array([[lx1, y1], [lx2, y1], [lx2, y2], [lx1, y2]]).astype(np.int64), t.text, t.prob)
+            q.is_sfx = getattr(t, 'is_sfx', False)
+            q.rescue_placeholder = getattr(t, 'rescue_placeholder', False)
+            out.append(q)
+    return out
+
+
+def merge_empty_balloons(ctx, result, device):
+    """#535: append an empty textline for every inked balloon DBNet left uncovered —
+    it then flows OCR → vlm_rescue → translate → render exactly like a rescued SFX.
+    Best-effort: any failure returns ``result`` unchanged."""
+    try:
+        from .bubble_detector import detect_bubbles
+        from .utils.generic import Quadrilateral
+        textlines, mask_raw, mask = result
+        # One balloon detection per page: container merge and tagging reuse ctx.bubble_polygons
+        # (the YOLO ran twice per page before — same image, same model, same answer).
+        polygons = getattr(ctx, 'bubble_polygons', None)
+        if polygons is None:
+            polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda')) or []
+            ctx.bubble_polygons = polygons
+        # #1147: no early return when no balloon was found - the white-caption and ink-cluster rescues
+        # below do not need one, and narration-only pages lost them.
+        textlines = split_cross_balloon_lines(textlines, polygons)   # #1146
+        img = ctx.img_rgb
+
+        def _aabb(poly):
+            xs = [p[0] for p in poly]
+            ys = [p[1] for p in poly]
+            return (float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys)))
+
+        def _ink(box):
+            x1, y1, x2, y2 = (max(0, int(v)) for v in box)
+            crop = img[y1:y2, x1:x2]
+            if crop.size == 0:
+                return 0
+            gray = crop.mean(axis=2) if crop.ndim == 3 else crop
+            return int((gray < 128).sum())
+
+        def _shrink(b, f=0.10):
+            # the balloon's black BORDER counts as ink and dilutes the coverage
+            # fraction below threshold (live v7 duplicated every bubble) — measure
+            # the interior only.
+            w, h = b[2] - b[0], b[3] - b[1]
+            return (b[0] + w * f, b[1] + h * f, b[2] - w * f, b[3] - h * f)
+
+        balloons = [_shrink(_aabb(p)) for p in polygons]
+        # #535: square white caption boxes are not speech balloons — the YOLO never
+        # proposes them (the "STARTING WITH…" box) — but their bright interiors are
+        # trivially detectable; give them the same ink-coverage rescue.
+        gray_pre = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        balloons += [_shrink(b) for b in white_box_candidates(gray_pre)]
+        existing = [textline_aabb(t) for t in textlines]
+        fresh = empty_balloon_boxes(balloons, existing, _ink)
+        textlines.extend(_placeholder_quad(b) for b in fresh)
+        if fresh:
+            logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
+
+        # #535 ink-cluster completeness: text-like ink on a LIGHT background that
+        # neither DBNet nor the balloon YOLO covered (a square panel caption, a
+        # stray sentence line) — the last net under everything.
+        gray = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        covered = [textline_aabb(t) for t in textlines] + list(balloons)
+        clusters = uncovered_text_clusters(gray, covered)
+        textlines.extend(_placeholder_quad(b) for b in clusters)
+        if clusters:
+            logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
+        return (textlines, mask_raw, mask)
+    except Exception:
+        logger.warning("[EmptyBalloon] rescue failed — continuing without", exc_info=True)
+        return result
+
+
 def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
                             max_area_frac: float = 0.25,
                             ink_lo: float = 0.04, ink_hi: float = 0.45,
-                            bg_light: int = 190, dilate_px: int = 9):
+                            bg_light: int = 190, dilate_px: int = 9,
+                            max_width_frac: float = 0.7):
     """#535 completeness (Otome "STARTING WITH…" box + the "ME OFF!" line): find
     text-like INK CLUSTERS no detector covered — sparse dark strokes sitting on a
     LIGHT background (typeset captions / dialogue), the exact pattern both DBNet and
@@ -96,6 +228,8 @@ def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
         x, y, bw, bh, area = stats[i]
         if bw * bh < min_area or (bw * bh) / page_area > max_area_frac:
             continue
+        if bw > max_width_frac * w:
+            continue                      # panel-wide = light art (a UI screen), not a text block
         crop = g[y:y + bh, x:x + bw]
         crop_ink = (crop < 128)
         density = float(crop_ink.mean())

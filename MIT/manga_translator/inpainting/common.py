@@ -14,6 +14,7 @@ class CommonInpainter(InfererModule):
         pass
 
 class OfflineInpainter(CommonInpainter, ModelWrapper):
+    _OFFLOAD = True   # #1123: forward may run in a thread under the GPU lock (worker slots)
     _MODEL_SUB_DIR = 'inpainting'
 
     async def _inpaint(self, *args, **kwargs):

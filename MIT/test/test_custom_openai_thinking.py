@@ -4,18 +4,10 @@ One-Punch benchmark narration group: 6502 chars of reasoning → completion=2048
 cap hit → empty content → translate 500s the whole page). The fix disables the
 model's native thinking via `chat_template_kwargs.enable_thinking=false`, gated
 by `CUSTOM_OPENAI_ENABLE_THINKING` (.env, default OFF)."""
-import asyncio
-from types import SimpleNamespace
-from unittest import mock
-
-import openai
-import pytest
-
-from _torch_free_import import load_custom_openai
-
-_co = load_custom_openai()
-resolve_enable_thinking = _co.resolve_enable_thinking
-thinking_extra_body = _co.thinking_extra_body
+from manga_translator.translators.custom_openai import (
+    resolve_enable_thinking,
+    thinking_extra_body,
+)
 
 
 def test_thinking_disabled_by_default():
@@ -45,27 +37,31 @@ def test_extra_body_none_when_thinking_enabled():
     assert thinking_extra_body(True) is None
 
 
-def _none_content_response():
-    return SimpleNamespace(
-        choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content=None))],
-        usage=SimpleNamespace(total_tokens=1, prompt_tokens=1, completion_tokens=0),
-    )
-
-
+# Wiring (ported from main's #706 test): the helpers above only matter if
+# _request_translation actually hands their result to chat.completions.create.
+# content=None ends the call with EmptyContentError (#631), so one call is enough.
 def _extra_body_sent_by_request(monkeypatch, env_value):
-    # Wiring: the helpers above only matter if _request_translation actually hands their
-    # result to chat.completions.create. content=None ends the call with an APIError
-    # (#631), so one call is enough and nothing retries.
+    import asyncio
+    from types import SimpleNamespace
+    from unittest import mock
+
+    import pytest
+
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator, EmptyContentError
+
     if env_value is None:
         monkeypatch.delenv('CUSTOM_OPENAI_ENABLE_THINKING', raising=False)
     else:
         monkeypatch.setenv('CUSTOM_OPENAI_ENABLE_THINKING', env_value)
-    t = _co.CustomOpenAiTranslator()
-    create = mock.AsyncMock(return_value=_none_content_response())
+    t = CustomOpenAiTranslator()
+    create = mock.AsyncMock(return_value=SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content=None))],
+        usage=SimpleNamespace(total_tokens=1, prompt_tokens=1, completion_tokens=0),
+    ))
     t.client.chat.completions.create = create
-    with pytest.raises(openai.APIError):
+    with pytest.raises(EmptyContentError):
         asyncio.run(t._request_translation('ENG', 'hello'))
-    return create.call_args.kwargs['extra_body']
+    return create.call_args.kwargs.get('extra_body')
 
 
 def test_request_sends_thinking_off_body_by_default(monkeypatch):
@@ -75,3 +71,58 @@ def test_request_sends_thinking_off_body_by_default(monkeypatch):
 
 def test_request_sends_no_extra_body_when_thinking_enabled(monkeypatch):
     assert _extra_body_sent_by_request(monkeypatch, 'true') is None
+
+
+def test_translator_clients_share_the_tls_context():
+    """#1119: building the translator must not build a new SSLContext (~140 ms of CPU) for its client."""
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    assert t.client._client._transport._pool._ssl_context is tls.ssl_context()
+
+
+def test_the_anthropic_client_shares_the_tls_context(monkeypatch):
+    """#1119: the Anthropic-protocol client is built per translator (per page with worker slots) - no new SSLContext."""
+    import asyncio
+    import httpx
+    import manga_translator.tls as tls
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+    t = CustomOpenAiTranslator()
+    seen = []
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: seen.append(k.get("verify")) or real(*a, **k))
+
+    async def main():
+        try:
+            await t._request_anthropic([{"role": "user", "content": "x"}], "m", 8)
+        except Exception:
+            pass   # no gateway here; only the client construction matters
+
+    asyncio.run(main())
+    assert seen == [tls.ssl_context()]
+
+
+def test_translators_on_one_loop_share_the_anthropic_connection_pool():
+    """#1119: with worker slots each page builds its own translator; a fresh connection to the gateway cost ~0.25-0.4 s
+    per request (TCP + TLS) against a warm one. Instances on one loop share the pool; closing an instance keeps it."""
+    import asyncio
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+
+    async def main():
+        a, b = CustomOpenAiTranslator(), CustomOpenAiTranslator()
+        ca, cb = a._anthropic_client(), b._anthropic_client()
+        await a.aclose_clients()
+        return ca, cb, ca.is_closed
+
+    ca, cb, closed = asyncio.run(main())
+    assert ca is cb and not closed
+
+
+def test_each_loop_gets_its_own_pool():
+    import asyncio
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator
+
+    async def grab():
+        return CustomOpenAiTranslator()._anthropic_client()
+
+    assert asyncio.run(grab()) is not asyncio.run(grab())

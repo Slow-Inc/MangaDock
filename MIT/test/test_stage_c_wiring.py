@@ -45,7 +45,7 @@ def test_278_sfx_provenance_gate_is_called_by_the_driver():
     # that misreads short dialogue in a big bubble as SFX and overwrites it with an onomatopoeia.
     #
     # #679: this used to assert the literal symbol `should_rescue_sfx`. Two implementations of the
-    # same gate exist — `ocr_vlm.should_rescue_sfx` (main, on `from_sfx_detection`) and
+    # same gate existed (landing's was removed in #693) — `ocr_vlm.should_rescue_sfx` (main, on `from_sfx_detection`) and
     # `sfx_merge.should_sfx_rescue` (landing, on `region.is_sfx`) — so pinning one name made the
     # guard fire on a deliberate, benchmarked swap (7e78341e) and accuse the driver of a revert
     # that had not happened. Which implementation is canonical is an ADR 026 decision, not
@@ -75,3 +75,20 @@ def test_026_addendum_real_text_guard_is_on_the_rescue_path():
         'sent to the vision gateway and its hallucinated onomatopoeia rendered over real '
         'dialogue. See ADR 026 Addendum; if this is a deliberate trade-off, amend the ADR.'
     )
+
+
+def test_754_det_sfx_false_positive_drop_is_called_by_the_driver():
+    # ADR 026 Addendum DROP (#754): without it a det_sfx box read as 'W' is translated ('ว') and
+    # rendered over the art or the real dialogue.
+    assert 'sfx_false_positive' in _called_names(), (
+        'the driver no longer drops det_sfx false-positives (ocr_vlm.sfx_false_positive, #754)')
+
+
+def test_rescue_placeholders_go_through_the_false_positive_drop():
+    # a junk OCR read of an empty-balloon / ink-cluster placeholder ('w' -> 'ว') is dropped like a
+    # det_sfx false-positive: the driver asks speculative_box(), not from_sfx_detection alone.
+    assert 'speculative_box' in _called_names()
+
+
+def test_low_confidence_placeholder_reads_are_dropped_by_the_driver():
+    assert 'placeholder_junk' in _called_names()

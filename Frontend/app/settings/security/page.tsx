@@ -162,7 +162,7 @@ export default function SecuritySettingsPage() {
 
       {/* ── Sessions ─────────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        <p className="text-sm font-semibold text-ink">อุปกรณ์ที่เข้าสู่ระบบ</p>
+        <p className="text-sm font-semibold text-ink">อุปกรณ์ที่เคยเข้าสู่ระบบ</p>
         <SessionList />
       </div>
 

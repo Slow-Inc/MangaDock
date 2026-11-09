@@ -1,3 +1,4 @@
+import asyncio
 import os
 import stat
 import sys
@@ -60,6 +61,7 @@ class InvalidModelMappingException(ValueError):
         super().__init__(error)
 
 class ModelWrapper(ABC):
+    _OFFLOAD = False   # #1123: GPU model families set True; translators never (loop-bound HTTP clients)
     r"""
     A class that provides a unified interface for downloading models and making forward passes.
     All model inferer classes should extend it.
@@ -329,11 +331,14 @@ class ModelWrapper(ABC):
         '''
         Loads models into memory. Has to be called before `forward`.
         '''
-        if not self.is_downloaded():
-            await self.download()
-        if not self.is_loaded():
-            await self._load(*args, **kwargs, device=device)
-            self._loaded = True
+        # #1123: worker slots run pages concurrently; two first-time loads of one model must not both run _load.
+        lock = self.__dict__.setdefault('_load_lock', asyncio.Lock())
+        async with lock:
+            if not self.is_downloaded():
+                await self.download()
+            if not self.is_loaded():
+                await self._load(*args, **kwargs, device=device)
+                self._loaded = True
 
     async def unload(self):
         if self.is_loaded():
@@ -346,7 +351,10 @@ class ModelWrapper(ABC):
         '''
         if not self.is_loaded():
             raise Exception(f'{self._key}: Tried to forward pass without having loaded the model.')
-        
+
+        if self._OFFLOAD:   # #1123: off the event loop in worker-slot mode (no-op unless enabled)
+            from ..gpu_offload import run
+            return await run(lambda: self._infer(*args, **kwargs))
         return await self._infer(*args, **kwargs)
 
     @abstractmethod

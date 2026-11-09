@@ -1,5 +1,42 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-25 — MIT worker transport fixes + dual-GPU worker layout (bugfix + perf) — #1119
+
+**Scope:** `MIT/server/myqueue.py`, `MIT/manga_translator/mode/share.py`, `MIT/server/main.py`,
+`MIT/manga_translator/translators/custom_openai.py` (PR #1120); dispatch is PR #1121, stacked on #1118 · **Type:** bug fix
++ latency fix + observability · **Tests:** torch-free suite 1000 passed / 4 skipped; torch-backed
+queue/custom_openai/guard tests 36 passed; 10-page E2E benchmark.
+**Severity:** medium (requests failed under concurrency; every page lost seconds in transport).
+
+**What & where:** `TaskQueue.update_event` awaits on a snapshot (was: iterated the live list across awaits);
+worker endpoints and the two PNG endpoints return one `Response` (were: `StreamingResponse(io.BytesIO(...))`);
+`Token split` log adds reasoning tokens, content size and finish reason. New guards: `test_queue_race.py`,
+`test_no_bytesio_streaming.py`.
+
+**Why:** goal to use both GPUs and cut batch and single-page time. Tracing showed the GPUs idle on a remote LLM
+call, results spending 2.5–13 s between worker and front, and batch pages failing instantly.
+
+**Before → After:** concurrent batch pages could get an instant HTTP 500 → none in 10-page batches on 4 and
+5 workers; a 21.6 MB result took 30 s to stream on localhost → 0.05 s.
+
+**Performance Δ:** 10-page corpus, one run per arm: sequential 19.87 → 14.09 s/page (Phase A 21.98);
+batch with 2 workers 13.57 → 7.98 s/page; with 5 workers (`MIT_WORKER_GPUS=1,1,1,0,0`) 4.36 s/page, 10/10.
+Report + PNG: `docs/reports/benchmarks/2026-10-25-mit-dual-gpu-throughput.md`.
+
+**Quality:** no prompt, model or render change; translation quality not re-judged.
+
+**Validation:** unit tests red before / green after (queue race; the guard named the six buffer sites, then the
+two `bytes` sites);
+E2E benchmark above. Not run: repeated runs per arm; dispatch order in isolation.
+
+**Risk / rollback:** same payloads on the worker and PNG endpoints; `/translate/bytes` and
+`/translate/with-form/bytes` now return their payload (they answered 200 with an empty body) with
+`application/octet-stream`; the queue no longer drops or resurrects tasks. Revert the commits to roll back. Worker count is an env knob (default 1 worker).
+
+**Links:** #1119, post-mortem `docs/reports/2026-10-25-mit-queue-lost-request.md`, #1117/#1118, #1111.
+
+---
+
 ## 2026-10-22 — Native Phase 4 integration with current main
 
 [Integration evidence and resume point](../../Mobile/docs/2026-10-22-main-integration.md). Landing status is recorded by the integration PR. / หลักฐานและจุดทำต่ออยู่ในรายงาน สถานะ merge ให้ดู PR รวม
@@ -477,6 +514,40 @@ Scope: no additional Backend/Frontend/MIT migration source or schema changes; pr
 **ตรวจสอบ:** TDD พบข้อผิดพลาดจาก public service methods ผ่าน Supabase SDK จริงและ HTTP จำลอง ก่อนแก้จน regression tests ใหม่ 12 เคสผ่าน `npm.cmd run build` ผ่าน; ชุดทดสอบ Backend ทั้งหมด 90 suites / 960 tests ผ่าน ยังไม่ได้ทดสอบการเชื่อมต่อฐานข้อมูลจริง
 
 **ความเสี่ยง / ย้อนกลับ:** รูปแบบ array สมมติว่าผู้ใช้มีหนึ่ง profile และเลือกตัวแรก ไม่มีการเปลี่ยน schema/auth/payment สามารถย้อนเฉพาะสาม services และ specs แต่จะกลับไปพบ compile errors เดิม **ลิงก์ / สถานะ:** [history](../../DONE.md); แก้ในเครื่อง ยังไม่ได้ commit และไม่มี issue/PR ที่เผยแพร่
+## 2026-10-20 — MIT quality loop round 2: #793 Thai tone marks, #791/#792 spaces + punctuation, review fixes
+
+**What & where:** `rendering/text_render.py` — `_stacked_mark_lift` + line loop in `put_text_horizontal` (#793), `compact_special_symbols` (#792), `_insert_thai_word_breaks` / `_glue_thai_tokens` / `_fit_syllable` / `_greedy_pack` guard (#791 + review); `translation_quality.py` (shared script table, `classify_glitch`, source-aware `foreign_script`) + `translators/common.py` (`_is_glitched(query, …)`); `ocr_vlm.py` (half-open `_Breaker`); `text_layer.empty_patch_result`; `tools/doctor_page.py` (prod font).
+**Why:** every Thai page lost the tone mark of words like `ที่ นี้ ชื่อ ตั้งแต่` with the prod font (no OpenType shaping); spaces the translator wrote were dropped; English lost the space after `,`/`!` (`Well,I`); review found a mid-word split, a JP-source re-ask loop and a breaker that never recovered.
+**Before → after:** stacked marks visible in 66/156 corpus regions (42%) that showed them missing; `RTSD,ZERO` → `RTSD, / ZERO`; `ขับขี่รถ / ยนต์` → `ขับขี่ / รถยนต์`; JP page with a kept kana SFX 3 LLM calls → 1.
+**Perf Δ:** none measurable in the renderer (two glyph lookups per stacked mark; Thai segmentation now lru_cached across the fit scan). SFX rescue costs at most one trial call per 300 s while the breaker is open.
+**Quality:** replay A/B with identical translations — spill 7 → 7 in both A/Bs; font changes 5/177 (#791/#792) and 2/156 (#793).
+**Validation:** red-first unit tests for each fix (tone height, compaction, glue, recursive split, packer guard, source-aware glitch, one-trial breaker); full MIT suite 872 passed; benchmarks `2026-10-20-791-792-thai-spaces-punctuation.*`, `2026-10-20-793-thai-tone-marks.*`.
+**Also (#795/#754/#797; #796 reverted):** anti-overlap sibling territories (`rendering/__init__.py:_neighbor_territories`), junk-read DROP (`ocr_vlm.sfx_false_positive` / `speculative_box`, `TextBlock.speculative` = every line a det_sfx box or rescue placeholder, `detection_postproc._placeholder_quad`). Junk one-letter regions 6 → 0 on the corpus, real lettering kept; doctor `overlap` verdict added and replay made deterministic. #796 (2-line merge pitch 2×) shipped then reverted after review: it disabled the 2-line split for every aligned pair.
+**Risk / follow-up:** shaping is still absent (tall-consonant mark offsets, other scripts' GPOS) — HarfBuzz is the general fix; Chainsaw p0 red credit lines overlap (layout); #757 merge default still opt-in pending more pages.
+
+## 2026-10-20 — MIT quality loop: #756 doctor page mode, #757 container merge (opt-in), #760 ink-cluster gate, #761 bubble-fit scan
+
+**What & where:** `MIT/tools/doctor_page.py` + `tools/pipeline_doctor/page_probes.py` (new, tooling); `manga_translator/container_merge.py` (new) + `textline_merge/__init__.py` (+`containers` param) + `manga_translator.py` (`_bubble_polygons` cache, `_textline_containers`) + `config.py` (`det_bubble_merge`); `detection_postproc.uncovered_text_clusters` (`max_width_frac`); `font_fit.py` (descending scan, `area_font_cap`) + `rendering/__init__.py` (`_bubble_fit_font_size` cap); `Backend/src/books/mit-config.ts` (`MIT_BUBBLE_MERGE`).
+**Why:** EN→TH captions translated per line; junk panel-wide region rendered a 120 px glyph; sole-occupant balloons fitted at 13 px with room for 26.
+**Before → after:** caption page regions 21 → 8 (merge on); `'d'` junk region gone (detect FAIL → OK); bubble_fit_sole font 13/15/21 → 26/22/24 px with identical translations.
+**Perf Δ:** fit scan 6–24 ms/region (bounded by area cap); balloon detection is cached on ctx, so merge-on adds no second YOLO pass in the patches path.
+**Quality:** replay A/B (17 pages): no region smaller with identical translation; composite failures 0 → 0.
+**Validation:** unit tests red-first for every change (container_merge 10, doctor page 13, font_fit 10, detection_postproc 19, Backend spec 42); deterministic replay benchmark with PNG.
+**Also (same loop):** #759 Thai line breaking (`text_render._glue_thai_tokens`, atomic Thai words, `_thai_subwords`) — replay A/B 0 font changes, spill unchanged, bad breaks fixed; #763 `CommonTranslator._is_glitched` + `manga_translator/translation_quality.py` — foreign-script leaks 1–2 → 0 per corpus run, one extra LLM call only on a leaking page; #762 prompt A/B inconclusive on style, v2 YAML kept as an experiment.
+**Risk / follow-up:** merge stays opt-in until more pages; wrapper overshooting `max_width` (root of the non-monotonic fit) still open; SFX katakana transliteration junk (`ベ`→`เบ`) and translation prompt quality are next.
+
+## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
+
+**What & where:** `MIT/manga_translator/manga_translator.py` (rescue call site), removed
+`sfx_merge.should_sfx_rescue` + 2 tests; ADR 026 amended; comment/doc touch-ups.
+**Why:** restore ADR 026's Addendum real-text guard (dev decision, #693).
+**Before → after:** det_sfx region read as ASCII on a bubble → *before:* eligible for the vision
+rescue (phantom SFX risk); *after:* not rescued. ≤2-char non-ASCII read without provenance in a large
+box → *after:* eligible (landing never rescued it) — inert while the rescue is unserved.
+**Perf Δ:** none measurable (one regex per region when `vlm_rescue` is on).
+**Quality:** render-neutral on the current model; gate 11/12 vs 5/12 on the documented set.
+**Validation:** guard test red → green; MIT suite 806 passed.
+**Risk / follow-up:** One-Punch `ぬ` not rescued (accepted); DROP half #754; bubble-overlap gate open.
 
 ## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
 
@@ -673,6 +744,7 @@ behaviour).
 
 ---
 
+
 ## 2026-07-28 — #678/#640: CI gates made real (unit-test selection, guard suites, mobile typecheck)
 
 **What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, new `mobile` job,
@@ -704,6 +776,86 @@ finally demonstrating #639's stated acceptance criterion. Both PRs green on the 
 job, now inherited by `scripts` and `mobile` too; worth a follow-up.
 
 **Links:** #643, #678, #639, #640, #642, #626, #548, #679, #680.
+
+---
+
+## 2026-07-28 — #643/#678: CI gates made real (frontend unit selection + torch-free collection)
+
+**What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, `gate`),
+`scripts/lib/frontend-unit-tests.mjs` + `scripts/list-frontend-unit-tests.mjs` + tests,
+`scripts/README.md`; `MIT/test/conftest.py`, `MIT/test/heavy_imports.py`,
+`MIT/test/test_heavy_test_list.py`.
+
+**Why:** `integrate/render-reconcile` failed CI the first time it was ever run through the pipeline
+(draft PR #642), blocking Phase E of #626/#548. Both failures were pre-existing and invisible because
+the branch had never been CI-verified — and, at the repo level, because no job ran the guard suites.
+
+**Before → After:** unit-test selection was an inline `find` blacklist extended by hand per qualifier
+→ a pure function with 5 tests and a CLI that fails closed on an empty selection. Guard suites
+(`issue-ref`, `worktree-budget`, `pr-bilingual`, `append-only`) ran **nowhere** in CI → a required
+`scripts (node --test)` job. MIT torch-free gate: **4 collection errors → 0** (638 tests collected);
+`_HEAVY_TESTS` drift was detectable only via an after-the-fact CI collection error → a local,
+torch-free AST guard that names the offenders.
+
+**Performance Δ:** none (test-infra only). New `scripts` job ≈ 11s, unfiltered by design.
+
+**Quality:** no product-behavior change. Render/translation paths untouched —
+`MIT/manga_translator` tree byte-identical (`1a073c0c`) across both the fix and the `main` catch-up
+merge, so the #626 render==baseline claim is unaffected.
+
+**Validation:** PR #678 green on every check including the required `gate` (`scripts` 11s,
+`frontend` 17s, `mit_logic` 2m16s, `mit_heavy` 4m18s, `backend` 52s). Locally: 58/58 script tests;
+MIT collection 638/0 with the ML stack hidden from the import system; real-tree selector check
+35 `*.test.ts` → 33 selected, 2 integration excluded, `PageRenderer.memo.test.ts` kept.
+
+**Risk / rollback:** low — additive test-infra. Rollback = revert #678 and `4e4f3c88`. Residual: the
+heavy-package list in `heavy_imports.py` is declared, not inferred (a static scan cannot follow the
+lazy `__getattr__` hop); the CI collection error remains the backstop.
+
+**Follow-up surfaced:** **#679** — `#278` SFX provenance gate not called by the driver on
+`integrate/render-reconcile` (passes on `main`). Render-quality regression, now the remaining Phase E
+blocker; verdict is user-in-the-loop on real rendered images.
+
+**Links:** #643, #678, #679, #642, #626, #548, #359, #609, #278.
+
+---
+
+## 2026-07-10 — #626: landing→main render+translation feature-merge (integration branch)
+
+**What & where:** Hand-merged `origin/landing/render-phase0` onto `integrate/render-reconcile`
+(off `origin/main`) at function granularity — 25 conflicts across MIT render/translate + Backend
+config + tests + goldens + docs. Full per-slice rationale in `docs/reports/RECONCILE-626-decisions.md`.
+
+**Why:** Converge the two complementary render campaigns (main = layout/fit + reference_layout;
+landing = wired inpaint/erase/rescue) into one trunk without regressing the confirmed-best render or
+translation (dev hard-gate). See `docs/RECONCILIATION-PLAN.md`.
+
+**Before → After:** Two diverged branches (landing→main = ~23-conflict set) → one reconciled
+integration branch. Crux `resize_regions_to_font_size` resolved to main's port-verified spine +
+grafted landing's #436 dedup refinements (equal-translation / onomatopoeia); dropped redundant
+`bubble_fit_tall` (main's `_bubble_fit_layout` supersedes); landmine #1 fixed (is_sfx now populated →
+main's #431 display-SFX arm live); selective_flux (#421) wired + Backend `MIT_SELECTIVE_FLUX` added
+(OFF default); #623 thinking control folded into custom_openai (default OFF); numbered_contract
+tolerant parse adopted.
+
+**Performance Δ:** N/A at merge (behavior-gated flags OFF by default). #623 thinking-off cuts dense
+translate completion tokens ~24× when a qwen3 model is used.
+
+**Quality:** Render/translation quality vs baseline NOT yet asserted — pending Phase-D GPU benchmark
+(render dump/replay + translation text diff on One-Punch). Merge validated for COHERENCE +
+DETERMINISM only so far.
+
+**Validation:** Characterization net **193 passed, 0 skipped** (torch-free), up from 175 baseline
+(+#623 thinking/parse, tolerant-parse, EN→TH Thai golden). 4 goldens regenerated from reconciled code.
+Full crux import chain resolves. AST-clean every slice. Render + translation benchmark gates = Phase D
+(BLOCKING, before Phase E dev merge-to-main).
+
+**Risk / rollback:** Integration branch isolated from prod (perf); Phase E (merge to main) is
+dev-gated. Rollback = discard the branch. Deferred (tracked follow-up): unify MIT render telemetry
+(main `_emit_trace` vs landing region-attrs); unify is_sfx/from_sfx_detection into one helper.
+
+**Links:** #626, #548, #625, #627; `docs/RECONCILIATION-PLAN.md`, `docs/reports/RECONCILE-626-decisions.md`.
+
 
 ---
 
@@ -745,7 +897,7 @@ job, now inherited by `scripts` and `mobile` too; worth a follow-up.
 ## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
 
 **What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,
-torch-free)` a **blocking** required check (lazy package import boundary — ADR 023 — + committed the
+torch-free)` a **blocking** required check (lazy package import boundary — ADR 029 — + committed the
 gitignored Kumiko `panel/lib` source). To get a green baseline for it, shipped a prerequisite repair
 (PR #504) to `main`: `MIT/requirements.txt` pin `opencv-python>=4.8,<5.0`, and reverted
 `test_resize_regions_characterization.py` + its 3 `resize_regions_*.npz` goldens.
@@ -776,7 +928,7 @@ re-land **atomically with their impl** — tracked in #503.
 tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_shape/clean_layout/
 `_bubble_fit_layout`) remains uncommitted in an entangled working tree — lands with #503.
 
-**Links:** #359 (closed), PR #427 / #504 / #502, ADR 023, reland #503.
+**Links:** #359 (closed), PR #427 / #504 / #502, ADR 029, reland #503.
 
 ---
 
@@ -1964,7 +2116,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 - **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
 ## 2026-06-29 — MIT: lazy package-import boundary → torch-free logic tests + blocking CI gate (#359)
 
-**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 023.
+**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 029.
 
 **2. Trigger.** `manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *`; both pull torch. So ANY import (even `from manga_translator.config import Config`) dragged in torch+cv2+transformers+diffusers — `mit-ci` had to install the full ML stack for a font-fit unit test and stayed `continue-on-error` (report-only), letting real breakage show green.
 
@@ -1988,7 +2140,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
 
-*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
+*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 029, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
 
 ---
 ## 2026-07-04 — Master Plan 2 (Phase 0–3 autonomous) + deterministic real-page benchmark harness

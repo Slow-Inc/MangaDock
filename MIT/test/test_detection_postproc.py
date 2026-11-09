@@ -34,6 +34,23 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
 
 # ---- #535 empty-balloon rescue: a balloon with INK but no textline = missed text ----
 
+def _ink_map(values):
+    """ink_of_box stub: exact-match boxes get their value; clipped sub-boxes get a
+    proportional share of the containing balloon's ink (uniform-ink approximation)."""
+    def ink(box):
+        box = tuple(float(v) for v in box)
+        if box in values:
+            return values[box]
+        # proportional share of the smallest registered box containing it
+        for b, v in values.items():
+            if box[0] >= b[0] and box[1] >= b[1] and box[2] <= b[2] and box[3] <= b[3]:
+                area_b = max(1.0, (b[2]-b[0])*(b[3]-b[1]))
+                area = max(0.0, (box[2]-box[0])*(box[3]-box[1]))
+                return v * area / area_b
+        return 0
+    return ink
+
+
 def test_normal_bubble_with_textline_over_its_ink_is_covered():
     # a speech bubble's text covers only ~15% of the balloon AREA but ~all of its INK
     # — must NOT be rescued (v6 live: duplicated every dialogue bubble).
@@ -97,6 +114,21 @@ def test_dense_dark_art_is_rejected():
     got = uncovered_text_clusters(img, covered_boxes=[])
     assert got == []                                          # too dense = art, not text
 
+
+
+def test_panel_wide_light_art_is_not_a_text_cluster():
+    """2026-10-20 corpus (Lv2 p1): a light panel showing a UI screen — sparse thin strokes on a
+    light background — passed the density/background gates as ONE cluster 93% of the page wide;
+    OCR read it as 'd' and the renderer drew a 120 px glyph over the art. Text blocks are not
+    panel-wide, so a cluster spanning most of the page width is art."""
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        for y in range(120, 190, 26):                 # UI rows: thin frames + tick marks (~20% area)
+            cv2.rectangle(img, (14, y), (386, y + 14), 0, 1)
+            for x in range(20, 380, 18):
+                cv2.line(img, (x, y + 3), (x + 6, y + 3), 0, 1)
+    img = _page_with(draw)
+    assert uncovered_text_clusters(img, covered_boxes=[]) == []
 
 # ---- #535 white caption boxes: bright rectangles are balloons the YOLO can't see ----
 
@@ -173,6 +205,9 @@ def test_no_white_boxes_leaves_mask_unchanged():
 def test_white_box_containing_line_art_character_is_skipped():
     # One-Punch HUH panel regression #2: a bright PANEL containing a line-art
     # character passed the white-box test (ink 8%) and the erase wiped the figure.
+    # A connected ink component large in BOTH dims (an absolute, page-scaled cap —
+    # a character's hair mass) marks the box as containing ART -> skip it entirely.
+    # A text line is wide but THIN, so captions still get cleaned.
     import numpy as np, cv2
     from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
     img = np.full((700, 700), 120, np.uint8)
@@ -199,9 +234,11 @@ def test_caption_with_long_bold_text_line_still_cleaned():
 # ---- LaMa ghost in white captions: flat paper needs a direct fill, not a GAN ----
 
 def test_flatten_white_captions_replaces_lama_ghost_with_paper():
-    # User-confirmed root: the erase mask covered ALL caption ink yet lama_large
-    # reconstructed a faint squiggle of the source text ("AGAIN?") from the stroke
-    # stubs. A white caption box is UNIFORM PAPER — fill the ink pixels directly.
+    # User-confirmed root: the erase mask covered ALL caption ink (631/631 px) yet
+    # lama_large reconstructed a faint squiggle of the source text ("AGAIN?") from
+    # the stroke stubs around the tight mask. A white caption box is UNIFORM PAPER —
+    # fill the source-ink pixels directly with the box's paper colour instead of
+    # trusting the GAN.
     import numpy as np, cv2
     from manga_translator.detection_postproc import flatten_white_captions
     orig = np.full((700, 700), 120, np.uint8)
@@ -225,3 +262,84 @@ def test_flatten_skips_art_boxes():
     inpainted = np.stack([orig]*3, axis=2).copy()
     out = flatten_white_captions(inpainted, orig)
     assert out[220, 220, 0] == 15                  # art preserved, box skipped
+
+
+def test_rescue_placeholders_are_marked_so_a_junk_read_can_be_dropped(monkeypatch):
+    """2026-10-20 corpus probe: the empty-balloon / ink-cluster placeholders exist for the VLM
+    rescue; with the rescue unserved the line-OCR reads the whole box ('w', 'I', 'V', '7') and the
+    junk was translated ('w' -> 'ว' at 84 px over 'อ่า...', Mushoku p0). They must be identifiable."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    img = np.full((400, 400, 3), 255, np.uint8)
+    img[150:250, 150:250] = 0                                   # ink inside the balloon
+    monkeypatch.setattr(bd, 'detect_bubbles',
+                        lambda image, device='cuda': [[(100, 100), (300, 100), (300, 300), (100, 300)]])
+    textlines, _, _ = merge_empty_balloons(SimpleNamespace(img_rgb=img), ([], None, None), 'cpu')
+    assert textlines and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_empty_balloon_rescue_shares_the_pages_balloon_detection(monkeypatch):
+    """Speed (2026-10-21): the balloon YOLO ran twice per page — once here, once (cached on ctx)
+    for container merge and balloon tagging. Same image, same model: detect once, share it."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    calls = {'n': 0}
+
+    def detect(image, device='cuda'):
+        calls['n'] += 1
+        return [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+
+    monkeypatch.setattr(bd, 'detect_bubbles', detect)
+    img = np.full((400, 400, 3), 255, np.uint8)
+    ctx = SimpleNamespace(img_rgb=img)
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert ctx.bubble_polygons == [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')        # a second consumer on the same page
+    assert calls['n'] == 1
+
+
+def test_a_page_without_balloons_still_gets_caption_and_ink_rescue_1147(monkeypatch):
+    # merge_empty_balloons returned as soon as the balloon YOLO found nothing, skipping the white-caption
+    # and ink-cluster rescues below it - narration pages (no balloons at all) lost both.
+    import types
+    import numpy as np
+    import manga_translator.detection_postproc as dp
+    monkeypatch.setattr(dp, 'white_box_candidates', lambda gray: [(10, 10, 90, 40)])
+    monkeypatch.setattr(dp, 'empty_balloon_boxes', lambda balloons, existing, ink: list(balloons))
+    monkeypatch.setattr(dp, 'uncovered_text_clusters', lambda gray, covered: [(100, 100, 150, 130)])
+    ctx = types.SimpleNamespace(img_rgb=np.full((200, 200, 3), 255, np.uint8), bubble_polygons=[])
+    textlines, _raw, _mask = dp.merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert len(textlines) == 2 and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_a_line_straddling_two_balloons_is_split_at_the_boundary_1146():
+    # ch. 6 p2: DBNet boxed `AND I DON'T` (left balloon) and `HOME AFTER` (right balloon) as ONE line,
+    # so OCR read "AND I DONT HOME AFTER" and the two speeches interleaved.
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]
+    straddle = Quadrilateral(np.array(poly(99, 331, 353, 350)), '', 1.0)
+    inside = Quadrilateral(np.array(poly(101, 356, 200, 373)), '', 1.0)
+    out = split_cross_balloon_lines([straddle, inside], balloons)
+    boxes = sorted(tuple(int(v) for v in t.xyxy) for t in out)
+    assert len(out) == 3
+    assert boxes[0][0] == 99 and boxes[0][2] <= 253          # left part ends inside the left balloon
+    assert boxes[-1][2] == 353 and boxes[-1][0] >= 208        # right part starts inside the right balloon
+    assert split_cross_balloon_lines([inside], balloons)[0] is inside
+
+
+def test_a_line_that_only_overhangs_its_own_balloon_is_not_split_1146():
+    """Independent review: with overlapping balloons, a line that pokes a few pixels past its OWN balloon (a
+    rotated line, an undersegmented mask) was cut and the tail of a real word became a line in the neighbour.
+    The overhang into the second balloon must be at least one line height."""
+    from manga_translator.detection_postproc import split_cross_balloon_lines
+    from manga_translator.utils.generic import Quadrilateral
+    poly = lambda x1, y1, x2, y2: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    balloons = [poly(55, 278, 253, 505), poly(208, 219, 394, 487)]   # the ch. 6 p2 pair, overlapping
+    overhang = Quadrilateral(np.array(poly(99, 331, 260, 350)), '', 1.0)   # 7 px past the left balloon
+    assert split_cross_balloon_lines([overhang], balloons) == [overhang]

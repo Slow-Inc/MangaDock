@@ -10,7 +10,7 @@ import Image from "next/image";
 import { ImageOff } from "lucide-react";
 import { safeImageSrc } from "../lib/safeUrl";
 
-export default function PostImage({ url, alt, className = "", priority = false, sizes }: { url: string; alt: string; className?: string; priority?: boolean; sizes?: string }) {
+export default function PostImage({ url, alt, className = "", priority = false, sizes, fit = "cover" }: { url: string; alt: string; className?: string; priority?: boolean; sizes?: string; fit?: "cover" | "contain" }) {
   const src = safeImageSrc(url);
   // Resize only our own /uploads files, and only where the caller knows the box (`sizes`); remote hosts
   // outside next.config's remotePatterns would make the optimizer refuse them.
@@ -33,7 +33,7 @@ export default function PostImage({ url, alt, className = "", priority = false, 
       priority={priority}
       sizes={sizes}
       unoptimized={!optimize}
-      className={`object-cover ${className}`}
+      className={`${fit === "contain" ? "object-contain" : "object-cover"} ${className}`}
       onError={() => setFailed(src)}
     />
   );

@@ -21,7 +21,7 @@ function setup() {
     addEventListener: (t: string, fn: (e: unknown) => void) => { (listeners[t] ??= new Set()).add(fn); },
     removeEventListener: (t: string, fn: (e: unknown) => void) => { listeners[t]?.delete(fn); },
   };
-  const fire = (t: string, e: unknown) => listeners[t]?.forEach((fn) => fn(e));
+  const fire = (t: string, e: object) => listeners[t]?.forEach((fn) => fn({ preventDefault() {}, ...e }));
   let closed = 0;
   const stop = popoverDismiss(doc as never, () => container as never, () => { closed++; });
   return { doc, fire, trigger, item, outside, inDialog, stop, closed: () => closed };
@@ -65,5 +65,22 @@ describe("popoverDismiss: Navbar popovers close by keyboard as well as mouse (#8
     s.fire("keydown", { key: "Escape" });
     s.fire("mousedown", { target: s.outside });
     expect(s.closed()).toBe(0);
+  });
+});
+
+describe("popoverDismiss inside a dialog: one Escape closes the popover only (#1073)", () => {
+  test("the Escape that closes the popover is consumed, so the dialog around it stays open", () => {
+    const s = setup();
+    let prevented = false;
+    s.fire("keydown", { key: "Escape", preventDefault: () => { prevented = true; } });
+    expect(s.closed()).toBe(1);
+    expect(prevented).toBe(true);
+  });
+  test("an Escape it leaves to a dialog is not consumed", () => {
+    const s = setup();
+    s.doc.activeElement = s.inDialog;
+    let prevented = false;
+    s.fire("keydown", { key: "Escape", preventDefault: () => { prevented = true; } });
+    expect(prevented).toBe(false);
   });
 });

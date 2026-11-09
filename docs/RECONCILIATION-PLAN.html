@@ -1,0 +1,490 @@
+<style>
+  :root{
+    --ground:#f5f7fa; --panel:#ffffff; --ink:#141922; --muted:#5b6472; --faint:#8a94a3;
+    --hair:#e3e7ee; --hair2:#eef1f6;
+    --main:#2f6fed; --landing:#c07c0c; --perf:#d63d4a; --integ:#159a63; --dash:#7c5cde; --grey:#94a0b0;
+    --good:#159a63; --warn:#c07c0c; --danger:#d63d4a;
+    --mono:"Cascadia Code","Cascadia Mono",Consolas,ui-monospace,"SF Mono",monospace;
+    --sans:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,"Noto Sans Thai",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.55;
+    font-size:16px;-webkit-font-smoothing:antialiased}
+  .page{max-width:1180px;margin:0 auto;padding:48px 28px 80px}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  a{color:var(--main)}
+  code,.mono{font-family:var(--mono);font-variant-ligatures:none}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 10px}
+  .tnum{font-variant-numeric:tabular-nums}
+  :lang(th) .eyebrow{letter-spacing:.05em}
+
+  /* language toggle */
+  .langbar{position:sticky;top:0;z-index:20;display:flex;justify-content:flex-end;
+    background:linear-gradient(var(--ground),var(--ground) 70%,rgba(245,247,250,0));padding:12px 28px 6px}
+  .langtog{display:inline-flex;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:var(--panel);
+    font-family:var(--mono);font-size:12.5px;box-shadow:0 1px 2px rgba(20,25,34,.04)}
+  .langtog button{border:0;background:transparent;padding:6px 14px;cursor:pointer;color:var(--muted);font-family:inherit;font-size:inherit}
+  .langtog button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .langtog button:focus-visible{outline:2px solid var(--main);outline-offset:-2px}
+
+  header.hd{border-bottom:2px solid var(--ink);padding-bottom:26px;margin-bottom:34px}
+  header.hd h1{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.14}
+  :lang(th) header.hd h1{letter-spacing:normal}
+  header.hd .sub{color:var(--muted);margin-top:10px;max-width:64ch;font-size:15.5px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--hair);
+    border:1px solid var(--hair);border-radius:10px;overflow:hidden;margin:0 0 40px}
+  .stat{background:var(--panel);padding:16px 18px}
+  .stat .k{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
+  :lang(th) .stat .k{letter-spacing:0;text-transform:none}
+  .stat .v{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  section{margin:0 0 46px}
+  h2.s{font-size:13px;font-family:var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);
+    padding-bottom:9px;border-bottom:1px solid var(--hair);margin-bottom:22px;display:flex;align-items:baseline;gap:12px}
+  :lang(th) h2.s{letter-spacing:.02em;text-transform:none;font-size:15px}
+  h2.s .no{color:var(--main)}
+  .lead{color:var(--muted);max-width:72ch;margin:-8px 0 22px;font-size:15px}
+
+  .graphbox{border:1px solid var(--hair);border-radius:12px;background:var(--panel);padding:6px;overflow-x:auto}
+  .graphbox svg{display:block;min-width:1080px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px 22px;margin-top:16px;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:22px;height:0;border-top:3px solid;border-radius:2px}
+  .dot{width:11px;height:11px;border-radius:50%;border:2.5px solid;background:#fff}
+
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:20px;border-top:4px solid}
+  .card h3{font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .card .ref{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:3px 0 12px}
+  .card .role{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:3px 8px;border-radius:5px;font-weight:600;margin-bottom:12px}
+  .card ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:#2c333e}
+  .card li{margin:4px 0}
+  .card .axis{font-size:12.5px;color:var(--faint);font-family:var(--mono);margin-top:12px}
+
+  .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+  .tbl th,.tbl td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair2)}
+  .tbl th{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  :lang(th) .tbl th{letter-spacing:0;text-transform:none;font-size:12px}
+  .tbl td.mono,.tbl td .mono{font-family:var(--mono)}
+  .tbl tr:last-child td{border-bottom:none}
+  .tblwrap{border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .p-hard{background:#fdecec;color:#b02730}
+  .p-med{background:#fdf3e2;color:#9a6206}
+  .p-easy{background:#e7f6ee;color:#0d6b45}
+
+  .commits{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .commits .col{border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .commits .ch{padding:12px 14px;border-bottom:1px solid var(--hair);font-weight:700;font-size:14px;display:flex;align-items:center;gap:9px}
+  .commits .ch .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;color:#fff}
+  .crow{display:grid;grid-template-columns:82px 1fr;gap:10px;padding:8px 14px;border-bottom:1px solid var(--hair2);font-size:13px}
+  .crow:last-child{border-bottom:none}
+  .crow .h{font-family:var(--mono);font-size:12px;color:var(--main)}
+  .crow .w{color:#2c333e}
+  .crow .w b{color:var(--ink)}
+
+  .phase{display:grid;grid-template-columns:44px 1fr;gap:16px;padding:16px 0;border-bottom:1px solid var(--hair2)}
+  .phase:last-child{border-bottom:none}
+  .phase .badge{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;font-size:18px;color:#fff}
+  .phase h3{font-size:15.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .phase p{margin:5px 0 0;font-size:13.5px;color:var(--muted);max-width:80ch}
+  .phase .op{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;font-weight:600}
+  .gate-dev{background:#fdecec;color:#b02730}
+  .gate-agent{background:#e7f6ee;color:#0d6b45}
+  .op-merge{background:#e8effe;color:#1a54c4}
+  .op-freeze{background:#f3eefd;color:#5b3fb0}
+  .op-rebase{background:#fdf3e2;color:#9a6206}
+
+  .mines{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mine{border:1px solid var(--hair);border-left:3px solid var(--danger);border-radius:8px;background:var(--panel);padding:12px 14px}
+  .mine b{font-size:13.5px}
+  .mine p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+  .mine code{font-size:11.5px;background:var(--hair2);padding:1px 5px;border-radius:4px}
+
+  footer{border-top:1px solid var(--hair);margin-top:20px;padding-top:20px;font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+  @media(max-width:820px){
+    .stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}
+    .commits{grid-template-columns:1fr}.mines{grid-template-columns:1fr}
+    header.hd h1{font-size:27px}
+  }
+</style>
+
+<div class="wrap" lang="en">
+  <div class="langbar">
+    <div class="langtog" role="group" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="th" aria-pressed="false">ไทย</button>
+    </div>
+  </div>
+  <div class="page">
+
+  <header class="hd">
+    <p class="eyebrow" data-i18n="eyebrow">MangaDock · Git Reconciliation Report</p>
+    <h1 data-i18n="title">Three versions, one trunk: the branch-divergence map &amp; convergence plan</h1>
+    <p class="sub" data-i18n="sub">Where the code forked, what each branch built, where it must rebase and merge back — and the safe order to do it without regressing render <em>or</em> translation quality.</p>
+    <div class="meta">
+      <span data-i18n="m_gen">generated <b>2026-07-10</b></span><span>epic <b>#548</b></span>
+      <span>plan <b>docs/RECONCILIATION-PLAN.md</b></span><span>exec <b>#625 · #626 · #627</b></span>
+      <span data-i18n="m_method">method <b>git merge-tree + 409-commit read + 2 code deep-dives + clink</b></span>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k" data-i18n="st1k">Live branches</div><div class="v tnum">15</div><div class="d" data-i18n="st1d">was 24 · −9 cleaned</div></div>
+    <div class="stat"><div class="k" data-i18n="st2k">Render campaigns</div><div class="v tnum">2</div><div class="d" data-i18n="st2d">complementary, on main + landing</div></div>
+    <div class="stat"><div class="k" data-i18n="st3k">Integration conflicts</div><div class="v tnum">~23</div><div class="d" data-i18n="st3d">landing → main, solve once</div></div>
+    <div class="stat"><div class="k" data-i18n="st4k">perf WIP files</div><div class="v tnum">320</div><div class="d" data-i18n="st4d">the freeze blocker</div></div>
+    <div class="stat"><div class="k" data-i18n="st5k">Divergence axes</div><div class="v tnum">2</div><div class="d" data-i18n="st5d">render + dashboard/observability</div></div>
+  </div>
+
+  <section>
+    <h2 class="s"><span class="no">01</span> <span data-i18n="s1">The branch map — fork · merge · rebase · deploy</span></h2>
+    <p class="lead" data-i18n="l1">Time runs left → right. Solid = history (done); dashed = the planned convergence. The <b>NOW</b> divider is today. Every node is a real fork, merge, or planned operation.</p>
+    <div class="graphbox">
+      <svg viewBox="0 0 1120 560" role="img" aria-label="Git branch topology and convergence plan">
+        <g font-family="Cascadia Code,Consolas,monospace" font-size="12.5" font-weight="600">
+          <text x="14" y="86"  fill="#7c5cde">feat/dashboard</text>
+          <text x="14" y="170" fill="#2f6fed">main</text>
+          <text x="14" y="262" fill="#c07c0c">landing/render-phase0</text>
+          <text x="14" y="346" fill="#d63d4a" data-i18n="g_perf">perf  (PROD)</text>
+          <text x="14" y="470" fill="#159a63">integrate/render-reconcile</text>
+        </g>
+        <line x1="792" y1="40" x2="792" y2="530" stroke="#141922" stroke-width="1.4" stroke-dasharray="2 5"/>
+        <text x="792" y="34" text-anchor="middle" font-family="Cascadia Code,Consolas,monospace" font-size="11" letter-spacing="1.5" fill="#141922" data-i18n="g_now">NOW · 2026-07-10</text>
+        <rect x="808" y="44" width="300" height="486" fill="#2f6fed" opacity="0.028"/>
+
+        <line x1="150" y1="150" x2="900" y2="150" stroke="#2f6fed" stroke-width="3.5"/>
+        <path d="M1010 440 C 1070 440, 1055 150, 1090 150" fill="none" stroke="#159a63" stroke-width="3" stroke-dasharray="6 5"/>
+        <line x1="1088" y1="150" x2="1108" y2="150" stroke="#2f6fed" stroke-width="3.5"/>
+        <path d="M215 150 C 250 150, 250 80, 285 80" fill="none" stroke="#7c5cde" stroke-width="3"/>
+        <line x1="285" y1="80" x2="1108" y2="80" stroke="#7c5cde" stroke-width="3" opacity="0.9"/>
+        <path d="M470 150 C 500 150, 500 300, 540 300" fill="none" stroke="#9aa4b2" stroke-width="3"/>
+        <path d="M560 300 C 585 300, 585 254, 610 254" fill="none" stroke="#c07c0c" stroke-width="3.2"/>
+        <path d="M560 300 C 585 300, 585 338, 610 338" fill="none" stroke="#d63d4a" stroke-width="3.2"/>
+        <line x1="608" y1="254" x2="900" y2="254" stroke="#c07c0c" stroke-width="3.2"/>
+        <line x1="608" y1="338" x2="1108" y2="338" stroke="#d63d4a" stroke-width="3.2"/>
+        <path d="M690 254 C 720 254, 700 150, 735 150" fill="none" stroke="#c07c0c" stroke-width="2.4" opacity="0.85"/>
+        <path d="M840 150 C 885 150, 880 440, 918 440" fill="none" stroke="#159a63" stroke-width="3" stroke-dasharray="6 5"/>
+        <line x1="916" y1="440" x2="1012" y2="440" stroke="#159a63" stroke-width="3" stroke-dasharray="6 5"/>
+        <path d="M902 254 C 950 254, 945 440, 985 440" fill="none" stroke="#c07c0c" stroke-width="2.6" stroke-dasharray="6 5"/>
+        <path d="M1096 150 C 1103 210, 1103 300, 1096 338" fill="none" stroke="#2f6fed" stroke-width="2.4" stroke-dasharray="6 5"/>
+
+        <circle cx="215" cy="150" r="6.5" fill="#fff" stroke="#7c5cde" stroke-width="3"/>
+        <text x="215" y="126" text-anchor="middle" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#5b6472" data-i18n="g_fork313">fork ~03-13</text>
+        <text x="300" y="66" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#7c5cde" data-i18n="g_dash">714 commits · observability (2nd axis) · PR#607</text>
+        <circle cx="470" cy="150" r="6.5" fill="#fff" stroke="#9aa4b2" stroke-width="3"/>
+        <text x="470" y="132" text-anchor="middle" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#5b6472">31f7b4d8 · 07-02</text>
+        <circle cx="560" cy="300" r="6" fill="#fff" stroke="#9aa4b2" stroke-width="3"/>
+        <text x="512" y="318" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#5b6472">efdf9c3c · 07-03</text>
+        <circle cx="640" cy="150" r="5.5" fill="#2f6fed"/>
+        <text x="640" y="140" text-anchor="middle" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#2f6fed">render v2 (#178/#180/#183)</text>
+        <path d="M735 150 m -6 0 a 6 6 0 1 0 12 0 a 6 6 0 1 0 -12 0" fill="#c07c0c"/>
+        <text x="748" y="146" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#c07c0c" data-i18n="g_550">#550 partial port</text>
+        <rect x="686" y="248" width="12" height="12" rx="2" fill="#c07c0c"/>
+        <text x="704" y="242" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#c07c0c" data-i18n="g_base">🔒 tuned baseline (best render)</text>
+        <text x="612" y="238" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#c07c0c" data-i18n="g_lplus">+118 · inpaint/rescue/SFX</text>
+        <text x="612" y="358" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#d63d4a" data-i18n="g_pplus">+8 · Stage A · #623 thinking-fix</text>
+        <rect x="856" y="332" width="13" height="13" rx="2" fill="#fff" stroke="#d63d4a" stroke-width="3"/>
+        <text x="850" y="382" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#d63d4a" data-i18n="g_frz1">▣ freeze WIP</text>
+        <text x="836" y="396" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#d63d4a" data-i18n="g_frz2">→ wip/perf-freeze (DEV)</text>
+        <circle cx="792" cy="150" r="5.5" fill="#141922"/>
+        <text x="792" y="196" text-anchor="middle" font-family="Cascadia Code,Consolas,monospace" font-size="10" fill="#141922" data-i18n="g_clean">cleanup 24→15</text>
+        <circle cx="918" cy="440" r="6" fill="#fff" stroke="#159a63" stroke-width="3"/>
+        <text x="880" y="428" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#159a63" data-i18n="g_ifork">fork off main + cherry-pick #623</text>
+        <path d="M985 440 m -7 0 l 7 -7 l 7 7 l -7 7 z" fill="#c07c0c"/>
+        <text x="945" y="472" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#c07c0c" data-i18n="g_fmerge">◆ feature-merge landing</text>
+        <text x="958" y="486" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#b02730" data-i18n="g_conf">~23 conflicts · hand-merge</text>
+        <path d="M1090 150 m -7 0 l 7 -7 l 7 7 l -7 7 z" fill="#159a63"/>
+        <text x="1030" y="130" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#159a63" data-i18n="g_tomain">◆ → main (DEV)</text>
+        <path d="M1096 338 m -7 -6 l 12 6 l -12 6 z" fill="#2f6fed"/>
+        <text x="1020" y="356" font-family="Cascadia Code,Consolas,monospace" font-size="10.5" fill="#2f6fed" data-i18n="g_deploy">▶ deploy → perf</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="border-color:#2f6fed"></span><span data-i18n="lg_main">main (trunk)</span></span>
+      <span><span class="sw" style="border-color:#c07c0c"></span><span data-i18n="lg_land">landing (render R&amp;D)</span></span>
+      <span><span class="sw" style="border-color:#d63d4a"></span><span data-i18n="lg_perf">perf (prod)</span></span>
+      <span><span class="sw" style="border-color:#159a63;border-top-style:dashed"></span><span data-i18n="lg_int">integrate (planned)</span></span>
+      <span><span class="sw" style="border-color:#7c5cde"></span><span data-i18n="lg_dash">dashboard (2nd axis)</span></span>
+      <span><span class="dot" style="border-color:#5b6472"></span><span data-i18n="lg_fork">fork</span></span>
+      <span data-i18n="lg_sym">◆ merge&nbsp;&nbsp;▣ freeze&nbsp;&nbsp;▶ deploy&nbsp;&nbsp;🔒 baseline</span>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">02</span> <span data-i18n="s2">Why it's hard — two complementary render campaigns</span></h2>
+    <p class="lead" data-i18n="l2">Not "one branch has render." <b>main</b> and <b>landing</b> each built a different half of the render stack on orthogonal axes. Neither dominates — so the merge is a <b>feature-merge at function granularity</b>, not a branch pick. The crux is one function: <code class="mono">resize_regions_to_font_size()</code> in <code class="mono">rendering/__init__.py</code> — take landing → lose KP/#178/#183; take main → lose display-SFX/cap/dedup. Both must survive.</p>
+    <div class="cards">
+      <div class="card" style="border-top-color:#2f6fed">
+        <h3>main</h3>
+        <div class="ref" data-i18n="c1ref">the true trunk · +291 commits</div>
+        <span class="role" style="background:#e8effe;color:#1a54c4" data-i18n="c1role">TRUNK · base</span>
+        <ul>
+          <li data-i18n="c1a"><b>All app work</b> — frontend F1–F7, dashboard V2, LLM #507, wallet, backend, CI</li>
+          <li data-i18n="c1b"><b>Render v2 (layout/fit)</b> — reference_layout #178, Knuth-Plass #180, width-squeeze #183</li>
+          <li data-i18n="c1c">Observability — sizing-trace/replay #462, VRAM #279, #278 SFX gate</li>
+          <li data-i18n="c1d">Carries landing's rescue <em>helpers</em> but <b>unwired</b> (dead code)</li>
+        </ul>
+        <div class="axis" data-i18n="c1ax">axis · LAYOUT / FIT + tooling</div>
+      </div>
+      <div class="card" style="border-top-color:#c07c0c">
+        <h3>landing/render-phase0</h3>
+        <div class="ref" data-i18n="c2ref">render R&amp;D fork · +118 commits</div>
+        <span class="role" style="background:#fdf3e2;color:#9a6206" data-i18n="c2role">RENDER SOURCE</span>
+        <ul>
+          <li data-i18n="c2a"><b>selective-Flux #421</b> — art/hair repair under text</li>
+          <li data-i18n="c2b"><b>Wired</b> empty-balloon / white-box rescue, own_work_alpha overlap</li>
+          <li data-i18n="c2c">flatten-white-captions, #535 index-parse, display-SFX + page-frac cap</li>
+          <li data-i18n="c2d">= the <b>confirmed-best</b> tuned baseline (🔒)</li>
+        </ul>
+        <div class="axis" data-i18n="c2ax">axis · INPAINT / ERASE / RESCUE</div>
+      </div>
+      <div class="card" style="border-top-color:#d63d4a">
+        <h3>perf/mit-layout-fit-and-merge</h3>
+        <div class="ref" data-i18n="c3ref">production · +8 committed · +320 WIP</div>
+        <span class="role" style="background:#fdecec;color:#b02730" data-i18n="c3role">PROD · frozen 07-03</span>
+        <ul>
+          <li data-i18n="c3a">App-frozen at 2026-07-03 — old render code</li>
+          <li data-i18n="c3b">Stage A + <b>#623 thinking-fix</b> (<code class="mono">d05fb4dc</code>)</li>
+          <li data-i18n="c3c"><b>320-file uncommitted WIP</b> — the freeze blocker</li>
+          <li data-i18n="c3d">Runs the defects users see (oversize / overflow / raw SFX)</li>
+        </ul>
+        <div class="axis" data-i18n="c3ax">axis · deploy target</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">03</span> <span data-i18n="s3">Which commits changed what</span></h2>
+    <p class="lead" data-i18n="l3">Representative load-bearing commits per campaign — the ones that must be reconciled by hand. Full lists: <code class="mono">git log efdf9c3c..&lt;branch&gt;</code>.</p>
+    <div class="commits">
+      <div class="col">
+        <div class="ch"><span class="tag" style="background:#2f6fed">main · render v2</span> <span data-i18n="ch1">layout / fit / tooling</span></div>
+        <div class="crow"><span class="h">1988fded</span><span class="w" data-i18n="k1a"><b>#550</b> clean_layout narration fit — grow-to-target → fit-to-footprint (ported from landing)</span></div>
+        <div class="crow"><span class="h">e35882ba</span><span class="w" data-i18n="k1b"><b>#530</b> wire Knuth-Plass line-breaker behind <code class="mono">render.knuth_plass</code></span></div>
+        <div class="crow"><span class="h">512b2875</span><span class="w" data-i18n="k1c"><b>#548</b> Stage-C slice 3 — port patch_geometry mask-quality family (TDD)</span></div>
+        <div class="crow"><span class="h">bcd0f2c2</span><span class="w" data-i18n="k1d"><b>#178</b> _reference_clean_layout — safe-box binary-search fit (both-axis)</span></div>
+        <div class="crow"><span class="h">509f63f1</span><span class="w" data-i18n="k1e"><b>#462</b> deterministic render-only replay harness</span></div>
+        <div class="crow"><span class="h">5b84ae81</span><span class="w" data-i18n="k1f"><b>#436</b> content-shaped patch alpha — overlapping balloons don't erase each other</span></div>
+      </div>
+      <div class="col">
+        <div class="ch"><span class="tag" style="background:#c07c0c">landing · render v1</span> <span data-i18n="ch2">inpaint / rescue / SFX</span></div>
+        <div class="crow"><span class="h">5f92b39e</span><span class="w" data-i18n="k2a"><b>#421</b> selective-Flux resolved — v2 discriminator, 0 cost on flat regions</span></div>
+        <div class="crow"><span class="h">61633c8b</span><span class="w" data-i18n="k2b"><b>#538</b> fills_bubble_width discriminator gates bubble_fit (kills oversize)</span></div>
+        <div class="crow"><span class="h">2c2627e1</span><span class="w" data-i18n="k2c"><b>#538</b> thread page_shape → clean_layout wraps to PAGE not crop</span></div>
+        <div class="crow"><span class="h">7e4e0920</span><span class="w" data-i18n="k2d"><b>#535</b> custom_openai parses BY INDEX (fixes page-wide misalignment)</span></div>
+        <div class="crow"><span class="h">9bcede53</span><span class="w" data-i18n="k2e"><b>#278</b> gate SFX rescue on det_sfx provenance, not text length</span></div>
+        <div class="crow"><span class="h">da55ed7b</span><span class="w" data-i18n="k2f"><b>#535</b> overlap-safe patch alpha — neighbour won't resurrect erased text</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">04</span> <span data-i18n="s4">Conflict budget — where merges collide</span></h2>
+    <p class="lead" data-i18n="l4">Computed read-only with <code class="mono">git merge-tree --write-tree</code> (no working-tree touched). This is why the direction is main-based and why the WIP must be frozen, not committed.</p>
+    <div class="tblwrap"><table class="tbl">
+      <tr><th data-i18n="t4h1">Merge direction</th><th data-i18n="t4h2">Real conflicts</th><th data-i18n="t4h3">Difficulty</th><th data-i18n="t4h4">Verdict</th></tr>
+      <tr><td class="mono">landing → perf</td><td class="num">1</td><td><span class="pill p-easy">EASY</span></td><td data-i18n="t4a">clean, but WRONG base (perf app-frozen)</td></tr>
+      <tr><td class="mono">main → perf</td><td class="num">~11</td><td><span class="pill p-med">MEDIUM</span></td><td data-i18n="t4b">not used</td></tr>
+      <tr><td class="mono">landing → main <b>(integration)</b></td><td class="num">~23</td><td><span class="pill p-hard">HARD</span></td><td data-i18n="t4c">the real set — two render campaigns collide; solve ONCE</td></tr>
+      <tr><td class="mono">commit WIP first, then landing→perf</td><td class="num">1 → 9</td><td><span class="pill p-hard">AVOID</span></td><td data-i18n="t4d">WIP entangles the render files → freeze, don't commit</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">05</span> <span data-i18n="s5">The convergence plan — where to freeze, merge, rebase, deploy</span></h2>
+    <div>
+      <div class="phase">
+        <div class="badge" style="background:#d63d4a">A</div>
+        <div><h3><span data-i18n="phA">Freeze &amp; clean</span> <span class="op gate-dev" data-i18n="op_dev">DEV GATE</span> <span class="op op-freeze">FREEZE</span></h3>
+        <p data-i18n="phAp">Commit the 320-file perf WIP to <code class="mono">wip/perf-freeze</code>, restore a clean <code class="mono">perf</code>. Triage: 25 discard (memory already migrated) · 264 trash (screenshots/logs) · 13 render modules kept for reference · 11 tool scripts. <b>The one true blocker</b> — only the dev knows what to keep.</p></div>
+      </div>
+      <div class="phase">
+        <div class="badge" style="background:#159a63">B</div>
+        <div><h3><span data-i18n="phB">Integration branch</span> <span class="op gate-agent" data-i18n="op_agent">AGENT</span> <span class="op op-merge">MERGE</span></h3>
+        <p data-i18n="phBp"><code class="mono">integrate/render-reconcile</code> off <code class="mono">main</code>. Cherry-pick perf's unique winners first (#623 thinking-fix, Stage A), then <code class="mono">merge landing --no-squash</code> (~23 conflicts surface here).</p></div>
+      </div>
+      <div class="phase">
+        <div class="badge" style="background:#159a63">C</div>
+        <div><h3><span data-i18n="phC">Feature-merge the render set</span> <span class="op gate-agent" data-i18n="op_agent_tdd">AGENT · TDD</span></h3>
+        <p data-i18n="phCp">Resolve in order: <b>①</b> <code class="mono">config.py</code> + <code class="mono">mit-config.ts</code> together (flag contract) → <b>②</b> hand-merge <code class="mono">resize_regions_to_font_size()</code> (keep main spine + landing SFX/dedup) → <b>③</b> inpaint/rescue wiring unit → <b>④</b> take landing wholesale for dead-on-main helpers + land the unique <b>#182 vertical</b> slice. Also: renumber the duplicate ADR 023.</p></div>
+      </div>
+      <div class="phase">
+        <div class="badge" style="background:#c07c0c">D</div>
+        <div><h3><span data-i18n="phD">Quality gates — both BLOCKING</span> <span class="op gate-agent" data-i18n="op_agent_gpu">AGENT · GPU</span></h3>
+        <p data-i18n="phDp">Regenerate golden <code class="mono">.npz</code> from reconciled code. <b>Render gate:</b> bench vs landing baseline (One-Punch + 8-pt checklist). <b>Translation gate (dev hard-constraint):</b> text equal-or-better than baseline — no dropped/garbled bubbles, index-aligned, no romaji; includes the #623 thinking-off vs thinking-on A/B. Commit PNG + text-diff + report.</p></div>
+      </div>
+      <div class="phase">
+        <div class="badge" style="background:#2f6fed">E</div>
+        <div><h3><span data-i18n="phE">Promote &amp; deploy</span> <span class="op gate-dev" data-i18n="op_dev2">DEV GATE</span> <span class="op op-rebase">REBASE-SAFE</span></h3>
+        <p data-i18n="phEp">Merge <code class="mono">integrate → main</code> (classifier blocks agent self-merge to default). Fast-forward <code class="mono">main → perf</code>. Bump <code class="mono">MIT_RENDER_VERSION</code>, enforce <code class="mono">lama_large</code> + <code class="mono">selective_flux=off</code> + KP gated by <code class="mono">render.knuth_plass</code>. Keep a rollback branch.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">06</span> <span data-i18n="s6">Branch cleanup — done &amp; pending</span></h2>
+    <p class="lead" data-i18n="l6">Remote 24 → 15, local 18 → 10. Every branch has a disposition; nothing dangling.</p>
+    <div class="tblwrap"><table class="tbl">
+      <tr><th data-i18n="t6h1">Branch / PR</th><th data-i18n="t6h2">Owner</th><th data-i18n="t6h3">Disposition</th></tr>
+      <tr><td class="mono" data-i18n="cl1n">15 squash-merged branches</td><td data-i18n="own_us">us</td><td><span class="pill p-easy">DELETED</span> <span data-i18n="cl1d">auto-removed by GitHub, refs pruned</span></td></tr>
+      <tr><td class="mono">#425 knuth-plass-kinsoku (#180)</td><td data-i18n="own_us2">us</td><td><span class="pill p-easy">CLOSED</span> <span data-i18n="cl2d">superseded — line_break.py on main</span></td></tr>
+      <tr><td class="mono">#424 squeeze (#183)</td><td data-i18n="own_us3">us</td><td><span class="pill p-easy">CLOSED</span> <span data-i18n="cl3d">superseded — feature on main</span></td></tr>
+      <tr><td class="mono">#422 chore-triage</td><td data-i18n="own_us4">us</td><td><span class="pill p-easy">CLOSED</span> <span data-i18n="cl4d">superseded — memory migrated #531</span></td></tr>
+      <tr><td class="mono">feat/mit-lama-lum-reground</td><td data-i18n="own_us5">us</td><td><span class="pill p-easy">DELETED</span> <span data-i18n="cl5d">reground fully on main (ADR 002 + knob + lesson)</span></td></tr>
+      <tr><td class="mono">#423 vertical-text (#182)</td><td data-i18n="own_us6">us</td><td><span class="pill p-med">KEEP</span> <span data-i18n="cl6d">unique — land via #626</span></td></tr>
+      <tr><td class="mono">#360 docs/ci-gate-adr (ADR 020)</td><td data-i18n="own_us7">us</td><td><span class="pill p-med">READY-FOR-HUMAN</span> <span data-i18n="cl7d">net-new, rebase + merge</span></td></tr>
+      <tr><td class="mono">bench/render-quality-baseline · bench/545</td><td data-i18n="own_us8">us</td><td><span class="pill p-med">KEEP</span> <span data-i18n="cl8d">🔒 baseline locks</span></td></tr>
+      <tr><td class="mono">feat/dashboard (#607)</td><td>xeno+akkanop</td><td><span class="pill p-med">FLAG</span> <span data-i18n="cl9d">2nd-axis — akkanop-led, don't drive</span></td></tr>
+      <tr><td class="mono">feat/frontend-ui · multi-provider-llm · mobile-*</td><td data-i18n="own_oth">others</td><td><span class="pill" style="background:#eef1f6;color:#5b6472">LEAVE</span> <span data-i18n="cl10d">not ours</span></td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2 class="s"><span class="no">07</span> <span data-i18n="s7">Landmines — handle during merge</span></h2>
+    <div class="mines">
+      <div class="mine"><b>is_sfx vs from_sfx_detection</b><p data-i18n="lm1">main's #431 display-SFX arm is DEAD (wrong attr). Merging landing's attr silently activates it. → one <code>is_display_sfx_region()</code> helper, test 3 cases.</p></div>
+      <div class="mine"><b>flux_klein 500s off-#277</b><p data-i18n="lm2">Shared <code>Backend/.env</code> → prod must default <code>lama_large</code>; log active inpainter at startup.</p></div>
+      <div class="mine"><b>VRAM OOM (12 GB)</b><p data-i18n="lm3">selective_flux / empty-balloon OFF by default; one GPU worker at a time.</p></div>
+      <div class="mine"><b>KP gate</b><p data-i18n="lm4">Must gate on <code>render.knuth_plass</code>, never <code>bubble_area_fit</code> (already ON) — else narration oversize, no kill switch.</p></div>
+      <div class="mine"><b>Golden .npz</b><p data-i18n="lm5">Regenerate from reconciled code; review by metric summary — never accept either binary side.</p></div>
+      <div class="mine"><b data-i18n="lm6b">Translation quality (dev hard-gate)</b><p data-i18n="lm6">#623 thinking-off must be benchmarked vs thinking-on-raised-max_tokens; don't ship a silent regression.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span data-i18n="ft">MangaDock branch reconciliation · epic #548 · docs/RECONCILIATION-PLAN.md · Slow-Inc/MangaDock<br>
+    conflict counts via git merge-tree (read-only) · baseline = landing/render-phase0 tuned stack · no secrets in this report</span>
+  </footer>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var T={
+    eyebrow:{th:"MangaDock · รายงานรวม Git Branch"},
+    title:{th:"สามเวอร์ชัน หนึ่ง trunk: แผนที่การแตก branch และแผนรวมกลับ"},
+    sub:{th:"code แตกตรงไหน แต่ละ branch สร้างอะไร ต้อง rebase/merge กลับตรงไหน — และลำดับที่ปลอดภัยที่จะทำโดยไม่ทำให้คุณภาพ render <em>หรือ</em> การแปล แย่ลง"},
+    m_gen:{th:"สร้างเมื่อ <b>2026-07-10</b>"},
+    m_method:{th:"วิธี <b>git merge-tree + อ่าน 409 commit + code deep-dive 2 ตัว + clink</b>"},
+    st1k:{th:"Branch ที่มีอยู่"}, st1d:{th:"เดิม 24 · ลบ 9"},
+    st2k:{th:"Render campaign"}, st2d:{th:"เสริมกัน อยู่ที่ main + landing"},
+    st3k:{th:"Conflict ตอน integrate"}, st3d:{th:"landing → main, แก้ครั้งเดียว"},
+    st4k:{th:"perf WIP files"}, st4d:{th:"ตัว block การ freeze"},
+    st5k:{th:"แกน divergence"}, st5d:{th:"render + dashboard/observability"},
+    s1:{th:"แผนที่ branch — fork · merge · rebase · deploy"},
+    l1:{th:"เวลาไล่ซ้าย → ขวา · เส้นทึบ = history (ทำแล้ว); เส้นประ = แผนรวมกลับ · เส้น <b>NOW</b> = วันนี้ · ทุก node คือ fork / merge / operation จริง"},
+    g_perf:{th:"perf  (PROD)"}, g_now:{th:"NOW · 2026-07-10"},
+    g_fork313:{th:"fork ~03-13"}, g_dash:{th:"714 commit · observability (แกนที่ 2) · PR#607"},
+    g_550:{th:"#550 port บางส่วน"}, g_base:{th:"🔒 baseline ที่ tune (render ดีสุด)"},
+    g_lplus:{th:"+118 · inpaint/rescue/SFX"}, g_pplus:{th:"+8 · Stage A · #623 thinking-fix"},
+    g_frz1:{th:"▣ freeze WIP"}, g_frz2:{th:"→ wip/perf-freeze (DEV)"},
+    g_clean:{th:"cleanup 24→15"}, g_ifork:{th:"fork จาก main + cherry-pick #623"},
+    g_fmerge:{th:"◆ feature-merge landing"}, g_conf:{th:"~23 conflict · hand-merge"},
+    g_tomain:{th:"◆ → main (DEV)"}, g_deploy:{th:"▶ deploy → perf"},
+    lg_main:{th:"main (trunk)"}, lg_land:{th:"landing (render R&D)"}, lg_perf:{th:"perf (prod)"},
+    lg_int:{th:"integrate (แผน)"}, lg_dash:{th:"dashboard (แกนที่ 2)"}, lg_fork:{th:"fork"},
+    lg_sym:{th:"◆ merge&nbsp;&nbsp;▣ freeze&nbsp;&nbsp;▶ deploy&nbsp;&nbsp;🔒 baseline"},
+    s2:{th:"ทำไมยาก — render campaign 2 สายที่เสริมกัน"},
+    l2:{th:"ไม่ใช่ \"branch เดียวมี render\" — <b>main</b> กับ <b>landing</b> สร้าง render คนละครึ่งบนแกนที่ตั้งฉากกัน ไม่มีสายไหนชนะขาด → merge = <b>feature-merge ระดับฟังก์ชัน</b> ไม่ใช่เลือก branch · คอขวด = ฟังก์ชันเดียว <code class=\"mono\">resize_regions_to_font_size()</code> ใน <code class=\"mono\">rendering/__init__.py</code> — เอา landing เสีย KP/#178/#183; เอา main เสีย display-SFX/cap/dedup · ต้องรอดทั้งคู่"},
+    c1ref:{th:"trunk แท้ · +291 commit"}, c1role:{th:"TRUNK · ฐาน"},
+    c1a:{th:"<b>งาน app ทั้งหมด</b> — frontend F1–F7, dashboard V2, LLM #507, wallet, backend, CI"},
+    c1b:{th:"<b>Render v2 (layout/fit)</b> — reference_layout #178, Knuth-Plass #180, width-squeeze #183"},
+    c1c:{th:"Observability — sizing-trace/replay #462, VRAM #279, #278 SFX gate"},
+    c1d:{th:"มี <em>helper</em> ของ rescue จาก landing แต่ <b>ไม่ได้ wire</b> (dead code)"},
+    c1ax:{th:"แกน · LAYOUT / FIT + tooling"},
+    c2ref:{th:"render R&D fork · +118 commit"}, c2role:{th:"แหล่ง RENDER"},
+    c2a:{th:"<b>selective-Flux #421</b> — ซ่อม art/hair ใต้ text"},
+    c2b:{th:"<b>wired</b> empty-balloon / white-box rescue, own_work_alpha overlap"},
+    c2c:{th:"flatten-white-captions, #535 index-parse, display-SFX + page-frac cap"},
+    c2d:{th:"= baseline ที่ tune แล้ว <b>ยืนยันว่าดีสุด</b> (🔒)"},
+    c2ax:{th:"แกน · INPAINT / ERASE / RESCUE"},
+    c3ref:{th:"production · +8 committed · +320 WIP"}, c3role:{th:"PROD · frozen 07-03"},
+    c3a:{th:"app แช่แข็งที่ 2026-07-03 — render code เก่า"},
+    c3b:{th:"Stage A + <b>#623 thinking-fix</b> (<code class=\"mono\">d05fb4dc</code>)"},
+    c3c:{th:"<b>WIP 320 ไฟล์ค้าง</b> — ตัว block การ freeze"},
+    c3d:{th:"รัน defect ที่ user เห็น (ใหญ่เกิน / ล้น / SFX raw)"},
+    c3ax:{th:"แกน · เป้า deploy"},
+    s3:{th:"commit ไหนแก้อะไร"},
+    l3:{th:"commit สำคัญตัวแทนแต่ละ campaign — ตัวที่ต้อง reconcile ด้วยมือ · list เต็ม: <code class=\"mono\">git log efdf9c3c..&lt;branch&gt;</code>"},
+    ch1:{th:"layout / fit / tooling"}, ch2:{th:"inpaint / rescue / SFX"},
+    k1a:{th:"<b>#550</b> clean_layout narration fit — grow-to-target → fit-to-footprint (port จาก landing)"},
+    k1b:{th:"<b>#530</b> wire Knuth-Plass line-breaker หลัง <code class=\"mono\">render.knuth_plass</code>"},
+    k1c:{th:"<b>#548</b> Stage-C slice 3 — port patch_geometry mask-quality family (TDD)"},
+    k1d:{th:"<b>#178</b> _reference_clean_layout — safe-box binary-search fit (both-axis)"},
+    k1e:{th:"<b>#462</b> deterministic render-only replay harness"},
+    k1f:{th:"<b>#436</b> content-shaped patch alpha — balloon ซ้อนไม่ลบ text กันเอง"},
+    k2a:{th:"<b>#421</b> selective-Flux สำเร็จ — discriminator v2, cost 0 บนพื้นเรียบ"},
+    k2b:{th:"<b>#538</b> fills_bubble_width discriminator gate bubble_fit (แก้ oversize)"},
+    k2c:{th:"<b>#538</b> thread page_shape → clean_layout wrap ตาม PAGE ไม่ใช่ crop"},
+    k2d:{th:"<b>#535</b> custom_openai parse BY INDEX (แก้ misalign ทั้งหน้า)"},
+    k2e:{th:"<b>#278</b> gate SFX rescue ที่ det_sfx provenance ไม่ใช่ความยาว text"},
+    k2f:{th:"<b>#535</b> overlap-safe patch alpha — patch ข้างเคียงไม่ปลุก text ที่ลบแล้ว"},
+    s4:{th:"Conflict budget — merge ชนตรงไหน"},
+    l4:{th:"คำนวณ read-only ด้วย <code class=\"mono\">git merge-tree --write-tree</code> (ไม่แตะ working tree) · นี่คือเหตุผลที่ต้อง main-based และต้อง freeze WIP ไม่ใช่ commit"},
+    t4h1:{th:"ทิศทาง merge"}, t4h2:{th:"conflict จริง"}, t4h3:{th:"ความยาก"}, t4h4:{th:"สรุป"},
+    t4a:{th:"clean แต่ฐานผิด (perf app-frozen)"}, t4b:{th:"ไม่ใช้"},
+    t4c:{th:"ชุดจริง — render 2 campaign ชนกัน; แก้ครั้งเดียว"},
+    t4d:{th:"WIP พันกับไฟล์ render → freeze อย่า commit"},
+    s5:{th:"แผนรวมกลับ — freeze / merge / rebase / deploy ตรงไหน"},
+    op_dev:{th:"รอ DEV"}, op_dev2:{th:"รอ DEV"}, op_agent:{th:"AGENT"}, op_agent_tdd:{th:"AGENT · TDD"}, op_agent_gpu:{th:"AGENT · GPU"},
+    phA:{th:"Freeze &amp; clean"},
+    phAp:{th:"commit perf WIP 320 ไฟล์ไป <code class=\"mono\">wip/perf-freeze</code>, คืน <code class=\"mono\">perf</code> สะอาด · triage: 25 ทิ้ง (memory ย้ายแล้ว) · 264 ขยะ (screenshot/log) · 13 render module เก็บอ้างอิง · 11 tool script · <b>ตัว block เดียวจริง</b> — มีแค่ dev รู้ว่าเก็บอะไร"},
+    phB:{th:"Integration branch"},
+    phBp:{th:"<code class=\"mono\">integrate/render-reconcile</code> จาก <code class=\"mono\">main</code> · cherry-pick ของเด่นของ perf ก่อน (#623 thinking-fix, Stage A), แล้ว <code class=\"mono\">merge landing --no-squash</code> (~23 conflict โผล่ตรงนี้)"},
+    phC:{th:"Feature-merge ชุด render"},
+    phCp:{th:"แก้ตามลำดับ: <b>①</b> <code class=\"mono\">config.py</code> + <code class=\"mono\">mit-config.ts</code> คู่กัน (flag contract) → <b>②</b> hand-merge <code class=\"mono\">resize_regions_to_font_size()</code> (เก็บ spine ของ main + SFX/dedup ของ landing) → <b>③</b> inpaint/rescue wiring unit → <b>④</b> เอา landing ทั้งก้อนสำหรับ helper ที่ตายบน main + land slice <b>#182 vertical</b> ที่ unique · และ renumber ADR 023 ที่ซ้ำ"},
+    phD:{th:"Quality gate — BLOCKING ทั้งคู่"},
+    phDp:{th:"regenerate golden <code class=\"mono\">.npz</code> จาก code ที่ reconcile แล้ว · <b>Render gate:</b> bench vs landing baseline (One-Punch + checklist 8 ข้อ) · <b>Translation gate (constraint แข็งของ dev):</b> text เท่าหรือดีกว่า baseline — ไม่ตก/garbled, index ตรง, ไม่มี romaji; รวม A/B #623 thinking-off vs thinking-on · commit PNG + text-diff + report"},
+    phE:{th:"Promote &amp; deploy"},
+    phEp:{th:"merge <code class=\"mono\">integrate → main</code> (classifier block agent self-merge เข้า default) · fast-forward <code class=\"mono\">main → perf</code> · bump <code class=\"mono\">MIT_RENDER_VERSION</code>, บังคับ <code class=\"mono\">lama_large</code> + <code class=\"mono\">selective_flux=off</code> + KP gate ที่ <code class=\"mono\">render.knuth_plass</code> · เก็บ rollback branch"},
+    s6:{th:"Branch cleanup — ทำแล้ว &amp; ค้าง"},
+    l6:{th:"remote 24 → 15, local 18 → 10 · ทุก branch มี disposition; ไม่มีค้าง"},
+    t6h1:{th:"Branch / PR"}, t6h2:{th:"เจ้าของ"}, t6h3:{th:"Disposition"},
+    own_us:{th:"เรา"},own_us2:{th:"เรา"},own_us3:{th:"เรา"},own_us4:{th:"เรา"},own_us5:{th:"เรา"},own_us6:{th:"เรา"},own_us7:{th:"เรา"},own_us8:{th:"เรา"},own_oth:{th:"คนอื่น"},
+    cl1n:{th:"15 branch squash-merged"}, cl1d:{th:"GitHub ลบอัตโนมัติ, prune ref แล้ว"},
+    cl2d:{th:"superseded — line_break.py อยู่บน main"}, cl3d:{th:"superseded — feature อยู่บน main"},
+    cl4d:{th:"superseded — memory ย้ายแล้ว #531"}, cl5d:{th:"reground อยู่บน main ครบ (ADR 002 + knob + บทเรียน)"},
+    cl6d:{th:"unique — land ผ่าน #626"}, cl7d:{th:"net-new, rebase + merge"},
+    cl8d:{th:"🔒 baseline lock"}, cl9d:{th:"แกนที่ 2 — akkanop นำ, ไม่ drive"}, cl10d:{th:"ไม่ใช่ของเรา"},
+    s7:{th:"Landmines — จัดการตอน merge"},
+    lm1:{th:"arm display-SFX #431 บน main ตาย (attr ผิด) · merge attr ของ landing จะปลุกมันเงียบๆ → ทำ helper <code>is_display_sfx_region()</code> เดียว, test 3 เคส"},
+    lm2:{th:"<code>Backend/.env</code> แชร์กัน → prod ต้อง default <code>lama_large</code>; log inpainter ที่ใช้ตอน start"},
+    lm3:{th:"selective_flux / empty-balloon default OFF; GPU worker ทีละตัว"},
+    lm4:{th:"ต้อง gate ที่ <code>render.knuth_plass</code> ห้าม <code>bubble_area_fit</code> (เปิดอยู่) — ไม่งั้น narration oversize ไม่มี kill switch"},
+    lm5:{th:"regenerate จาก code ที่ reconcile; review ด้วย metric summary — ห้าม pick ข้าง binary"},
+    lm6b:{th:"คุณภาพการแปล (hard-gate ของ dev)"},
+    lm6:{th:"#623 thinking-off ต้อง benchmark vs thinking-on-เพิ่ม-max_tokens; อย่า ship regression เงียบๆ"},
+    ft:{th:"MangaDock branch reconciliation · epic #548 · docs/RECONCILIATION-PLAN.md · Slow-Inc/MangaDock<br>conflict count ผ่าน git merge-tree (read-only) · baseline = landing/render-phase0 tuned stack · ไม่มี secret ในรายงานนี้"}
+  };
+  var nodes=document.querySelectorAll('[data-i18n]');
+  var en={};
+  nodes.forEach(function(el){en[el.getAttribute('data-i18n')]=el.innerHTML;});
+  var root=document.querySelector('.wrap');
+  function set(lang){
+    nodes.forEach(function(el){
+      var k=el.getAttribute('data-i18n');
+      var v=(lang==='en')?en[k]:((T[k]&&T[k].th)!=null?T[k].th:en[k]);
+      if(el.namespaceURI==='http://www.w3.org/2000/svg') el.textContent=v.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&');
+      else el.innerHTML=v;
+    });
+    root.setAttribute('lang',lang);
+    document.querySelectorAll('.langtog button').forEach(function(b){
+      b.setAttribute('aria-pressed', b.getAttribute('data-lang')===lang ? 'true':'false');
+    });
+  }
+  document.querySelectorAll('.langtog button').forEach(function(b){
+    b.addEventListener('click',function(){set(b.getAttribute('data-lang'));});
+  });
+})();
+</script>

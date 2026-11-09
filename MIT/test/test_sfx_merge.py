@@ -56,3 +56,41 @@ def test_small_overlap_below_threshold_is_kept():
     # candidate 100x100 at (90,90): overlaps a 10x10 corner → IoA 100/10000 = 0.01
     candidate = [(90, 90, 190, 190)]
     assert dedup_sfx_boxes(existing, candidate, ioa_threshold=0.2) == [(90, 90, 190, 190)]
+
+
+# ---- #19 (Otome p10): SFX box ENGULFING an existing textline = FP on normal text ----
+
+def test_sfx_box_containing_a_textline_is_dropped():
+    from manga_translator.sfx_merge import dedup_sfx_boxes
+    # thin DBNet line fully inside a big SFX candidate: IoA-over-candidate is tiny
+    # (0.06) so the old check passed it -> phantom overlay on the girl's bubble.
+    existing = [(100, 100, 220, 118)]              # thin text line
+    candidate = [(80, 60, 260, 240)]               # big FP box engulfing it
+    assert dedup_sfx_boxes(existing, candidate) == []
+
+
+def test_sfx_box_far_from_text_still_kept():
+    from manga_translator.sfx_merge import dedup_sfx_boxes
+    existing = [(0, 0, 50, 20)]
+    candidate = [(300, 300, 400, 400)]
+    assert dedup_sfx_boxes(existing, candidate) == [(300, 300, 400, 400)]
+
+
+# ---- #278: det_sfx provenance reaches the merged region ----
+
+def test_is_sfx_provenance_propagates_through_textline_merge():
+    # merge_sfx_detections flags SFX textlines is_sfx=True; the flag must reach the merged
+    # TextBlock region so the rescue site can gate on it.
+    import asyncio, numpy as np
+    from manga_translator.utils.generic import Quadrilateral
+    from manga_translator import textline_merge
+    def quad(x1, y1, x2, y2, txt, sfx):
+        q = Quadrilateral(np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], np.float32), txt, 0.9)
+        q.is_sfx = sfx
+        return q
+    sfx_q = quad(30, 30, 140, 90, 'ﾄﾞ', True)
+    dlg_q = quad(300, 300, 460, 360, 'hello', False)
+    regions = asyncio.run(textline_merge.dispatch([sfx_q, dlg_q], 600, 600, verbose=False))
+    by_text = {r.text: getattr(r, 'is_sfx', None) for r in regions}
+    assert any(v is True for v in by_text.values())      # the SFX region carries the flag
+    assert any(v is False for v in by_text.values())     # the dialogue region does not

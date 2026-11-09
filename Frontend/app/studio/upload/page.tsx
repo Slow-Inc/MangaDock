@@ -392,7 +392,8 @@ function StudioUploadContent() {
                     {!page.uploading && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeletePage(page.url); }}
-                        className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded bg-danger/80 text-[10px] text-bg transition group-hover:flex"
+                        aria-label={`ลบหน้า ${idx + 1}`}
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded bg-danger/80 text-[10px] text-bg opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         ✕
                       </button>

@@ -70,7 +70,9 @@ TRANSLATORS = {
     **GPT_TRANSLATORS,
     **OFFLINE_TRANSLATORS,
 }
-_registry = DispatchRegistry(TRANSLATORS, 'translator')
+# #1123: API translators get one instance per request inside request_scope() (worker slots); offline
+# translators hold model weights and stay shared.
+_registry = DispatchRegistry(TRANSLATORS, 'translator', scoped=lambda key: key not in OFFLINE_TRANSLATORS)
 
 def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
     return _registry.get(key, *args, **kwargs)

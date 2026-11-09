@@ -7,6 +7,7 @@ import { DOMAIN_COLORS } from './engine';
 import { ALL_DOMAINS, findScenarioById } from './data/index';
 import type { SimDomain, SimScenario } from './engine';
 import { useLang } from '../lang-context';
+import Collapse from '../Collapse';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,26 +47,26 @@ function DomainAccordionItem({
       <button
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-black/[0.04] transition-colors rounded-lg"
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-fill transition-colors rounded-lg"
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium text-[#1d1d1f] truncate">
+          <div className="text-[13px] font-medium text-ink truncate">
             {lang === 'th' ? domain.labelTH : domain.labelEN}
           </div>
           {lang === 'th' && (
-            <div className="text-[11px] text-[#6e6e73] truncate">{domain.labelEN}</div>
+            <div className="text-[11px] text-ink-2 truncate">{domain.labelEN}</div>
           )}
         </div>
         <ChevronRight
           size={13}
-          className="shrink-0 text-[#86868b] transition-transform duration-200"
+          className="shrink-0 text-ink-3 transition-transform duration-200"
           style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
         />
       </button>
 
-      {isOpen && (
-        <div className="ml-[22px] pl-3 border-l border-black/[0.08] space-y-0.5 pb-1">
+      <Collapse open={isOpen}>
+        <div className="ml-[22px] pl-3 border-l border-line space-y-0.5 pb-1">
           {domain.scenarios.map(scenario => {
             const isActive = scenario.id === activeScenarioId;
             return (
@@ -75,15 +76,15 @@ function DomainAccordionItem({
                 aria-pressed={isActive}
                 className={`w-full text-left flex items-center gap-2 px-2 py-2 rounded-md text-[12px] transition-colors ${
                   isActive
-                    ? 'bg-[#0071e3]/[0.08] text-[#0071e3] font-medium'
-                    : 'text-[#374151] hover:bg-black/[0.04] hover:text-[#1d1d1f]'
+                    ? 'bg-accent/10 text-accent font-medium'
+                    : 'text-ink-2 hover:bg-fill hover:text-ink'
                 }`}
               >
                 <span
                   className={`shrink-0 inline-flex items-center justify-center rounded text-[9px] font-mono font-semibold tabular-nums leading-none transition-colors ${
                     isActive
-                      ? 'bg-[#0071e3]/[0.12] text-[#0071e3]'
-                      : 'bg-black/[0.06] text-[#86868b]'
+                      ? 'bg-accent/[0.12] text-accent'
+                      : 'bg-fill text-ink-3'
                   }`}
                   style={{ minWidth: '24px', height: '16px', padding: '0 3px' }}
                 >
@@ -96,7 +97,7 @@ function DomainAccordionItem({
             );
           })}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -120,7 +121,7 @@ function MobileChipPicker({
   const currentDomain = ALL_DOMAINS.find(d => d.id === selectedDomainId) ?? ALL_DOMAINS[0];
 
   return (
-    <div className="md:hidden border-b border-black/[0.08]">
+    <div className="md:hidden border-b border-line">
       {/* Domain chips */}
       <div className="overflow-x-auto px-4 pt-3 pb-0 flex gap-2 min-w-0" style={{ scrollbarWidth: 'none' }}>
         {ALL_DOMAINS.map(d => {
@@ -136,7 +137,7 @@ function MobileChipPicker({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-all ${
                 isSelected
                   ? `${dc.badge} ${dc.badgeFg} shadow-sm`
-                  : 'bg-black/[0.04] text-[#6e6e73] hover:bg-black/[0.07]'
+                  : 'bg-fill text-ink-2 hover:bg-black/[0.07]'
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${dc.dot}`} aria-hidden="true" />
@@ -158,7 +159,7 @@ function MobileChipPicker({
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap shrink-0 transition-all ${
                 isActive
                   ? 'bg-[#1d1d1f] text-white'
-                  : 'bg-black/[0.04] text-[#374151] hover:bg-black/[0.07]'
+                  : 'bg-fill text-ink-2 hover:bg-black/[0.07]'
               }`}
             >
               <span className="font-mono text-[9px] font-semibold opacity-60 tabular-nums">{s.badge}</span>
@@ -212,12 +213,12 @@ export default function SimulationsView() {
 
       {/* Desktop: domain accordion sidebar */}
       <aside
-        className="hidden md:flex w-[220px] shrink-0 flex-col border-r border-black/[0.08] bg-[#f5f5f7] overflow-y-auto"
+        className="hidden md:flex w-[220px] shrink-0 flex-col border-r border-line bg-raised overflow-y-auto"
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
         aria-label="Simulation domains"
       >
         <div className="px-3 pt-5 pb-3">
-          <p className="px-3 mb-3 text-[11px] font-medium text-[#6e6e73] tracking-wide uppercase">
+          <p className="px-3 mb-3 text-[11px] font-medium text-ink-2 tracking-wide uppercase">
             Scenarios
           </p>
           <div className="space-y-0.5">
@@ -250,13 +251,13 @@ export default function SimulationsView() {
           <div className="max-w-[840px] mx-auto px-4 md:px-8 py-6">
             {/* Page heading */}
             <div className="mb-6">
-              <h1 className="text-[22px] font-semibold text-[#1d1d1f]">
+              <h1 className="text-[22px] font-semibold text-ink">
                 {lang === 'th' ? 'จำลองการทำงานของระบบ' : 'Interactive Simulations'}
               </h1>
-              <p className="text-[14px] text-[#6e6e73] mt-1">
+              <p className="text-[14px] text-ink-2 mt-1">
                 {lang === 'th'
-                  ? <>กดปุ่ม <kbd className="px-1.5 py-0.5 rounded text-[11px] bg-black/[0.06] font-mono">›</kbd> หรือ Play เพื่อดำเนินต่อ</>
-                  : <>Step through how MangaDock&rsquo;s systems work — press <kbd className="px-1.5 py-0.5 rounded text-[11px] bg-black/[0.06] font-mono">›</kbd> or Play to advance</>
+                  ? <>กดปุ่ม <kbd className="px-1.5 py-0.5 rounded text-[11px] bg-fill font-mono">›</kbd> หรือ Play เพื่อดำเนินต่อ</>
+                  : <>Step through how MangaDock&rsquo;s systems work — press <kbd className="px-1.5 py-0.5 rounded text-[11px] bg-fill font-mono">›</kbd> or Play to advance</>
                 }
               </p>
             </div>
@@ -286,13 +287,13 @@ export default function SimulationsView() {
                     className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
                       isActive
                         ? `${colors.bg} ${colors.border}`
-                        : 'border-black/[0.08] hover:border-black/[0.15] hover:bg-black/[0.02]'
+                        : 'border-line hover:border-line hover:bg-fill'
                     }`}
                   >
-                    <div className={`text-[12px] font-semibold ${isActive ? colors.text : 'text-[#1d1d1f]'}`}>
+                    <div className={`text-[12px] font-semibold ${isActive ? colors.text : 'text-ink'}`}>
                       {domain.labelEN}
                     </div>
-                    <div className="text-[11px] text-[#86868b] mt-0.5">
+                    <div className="text-[11px] text-ink-3 mt-0.5">
                       {domain.scenarios.length} scenario{domain.scenarios.length !== 1 ? 's' : ''}
                     </div>
                   </button>

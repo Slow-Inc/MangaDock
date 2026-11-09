@@ -13,6 +13,34 @@ from typing import Callable, List
 logger = logging.getLogger('manga_translator')
 
 
+_PLAIN_WORD = re.compile(r"^[A-Za-z][A-Za-z'’-]+[!?.,…]*$")
+#: a URL, e-mail, domain or wallet address — no translation can change it. Shaped tightly so dialogue does not match:
+#: `WAIT...WHAT`, `MR.SMITH`, a grawlix `@#%!` and a short ID like `ab12cd34ef` stay outside.
+_UNTRANSLATABLE_TOKEN = re.compile(
+    r'https?://\S+|www\.\S+|\w@\w+\.\w'
+    r'|\b[A-Za-z0-9-]+\.(?:com|net|org|io|gg|xyz|pm|tv)\b'
+    r'|\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{16,}\b', re.I)
+
+
+def _verbatim(text: str, translation: str) -> bool:
+    return bool(text) and ''.join(text.split()).upper() == ''.join(translation.split()).upper()
+
+
+def _credit_line(region) -> bool:
+    """A line handed back verbatim that holds a URL, e-mail or wallet address: the page is a credit page (#1139)."""
+    text = getattr(region, 'text', '') or ''
+    return _verbatim(text, region.translation) and bool(_UNTRANSLATABLE_TOKEN.search(text))
+
+
+def _kept_untranslatable(text: str, translation: str, in_target: float) -> bool:
+    """On a credit page, a short Latin line with no target-script letter handed back verbatim (coin name, wallet
+    address, URL) (#1139). No answer can put Thai into it, so counting it failed the page on every retry. A sentence
+    (4+ plain words) and a non-Latin source line still count."""
+    if in_target > 0 or not (text or '').isascii() or not _verbatim(text, translation):
+        return False
+    return sum(1 for word in text.split() if _PLAIN_WORD.match(word)) < 4
+
+
 def check_target_language_ratio(text_regions: List, target_lang: str,
                                 script_ratio: Callable[[str, str], float],
                                 min_ratio: float = 0.5) -> bool:
@@ -23,11 +51,14 @@ def check_target_language_ratio(text_regions: List, target_lang: str,
     if not text_regions:
         return True
 
-    all_translations = []
-    for region in text_regions:
-        translation = getattr(region, 'translation', '')
-        if translation and translation.strip():
-            all_translations.append(translation.strip())
+    answered = [r for r in text_regions if getattr(r, 'translation', '') and r.translation.strip()]
+    judged = answered
+    # a credit page carries several addresses/links; one alone is not enough to exempt short lines
+    if sum(_credit_line(r) for r in answered) >= 2:
+        judged = [r for r in answered
+                  if not _kept_untranslatable(getattr(r, 'text', ''), r.translation, script_ratio(r.translation, target_lang))]
+    # a page where every line came back verbatim was not translated at all: judge it whole (#1139)
+    all_translations = [r.translation.strip() for r in (judged or answered)]
 
     if not all_translations:
         logger.debug('No valid translation texts for language ratio check')

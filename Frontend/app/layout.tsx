@@ -9,6 +9,7 @@ import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
 import SkipLink from "./components/SkipLink";
 import DailyCheckinModal from "./components/DailyCheckinModal";
+import ContentLevelSync from "./components/ContentLevelSync";
 import { themeBootScript } from "./lib/theme";
 import { SITE_TITLE } from "./lib/siteTitle";
 
@@ -47,6 +48,7 @@ export default function RootLayout({
               <SupabaseGuard />
               {children}
               <DailyCheckinModal />
+              <ContentLevelSync />
               <DevImageCacheToggle />
               </HybridPushProvider>
             </AuthProvider>

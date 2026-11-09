@@ -39,7 +39,8 @@ class Page:
 		debug = False,
 		url = None,
 		min_panel_size_ratio = None,
-		panel_expansion = True
+		panel_expansion = True,
+		img = None
 	):
 		self.filename = filename
 		self.panels = []
@@ -48,7 +49,7 @@ class Page:
 		self.processing_time = None
 		t1 = time.time_ns()
 
-		self.img = cv.imread(filename)
+		self.img = img if img is not None else cv.imread(filename)
 		if not isinstance(self.img, np.ndarray) or self.img.size == 0:
 			raise NotAnImageException(f"File {filename} is not an image")
 

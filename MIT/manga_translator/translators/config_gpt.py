@@ -1,3 +1,5 @@
+import functools
+import os
 import re
 from typing import List, Dict
 from omegaconf import OmegaConf
@@ -13,6 +15,22 @@ class TextValue(BaseModel):
 class TranslationList(BaseModel):
     TextList: list[TextValue]
     
+
+#: Per-target system prompts shipped with MIT (#762). Thai: the manga prompt that, on 17 real
+#: pages x 6 runs + Tsuki p1 x 3, removed the generic prompt's spurious 'ทน' insertions
+#: ('ฉันทนฟังบทสนทนา') and its untranslated segments.
+_LANGUAGE_SYSTEM_TEMPLATES = {'Thai': 'thai_manga_system.txt', 'THA': 'thai_manga_system.txt'}
+
+
+@functools.lru_cache(maxsize=None)
+def _language_system_template(to_lang: str):
+    name = _LANGUAGE_SYSTEM_TEMPLATES.get(to_lang)
+    if not name:
+        return None
+    path = os.path.join(os.path.dirname(__file__), 'prompts', name)
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
 
 class ConfigGPT:
     _LANGUAGE_CODE_MAP = VALID_LANGUAGES
@@ -229,15 +247,30 @@ class ConfigGPT:
 
     @property
     def chat_system_template(self) -> str:
+        return self._assemble_system_template(self._CHAT_SYSTEM_TEMPLATE)
+
+    def system_prompt(self, to_lang: str) -> str:
+        """The formatted system prompt for ``to_lang``. A language with its own prompt
+        (``prompts/<lang>``, #762: Thai) uses it unless the gpt_config sets one."""
+        default = _language_system_template(to_lang) or self._CHAT_SYSTEM_TEMPLATE
+        return self._assemble_system_template(default).format(to_lang=to_lang)
+
+    def _assemble_system_template(self, default: str) -> str:
         # Series context (#157) + rolling cross-page context (#159): one append seam
         # for every GPT-family translator (Qwen3, Gemini, ChatGPT, DeepSeek,
         # custom_openai). Both absent → template byte-identical. (append_series_context
         # is a plain brace-escaped text append; reused verbatim for the #159 block.)
-        base = self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE)
+        base = self._config_get('chat_system_template', default)
         if self._config_get('concise_bubbles'):
             base = base + self._CONCISE_DIRECTIVE
         template = append_series_context(base, self._config_get('series_context'))
-        return append_series_context(template, self._config_get('prev_context'))
+        template = append_series_context(template, self._config_get('prev_context'))
+        # #980: the cross-page name glossary. Text is brace-escaped because the template is later
+        # .format(to_lang=...)ed; absent -> byte-identical.
+        glossary = self._config_get('name_glossary')
+        if glossary:
+            template = template + str(glossary).replace('{', '{{').replace('}', '}}')
+        return template
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:

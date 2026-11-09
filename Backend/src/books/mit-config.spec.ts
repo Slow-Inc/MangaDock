@@ -138,6 +138,23 @@ describe('mit-config pure builders (#229)', () => {
           '"render":{"direction":"auto","rtl":true}}',
       );
     });
+    it('omits temperature by default and passes a valid MIT_TEMPERATURE through (#762)', () => {
+      type TCfg = { translator: { temperature?: number } };
+      const base = JSON.parse(buildMitConfig({}, 'JPN', 'THA', 'ja')) as TCfg;
+      expect(base.translator.temperature).toBeUndefined();
+
+      const withTemp = JSON.parse(
+        buildMitConfig({ MIT_TEMPERATURE: '0.2' } as Record<string, string>, 'JPN', 'THA', 'ja'),
+      ) as TCfg;
+      expect(withTemp.translator.temperature).toBe(0.2);
+
+      for (const bad of ['abc', '-1', '5']) {
+        const cfg = JSON.parse(
+          buildMitConfig({ MIT_TEMPERATURE: bad } as Record<string, string>, 'JPN', 'THA', 'ja'),
+        ) as TCfg;
+        expect(cfg.translator.temperature).toBeUndefined();
+      }
+    });
     it('omits source_lang for ANY and sets rtl:false for a non-RTL source', () => {
       const cfg = JSON.parse(buildMitConfig({}, 'ANY', 'THA', 'en')) as {
         translator: { source_lang?: string; source_lang_only?: boolean };
@@ -257,5 +274,25 @@ describe('buildMitConfig() — provider-aware translator section', () => {
     expect(cfg.translator.translator).toBe('chatgpt');
     expect(cfg.translator.api_key).toBe('sk-local');
     expect(cfg.translator.api_url).toBe('http://localhost:11434/v1');
+  });
+
+  it('MIT_OWN_TRANSLATOR=1: custom provider stays in the Backend, MIT keeps its own translator (#1177)', () => {
+    const cfg = JSON.parse(
+      buildMitConfig(
+        {
+          ...MIT_BASE,
+          LLM_PROVIDER: 'custom',
+          LLM_API_KEY: 'sk-local',
+          LLM_BASE_URL: 'http://localhost:11434/v1',
+          MIT_OWN_TRANSLATOR: '1',
+        } as NodeJS.ProcessEnv,
+        'JPN',
+        'THA',
+        'ja',
+      ),
+    );
+    expect(cfg.translator.translator).toBeUndefined();
+    expect(cfg.translator.api_key).toBeUndefined();
+    expect(cfg.translator.api_url).toBeUndefined();
   });
 });

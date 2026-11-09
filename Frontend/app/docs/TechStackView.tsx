@@ -28,7 +28,7 @@ const STACK: StackCategory[] = [
     label: 'Frontend',
     labelTH: 'Next.js App Router · port 4000',
     badge: 'Next.js App',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    badgeClass: 'bg-accent/10 text-accent border-accent/25',
     dotClass: 'bg-indigo-500',
     techs: [
       {
@@ -123,7 +123,7 @@ const STACK: StackCategory[] = [
     label: 'Backend',
     labelTH: 'NestJS API · port 3001 / 4001',
     badge: 'NestJS API',
-    badgeClass: 'bg-amber-50 text-amber-700 border-amber-100',
+    badgeClass: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
     dotClass: 'bg-amber-500',
     techs: [
       {
@@ -211,8 +211,8 @@ const STACK: StackCategory[] = [
     label: 'MIT — ML Server',
     labelTH: 'Python GPU inference · port 5003',
     badge: 'Python GPU',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-ok/10 text-ok border-ok/30',
+    dotClass: 'bg-ok',
     techs: [
       {
         name: 'FastAPI',
@@ -303,7 +303,7 @@ const STACK: StackCategory[] = [
     label: 'Infrastructure',
     labelTH: 'Cloud · Storage · Database',
     badge: 'Cloud',
-    badgeClass: 'bg-sky-50 text-sky-700 border-sky-100',
+    badgeClass: 'bg-sky-500/10 text-sky-600 border-sky-500/30',
     dotClass: 'bg-sky-500',
     techs: [
       {
@@ -559,8 +559,8 @@ function StatStrip({ stack }: { stack: StackCategory[] }) {
       {stack.map(cat => (
         <div key={cat.label} className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cat.dotClass}`} aria-hidden="true" />
-          <span className="text-[12px] text-[#6e6e73]">
-            <span className="font-medium text-[#1d1d1f]">{cat.techs.length}</span>
+          <span className="text-[12px] text-ink-2">
+            <span className="font-medium text-ink">{cat.techs.length}</span>
             {' '}{cat.label}
           </span>
         </div>
@@ -589,14 +589,14 @@ function TechDetailPanel({
       {/* Back */}
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] hover:text-[#1d1d1f] transition-colors group"
+        className="flex items-center gap-1.5 text-[12px] text-ink-2 hover:text-ink transition-colors group"
       >
         <ArrowLeft size={13} className="group-hover:-translate-x-1 transition-transform" />
         Tech Stack
       </button>
 
       {/* Header */}
-      <div className="pb-5 border-b border-black/[0.08]">
+      <div className="pb-5 border-b border-line">
         <div className="flex items-start gap-3">
           <span
             className="w-3 h-3 rounded-full mt-[6px] shrink-0"
@@ -605,19 +605,19 @@ function TechDetailPanel({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
-              <h1 className="text-[22px] font-semibold text-[#1d1d1f] tracking-tight leading-snug">
+              <h1 className="text-[22px] font-semibold text-ink leading-snug">
                 {tech.name}
               </h1>
               {tech.version && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-black/[0.04] text-[#86868b] leading-none shrink-0">
+                <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-fill text-ink-3 leading-none shrink-0">
                   {tech.version.startsWith('≥') ? tech.version : `v${tech.version}`}
                 </span>
               )}
             </div>
-            <p className="text-[13px] text-[#6e6e73] leading-relaxed">
+            <p className="text-[13px] text-ink-2 leading-relaxed">
               {lang === 'en' && tech.roleEN ? tech.roleEN : tech.role}
             </p>
-            <span className="inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-medium bg-[#f5f5f7] border border-black/[0.06] text-[#6e6e73]">
+            <span className="inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-medium bg-raised border border-line text-ink-2">
               {categoryLabel}
             </span>
           </div>
@@ -628,37 +628,37 @@ function TechDetailPanel({
         <>
           {/* What it does */}
           <section className="space-y-2">
-            <h2 className="text-[13px] font-medium text-[#6e6e73]">
+            <h2 className="text-[13px] font-medium text-ink-2">
               {lang === 'th' ? 'สิ่งที่ทำได้' : 'What it does'}
             </h2>
-            <p className="text-[14px] text-[#1d1d1f] leading-relaxed">
+            <p className="text-[14px] text-ink leading-relaxed">
               {lang === 'en' ? details.whatEN : details.what}
             </p>
           </section>
 
           {/* Why we chose it */}
           <section className="space-y-2">
-            <h2 className="text-[13px] font-medium text-[#6e6e73]">
+            <h2 className="text-[13px] font-medium text-ink-2">
               {lang === 'th' ? 'ทำไมถึงเลือกใช้ใน MangaDock' : 'Why we chose it'}
             </h2>
-            <p className="text-[14px] text-[#1d1d1f] leading-relaxed">
+            <p className="text-[14px] text-ink leading-relaxed">
               {lang === 'en' ? details.whyEN : details.why}
             </p>
           </section>
         </>
       ) : (
-        <p className="text-[13px] text-[#86868b]">
+        <p className="text-[13px] text-ink-3">
           {lang === 'th' ? 'ยังไม่มีข้อมูลเพิ่มเติม' : 'No additional details available'}
         </p>
       )}
 
       {/* External docs link */}
-      <div className="pt-2 border-t border-black/[0.08]">
+      <div className="pt-2 border-t border-line">
         <a
           href={tech.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed] transition-colors border border-black/[0.06]"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium bg-raised text-ink hover:bg-fill transition-colors border border-line"
         >
           <ExternalLink size={13} />
           {lang === 'th' ? 'เปิด Official Docs' : 'Open official docs'}
@@ -674,7 +674,7 @@ function TechDetailPanel({
 function TechRow({ tech, onSelect }: { tech: Tech; onSelect: (tech: Tech) => void }) {
   const lang = useLang();
   return (
-    <div className="group flex items-start gap-1 py-3 px-3 -mx-3 rounded-xl hover:bg-[#f5f5f7] transition-colors border-b border-black/[0.05] last:border-0">
+    <div className="group flex items-start gap-1 py-3 px-3 -mx-3 rounded-xl hover:bg-raised transition-colors border-b border-line last:border-0">
       <button
         onClick={() => onSelect(tech)}
         className="flex items-start gap-3 flex-1 min-w-0 text-left"
@@ -687,16 +687,16 @@ function TechRow({ tech, onSelect }: { tech: Tech; onSelect: (tech: Tech) => voi
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors leading-snug">
+            <span className="text-[13px] font-semibold text-ink group-hover:text-accent transition-colors leading-snug">
               {tech.name}
             </span>
             {tech.version && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/[0.04] text-[#86868b] leading-none shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-fill text-ink-3 leading-none shrink-0">
                 {tech.version.startsWith('≥') ? tech.version : `v${tech.version}`}
               </span>
             )}
           </div>
-          <p className="text-[12px] text-[#6e6e73] mt-0.5 leading-relaxed">
+          <p className="text-[12px] text-ink-2 mt-0.5 leading-relaxed">
             {lang === 'en' && tech.roleEN ? tech.roleEN : tech.role}
           </p>
         </div>
@@ -707,7 +707,7 @@ function TechRow({ tech, onSelect }: { tech: Tech; onSelect: (tech: Tech) => voi
         rel="noreferrer"
         aria-label={`เปิด docs ของ ${tech.name}`}
         onClick={e => e.stopPropagation()}
-        className="shrink-0 mt-[5px] p-1.5 rounded text-[#d1d5db] hover:text-[#0071e3] transition-colors"
+        className="shrink-0 mt-[5px] p-1.5 rounded text-ink-3 hover:text-accent transition-colors"
       >
         <ExternalLink size={12} aria-hidden="true" />
       </a>
@@ -749,19 +749,19 @@ export default function TechStackView() {
         >
 
       {/* Header */}
-      <div className="pb-6 border-b border-black/[0.08]">
+      <div className="pb-6 border-b border-line">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[26px] font-semibold text-[#1d1d1f] tracking-tight leading-tight">
+            <h1 className="text-[26px] font-semibold text-ink leading-tight">
               Tech Stack
             </h1>
-            <p className="text-[14px] text-[#6e6e73] mt-1.5 leading-relaxed">
+            <p className="text-[14px] text-ink-2 mt-1.5 leading-relaxed">
               {lang === 'th'
                 ? 'เทคโนโลยีทั้งหมดที่ใช้ใน MangaDock — Frontend · Backend · ML Server · Infrastructure'
                 : 'All technologies powering MangaDock — Frontend · Backend · ML Server · Infrastructure'}
             </p>
           </div>
-          <span className="px-2.5 py-1.5 rounded-lg text-[12px] font-mono bg-[#f5f5f7] border border-black/[0.08] text-[#6e6e73] shrink-0 self-start">
+          <span className="px-2.5 py-1.5 rounded-lg text-[12px] font-mono bg-raised border border-line text-ink-2 shrink-0 self-start">
             {totalCount} technologies
           </span>
         </div>
@@ -777,17 +777,17 @@ export default function TechStackView() {
           {/* Category header */}
           <div className="flex items-center gap-2.5 mb-1">
             <span className={`w-2 h-2 rounded-full shrink-0 ${cat.dotClass}`} aria-hidden="true" />
-            <h2 className="text-[15px] font-semibold text-[#1d1d1f]">{cat.label}</h2>
+            <h2 className="text-[15px] font-semibold text-ink">{cat.label}</h2>
             <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${cat.badgeClass}`}>
               {cat.badge}
             </span>
-            <span className="ml-auto text-[11px] font-mono text-[#86868b]">
+            <span className="ml-auto text-[11px] font-mono text-ink-3">
               {cat.techs.length} libs
             </span>
           </div>
 
           {/* Sublabel */}
-          <p className="text-[11px] text-[#86868b] mb-4 pl-[18px]">{cat.labelTH}</p>
+          <p className="text-[11px] text-ink-3 mb-4 pl-[18px]">{cat.labelTH}</p>
 
           {/* Tech list */}
           <div>
@@ -804,18 +804,18 @@ export default function TechStackView() {
       ))}
 
       {/* Footer */}
-      <div className="pt-6 border-t border-black/[0.08]">
-        <p className="text-[12px] text-[#86868b] leading-relaxed">
+      <div className="pt-6 border-t border-line">
+        <p className="text-[12px] text-ink-3 leading-relaxed">
           {lang === 'th' ? 'Versions แสดง ณ เวลาที่เขียนเอกสาร — ดู' : 'Versions as of the time of writing — see'}{' '}
-          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-[#f5f5f7] text-[#374151]">
+          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-raised text-ink-2">
             Frontend/package.json
           </code>
           {', '}
-          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-[#f5f5f7] text-[#374151]">
+          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-raised text-ink-2">
             Backend/package.json
           </code>
           {', '}
-          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-[#f5f5f7] text-[#374151]">
+          <code className="px-1 py-0.5 rounded text-[11px] font-mono bg-raised text-ink-2">
             MIT/requirements.txt
           </code>{' '}
           {lang === 'th' ? 'สำหรับ versions ล่าสุด' : 'for the latest versions'}

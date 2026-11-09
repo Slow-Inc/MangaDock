@@ -16,6 +16,7 @@ function makeDeps(opts: {
   rowDefs?: Array<{ id: string; title: string; order: string; limit?: number }>;
   env?: Record<string, string>;
   imageCache?: Record<string, unknown>;
+  unreadable?: string[];
 }) {
   const cache = {
     get: jest.fn(async () =>
@@ -32,6 +33,7 @@ function makeDeps(opts: {
     ],
     fetchMangaForRow:
       opts.rowFetch ?? jest.fn().mockResolvedValue({ items: [] }),
+    findUnreadable: jest.fn().mockResolvedValue(new Set(opts.unreadable ?? [])),
   };
   const geminiCatalog = {
     getMangaModels: jest.fn().mockResolvedValue(['gemini-2.5-flash']),
@@ -105,6 +107,24 @@ describe('LandingService — landing assembly + description (#231)', () => {
     expect(out.hero).toEqual({ id: 'a', thumbnail: 't' });
     expect(out.apiOffline).toBeUndefined();
     expect(cache.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops titles with nothing to read, so the hero is a readable one (#1112)', async () => {
+    const { svc, mangaDex } = makeDeps({
+      rowFetch: jest.fn().mockResolvedValue({
+        items: [
+          { id: 'gone', thumbnail: 't' },
+          { id: 'a', thumbnail: 't' },
+        ],
+      }),
+      unreadable: ['gone'],
+    });
+
+    const out = await svc.getLandingBooks();
+
+    expect(mangaDex.findUnreadable).toHaveBeenCalledWith(['gone', 'a']);
+    expect(out.hero).toEqual({ id: 'a', thumbnail: 't' });
+    expect(out.rows[0].items.map((b) => b.id)).toEqual(['a']);
   });
 
   it('fills a row that came back empty from the stale landing, and caches only briefly (#865)', async () => {
@@ -281,6 +301,80 @@ describe('translateDescription() — openai provider', () => {
     const result = await svc.translateDescription('Some text');
     expect(result.translated).toBe(false);
     expect(mockLlm.complete).not.toHaveBeenCalled();
+  });
+});
+
+describe('translateDescription() - docs site options (to / kind)', () => {
+  function make(reply: string) {
+    const cache = {
+      get: jest.fn().mockResolvedValue(null),
+      setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
+    };
+    const llm = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getDescriptionModel: jest.fn().mockReturnValue('m1'),
+      complete: jest.fn().mockResolvedValue(reply),
+    } as unknown as LlmService;
+    const svc = new LandingService(
+      cache as any,
+      { enabled: false } as any,
+      {} as any,
+      {} as any,
+      () => 'http://localhost',
+      { LLM_PROVIDER: 'openai', LLM_API_KEY: 'k' } as NodeJS.ProcessEnv,
+      llm,
+    );
+    return { svc, cache, llm };
+  }
+  const thai = 'ระบบนี้เก็บรูปภาพทั้งหมดไว้บนเซิร์ฟเวอร์และส่งต่อให้ผู้ใช้';
+
+  it('default call keeps the original prompt and the original cache key', async () => {
+    const { svc, cache, llm } = make('คำแปล');
+    await svc.translateDescription('Some English description here');
+    expect(
+      (llm.complete as jest.Mock).mock.calls[0][0] as string,
+    ).toContain('manga/book description to Thai');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:th:v5:/,
+    );
+  });
+
+  it('to=en translates Thai text to English with its own cache key', async () => {
+    const { svc, cache, llm } = make('This system stores every image.');
+    const r = await svc.translateDescription(thai, { to: 'en', kind: 'doc' });
+    expect(r).toMatchObject({
+      translated: true,
+      translatedText: 'This system stores every image.',
+    });
+    const prompt = (llm.complete as jest.Mock).mock.calls[0][0] as string;
+    expect(prompt).toContain('technical documentation (Markdown) to English');
+    expect(prompt).toContain('[[CODE_n]]');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:en:doc:v1:/,
+    );
+  });
+
+  it('to=en leaves text that has no Thai alone (nothing to translate)', async () => {
+    const { svc, llm } = make('x');
+    const english = 'Already English, with `code` and a [link](http://a.b).';
+    await expect(
+      svc.translateDescription(english, { to: 'en', kind: 'doc' }),
+    ).resolves.toEqual({ translatedText: english, translated: false });
+    expect(llm.complete).not.toHaveBeenCalled();
+  });
+
+  it('to=th with kind=doc uses the doc prompt and a separate cache key', async () => {
+    const { svc, cache, llm } = make('คำแปลเอกสาร');
+    await svc.translateDescription('The cache has three tiers.', {
+      to: 'th',
+      kind: 'doc',
+    });
+    expect(
+      (llm.complete as jest.Mock).mock.calls[0][0] as string,
+    ).toContain('technical documentation (Markdown) to Thai');
+    expect(cache.setMangaCacheWithTiers.mock.calls[0][0]).toMatch(
+      /^translate:th:doc:v1:/,
+    );
   });
 });
 

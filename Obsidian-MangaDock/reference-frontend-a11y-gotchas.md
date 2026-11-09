@@ -39,4 +39,21 @@ the code that encodes the answer is named so you can read it instead of rediscov
    the data cache with a `signal` (`patch-fetch.js` decides from cache/revalidate/method), so
    `AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS)` is free (`lib/serverFetch.ts`, #858); MangaDex calls 6 s (#861).
 
+9. **A modal is `useModalDialog`; one Escape closes one layer** (`hooks/useDialogFocus.ts`, #1073). Escape belongs to
+   the innermost `aria-modal` dialog that holds focus (`ownsEscapeNow`). Do not listen in the capture phase and
+   `stopPropagation`. Two traps were measured when that was tried:
+   - it ate the Escape of a popover inside the dialog, so the post form closed and the draft was lost;
+   - `stopPropagation` does not stop *other listeners on the same node*, so the reader's own window-capture
+     listener still closed the reader under a report form.
+
+   Instead the dialog listens in the bubble phase and skips `e.defaultPrevented`, and popovers consume the Escape
+   they act on (`preventDefault`). Layers outside the hook (reader, book popup) stand aside via `ownsEscapeNow`.
+
+   Tab-trap gotchas:
+   - A radio group is one Tab stop (`keepTabStops`); counting every radio let Tab leave the dialog.
+   - An `autoFocus` field takes focus before the dialog's effect runs, so the opener is the element focused before
+     it (`pickOpener`).
+   - The community drawer stays mounted with `aria-modal="true"` while closed, so probes must count only visible
+     dialogs.
+
 Related: [[feedback-frontend-css-layer-and-blur]], [[feedback-verify-before-claiming]].

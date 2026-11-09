@@ -37,3 +37,17 @@ async def count_alive(workers) -> int:
         if worker.busy or await worker_reachable(worker.ip, worker.port):
             alive += 1
     return alive
+
+
+def preload_enabled(env=None):
+    """Whether the worker should load the heavy models at boot (#1047, opt-in).
+
+    Preloading hides the first page's model-load time (measured: first page 19.4 s cold vs 14.6 s after a
+    1.9 s preload on a loaded host) but costs GPU/RAM while idle and slows boot, so it is opt-in
+    (`MIT_PRELOAD=1`); unset/false keeps lazy loading exactly as before.
+    """
+    import os
+
+    value = str((env or os.environ).get('MIT_PRELOAD', '')).strip().lower()
+    return value in ('1', 'true', 'yes', 'on')
+

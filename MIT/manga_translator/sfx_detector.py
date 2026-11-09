@@ -29,6 +29,8 @@ def _load():
     if _model is None:
         from huggingface_hub import hf_hub_download
         from ultralytics import YOLO
+        from .cv_threads import restore_opencv_threads
+        restore_opencv_threads()   # the import left OpenCV single-threaded (#872)
         # token=None → huggingface_hub picks up HF_TOKEN from env (gated repo).
         path = hf_hub_download(repo_id=_REPO, filename=_FILE)
         _model = YOLO(path)
@@ -58,6 +60,22 @@ def detect_sfx_boxes(img_rgb, device: str = "cuda", imgsz: int = 1024,
         logger.warning("[SFXDetect] detection failed — proceeding without SFX",
                        exc_info=True)
         return []
+
+
+def preload(device: str = "cuda") -> bool:
+    """Load the AnimeText YOLO onto `device` so the first page does not pay for it.
+
+    Best-effort: gated-repo download or GPU failures only log; the lazy path stays.
+    """
+    try:
+        import numpy as np
+        model = _load()
+        model.predict(np.zeros((64, 64, 3), dtype=np.uint8), imgsz=64, conf=0.99, device=device, verbose=False)
+        logger.info(f"[SFXDetect] preloaded on {device}")
+        return True
+    except Exception:
+        logger.warning("[SFXDetect] preload failed - it will lazy-load on the first page", exc_info=True)
+        return False
 
 
 def unload() -> None:

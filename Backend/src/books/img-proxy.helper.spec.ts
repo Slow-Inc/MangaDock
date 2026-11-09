@@ -209,3 +209,50 @@ describe('fetchProxiedImage', () => {
     });
   });
 });
+
+describe('fetchProxiedImage host allow-list (#959)', () => {
+  const spyFetch = () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const fn = ((url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return makeFetch({ contentType: 'image/jpeg' })(url, init);
+    }) as unknown as typeof fetch;
+    return { fn, calls };
+  };
+
+  test.each([
+    'https://example.com/a.jpg',
+    'https://uploads.mangadex.org.evil.example/a.jpg', // look-alike: the real host is a prefix
+    'https://evilmangadex.network/a.jpg', // not a subdomain of mangadex.network
+    'https://uploads.mangadex.org@evil.example/a.jpg', // userinfo: the host is evil.example
+    'https://127.0.0.1/a.jpg',
+    'https://localhost:3001/books/x',
+  ])('a host off the list is refused without any request: %s', async (url) => {
+    const { fn, calls } = spyFetch();
+    const result = await fetchProxiedImage(url, 15_000_000, 10_000, fn);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.httpStatus).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each([
+    'https://uploads.mangadex.org/covers/abc/cover.jpg',
+    'https://abc123.xyz789.mangadex.network:44300/token/data/hash/1.png', // MangaDex@Home node, own port
+  ])('a MangaDex image host is served: %s', async (url) => {
+    const { fn, calls } = spyFetch();
+    const result = await fetchProxiedImage(url, 15_000_000, 10_000, fn);
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  test('redirects are not followed (a redirect could leave the allow-list)', async () => {
+    const { fn, calls } = spyFetch();
+    await fetchProxiedImage(
+      'https://uploads.mangadex.org/covers/abc/cover.jpg',
+      15_000_000,
+      10_000,
+      fn,
+    );
+    expect(calls[0].init?.redirect).toBe('error');
+  });
+});

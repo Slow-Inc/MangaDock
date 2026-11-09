@@ -26,22 +26,25 @@ from typing import Any, Dict, Optional, Tuple
 
 from PIL import Image
 
-from manga_translator.ocr_vlm import sanitize_sfx, vlm_localize_sfx
+from manga_translator.ocr_vlm import crop_has_lettering, sanitize_sfx, vlm_localize_sfx
 
 from .report import FAIL, OK, WARN, StageReport
 from .runner import doctor
 
 # --- thresholds: every one is a measurement, and says so ---------------------------------------
 
-#: The largest completion budget **measured to truncate**: B1 tried 24, 256, 2048 and 8192 and got
-#: `finish_reason: length` with `content: None` from each. 8192 is excluded because it burned 59 s
-#: rather than returning short, so 2048 is the largest budget with a clean truncating result.
-BUDGET_MEASURED_TRUNCATING = 2048
+#: The largest completion budget **measured to truncate** on the model actually configured
+#: (`qwen3.8-27b-fp8` via gateway.9arm.co, 2026-10-22, the #881 Boku SFX crop): 24 and 128 both
+#: returned `finish_reason: length` with `content: ''` — the whole budget went to reasoning tokens.
+#: Re-measured from 2048/4096 (2026-07-28, qwen3.6-35b-a3b, whose reasoning was much longer);
+#: re-measure again if the configured model changes.
+BUDGET_MEASURED_TRUNCATING = 128
 
-#: The smallest completion budget **measured to complete**: 4096 answered in 795 tokens (B2).
-#: Between the two the behaviour is simply unmeasured, and a probe must not claim a boundary
-#: nobody located — that band is a `WARN`.
-BUDGET_MEASURED_COMPLETING = 4096
+#: The smallest completion budget **measured to complete** on that model/crop: 192 answered after
+#: 154 reasoning tokens, 256/384/512 identical. Between the two points the behaviour is unmeasured,
+#: and a probe must not claim a boundary nobody located — that band is a `WARN`. The shipped
+#: `SFX_MAX_TOKENS` (512) keeps headroom above the measured reasoning need for a larger crop.
+BUDGET_MEASURED_COMPLETING = 192
 
 #: Visual tokens for the crop the model **did** answer on. The pipeline sends the SFX crop at its
 #: native 220x130 (40 tokens by the grid below) and the model reads it as empty; the same crop
@@ -87,6 +90,7 @@ class SfxCall:
     image_size: Tuple[int, int] = (0, 0)
     image_mode: str = ''
     image_is_blank: bool = False
+    skipped_no_lettering: bool = False
 
     @property
     def budget(self) -> int:
@@ -146,8 +150,12 @@ def capture_sfx_call(crop_rgb, *, response: Dict[str, Any], target_lang: str = '
     result = vlm_localize_sfx(crop_rgb, api_base=api_base, api_key=api_key, model=model,
                               target_lang=target_lang, post_fn=_record)
     size, mode, blank = _inspect_image(captured)
+    # #887: the crop guard can refuse before any request exists. Record why, so the contracts can
+    # report `no lettering -> no call` instead of pretending an empty request is a failure.
+    skipped = not captured and not crop_has_lettering(crop_rgb)
     return SfxCall(request=captured, response=response, result=result, target_lang=target_lang,
-                   image_size=size, image_mode=mode, image_is_blank=blank)
+                   image_size=size, image_mode=mode, image_is_blank=blank,
+                   skipped_no_lettering=skipped)
 
 
 def _inspect_image(request: Dict[str, Any]) -> Tuple[Tuple[int, int], str, bool]:
@@ -171,6 +179,9 @@ def _request_contract(page) -> Optional[StageReport]:
     if call is None:
         return None
     metrics = call.to_metrics()
+    if call.skipped_no_lettering:
+        return StageReport('vlm-send', OK, metrics,
+                           'no request: the crop has no lettering, the guard refused it (#887)')
     if not call.request.get('model'):
         return StageReport('vlm-send', FAIL, metrics, 'no model configured — the call cannot run')
     if call.budget <= BUDGET_MEASURED_TRUNCATING:
@@ -197,6 +208,9 @@ def _image_contract(page) -> Optional[StageReport]:
     width, height = call.image_size
     metrics = {'size': f'{width}x{height}', 'mode': call.image_mode,
                'vision_tokens_est': call.vision_tokens}
+    if call.skipped_no_lettering:
+        return StageReport('vlm-image', OK, metrics,
+                           'no request: the crop has no lettering, the guard refused it (#887)')
     if not width or not height:
         return StageReport('vlm-image', FAIL, metrics, 'no image in the request, or it did not decode')
     if call.image_mode != 'RGB':

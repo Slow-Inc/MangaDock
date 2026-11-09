@@ -107,3 +107,20 @@ the likeliest way it would return, since a config change carries no reason to re
 
 Tracked in #679. Superseding this ADR requires a benchmark that covers **both** cases: the `ぬ`
 stylized SFX is still localized, and an ASCII det_sfx false-positive on a bubble is still not.
+
+## Decision on the Amendment (2026-10-20) — guard restored (#693)
+
+The dev chose to restore the Addendum guard on `integrate/render-reconcile`: the rescue site in
+`manga_translator.py` calls `ocr_vlm.should_rescue_sfx` again, and `sfx_merge.should_sfx_rescue` (left
+with no caller) was removed with its tests. `test_026_addendum_real_text_guard_is_on_the_rescue_path`
+is green on the branch. Trade-off accepted: the One-Punch `ぬ` (read `"X"`) is not rescued — render-neutral
+today, since the rescue returns `''` on the configured model (see the 2026-07-28 benchmark).
+
+- **Not restored:** the Addendum's second half, the `_apply_ocr` DROP of a real-text det_sfx region. It
+  changes the render vs the landing baseline, so it is tracked separately in **#754** with its own
+  benchmark.
+- **Behaviour difference from landing's gate** the 12-row benchmark never exercised: without det_sfx
+  provenance, `should_rescue_sfx` still rescues a ≤2-char non-ASCII read in a large box (e.g. `は`,
+  `おい` — `test_ocr_vlm.py`). Landing's gate never did. Inert while the rescue is unserved; re-check it
+  before pointing the rescue at a vision-capable model.
+- The bubble-overlap gate that could satisfy both the `ぬ` row and the phantom rows remains open.

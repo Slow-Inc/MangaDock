@@ -17,7 +17,10 @@ TASK = "ch:ANY:THA"
 
 
 @pytest.fixture(autouse=True)
-def _clean_registry():
+def _clean_registry(monkeypatch):
+    # #1119: a shell with MIT_WORKERS>1 exported must not move the sequential-loop tests onto batch slots.
+    monkeypatch.delenv("MIT_WORKERS", raising=False)
+    monkeypatch.delenv("MIT_BATCH_CONCURRENCY", raising=False)
     cancellation._cancelled.clear()
     yield
     cancellation._cancelled.clear()
@@ -189,3 +192,171 @@ def test_rolling_context_off_by_default_keeps_the_call_byte_identical(monkeypatc
     _run_batch(pages=(0, 1))
 
     assert seen_kwargs == [{}, {}]                       # prev_context never injected
+
+
+# ---- #905: the opt-in whole-batch pipeline path ----
+
+
+class _FakeImage:
+    @staticmethod
+    def open(_b):
+        return _FakeImage()
+
+    def convert(self, _mode):
+        return self
+
+
+class _FakeExecutor:
+    def __init__(self, results=None, error=None):
+        self.results = results
+        self.error = error
+        self.calls = 0
+
+    async def sent_batch_pipeline(self, images, config):
+        self.calls += 1
+        assert len(images) >= 1
+        if self.error:
+            raise RuntimeError(self.error)
+        return self.results
+
+
+class _FakeExecutors:
+    def __init__(self, executor):
+        self.executor = executor
+        self.freed = 0
+
+    async def find_executor(self):
+        return self.executor
+
+    async def free_executor(self, _executor):
+        self.freed += 1
+
+
+def _pipeline_deps(executor):
+    executors = _FakeExecutors(executor)
+    return (lambda: (_FakeImage, lambda _s: object(), executors)), executors
+
+
+def _page_result():
+    return {"img_width": 10, "img_height": 20, "patches": [], "regions": [{"src": "a", "dst": "b"}]}
+
+
+def _run_batch_pipelined(monkeypatch, executor, pages=(0, 1, 2)):
+    sent = []
+
+    async def fake_send(url, secret, payload):
+        sent.append((payload["pageIndex"], payload["error"], len(payload.get("regions") or [])))
+
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    deps_fn, executors = _pipeline_deps(executor)
+    asyncio.run(batch_runner._run_batch_pipelined(list(pages), [b'img'] * len(pages), '{}', TASK,
+                                                  "http://backend/cb", "", deps=deps_fn()))
+    return sent, executors
+
+
+def test_pipeline_path_delivers_one_webhook_per_page_in_order(monkeypatch):
+    executor = _FakeExecutor(results=[_page_result() for _ in range(3)])
+    sent, executors = _run_batch_pipelined(monkeypatch, executor)
+    assert executor.calls == 1, 'the whole batch must go to ONE worker'
+    assert executors.freed == 1, 'the worker must be released'
+    assert sent == [(0, None, 1), (1, None, 1), (2, None, 1)]
+
+
+def test_pipeline_path_reports_a_worker_failure_per_page(monkeypatch):
+    executor = _FakeExecutor(error='worker died')
+    sent, _ = _run_batch_pipelined(monkeypatch, executor)
+    assert [p for p, _e, _r in sent] == [0, 1, 2]
+    assert all(e == 'worker died' for _p, e, _r in sent)
+
+
+def test_pipeline_path_drops_deliveries_after_a_cancel(monkeypatch):
+    executor = _FakeExecutor(results=[_page_result() for _ in range(3)])
+    sent = []
+
+    async def fake_send(url, secret, payload):
+        sent.append(payload["pageIndex"])
+        cancellation.mark_cancelled(TASK)  # cancel lands right after page 0 is delivered
+
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    deps_fn, _ = _pipeline_deps(executor)
+    asyncio.run(batch_runner._run_batch_pipelined([0, 1, 2], [b'img'] * 3, '{}', TASK,
+                                                  "http://backend/cb", "", deps=deps_fn()))
+    assert sent == [0]
+
+
+def test_the_pipeline_path_is_opt_in(monkeypatch):
+    monkeypatch.delenv('MIT_BATCH_PIPELINE', raising=False)
+    assert batch_runner._pipeline_enabled() is False
+    monkeypatch.setenv('MIT_BATCH_PIPELINE', '1')
+    assert batch_runner._pipeline_enabled() is True
+
+
+# --- #1119: batch slots — independent pages run concurrently, one per worker ------------------
+
+
+def _concurrency_probe(monkeypatch, sent, delay=0.02):
+    state = {"now": 0, "max": 0}
+
+    async def translate(config_str, img_bytes, progress_meta=None, **kw):
+        state["now"] += 1
+        state["max"] = max(state["max"], state["now"])
+        await asyncio.sleep(delay)
+        state["now"] -= 1
+        return {"img_width": 100, "img_height": 200, "patches": []}
+
+    _stub_pipeline(monkeypatch, sent, translate=translate)
+    return state
+
+
+def test_slot_count_comes_from_workers_or_override():
+    assert batch_runner.batch_slots({}) == 1
+    assert batch_runner.batch_slots({"MIT_WORKERS": "4"}) == 4
+    assert batch_runner.batch_slots({"MIT_WORKERS": "4", "MIT_BATCH_CONCURRENCY": "2"}) == 2
+    assert batch_runner.batch_slots({"MIT_BATCH_CONCURRENCY": "0"}) == 1
+
+
+def test_independent_pages_run_one_per_slot(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "2")
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2, 3))
+    assert state["max"] == 2
+    assert sorted(sent) == [0, 1, 2, 3]
+
+
+def test_single_worker_keeps_pages_sequential(monkeypatch):
+    sent = []
+    monkeypatch.delenv("MIT_WORKERS", raising=False)
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2))
+    assert state["max"] == 1 and sent == [0, 1, 2]
+
+
+def test_rolling_context_keeps_pages_sequential_even_with_workers(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "4")
+    monkeypatch.setenv("MIT_CONTEXT_PAGES", "2")
+    state = _concurrency_probe(monkeypatch, sent)
+    _run_batch(pages=(0, 1, 2))
+    assert state["max"] == 1 and sent == [0, 1, 2]
+
+
+def test_cancel_stops_pages_that_have_not_started(monkeypatch):
+    sent = []
+    monkeypatch.setenv("MIT_WORKERS", "2")
+
+    async def translate(config_str, img_bytes, progress_meta=None, **kw):
+        await asyncio.sleep(0.02)
+        cancellation.mark_cancelled(TASK)  # cancel lands while the first two pages run
+        return {"img_width": 100, "img_height": 200, "patches": []}
+
+    _stub_pipeline(monkeypatch, sent, translate=translate)
+    _run_batch(pages=(0, 1, 2, 3))
+    assert sent == []  # in-flight results are dropped, pages 2-3 never start
+
+
+def test_slot_count_multiplies_worker_slots():
+    # #1123: 2 workers x 3 slots each -> 6 pages in flight (worker slots need preload).
+    env = {"MIT_WORKERS": "2", "MIT_WORKER_SLOTS": "3", "MIT_PRELOAD": "1"}
+    assert batch_runner.batch_slots(env) == 6
+    assert batch_runner.batch_slots({"MIT_WORKERS": "2", "MIT_WORKER_SLOTS": "3"}) == 2   # no preload -> 1 slot

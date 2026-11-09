@@ -18,7 +18,11 @@ import re
 from typing import Dict, List, Optional
 
 OCR_FAILED = '[OCR FAILED]'
-_BLOCK_RE = re.compile(r'<\|(\d+)\|>')
+# Tolerant delimiter: the model sometimes emits a marker with a missing/loose closing
+# ('<|10|' or '<|10>') — live full-page Otome. Accept an optional closing so a malformed
+# marker still SPLITS (no leaked '<|10|' in the text, no index shift for later blocks).
+_BLOCK_RE = re.compile(r'<\|\s*(\d+)\s*\|?>?')
+_STRAY_MARKER_RE = re.compile(r'<\|\s*\d*\s*\|?>?\s*$')
 
 
 def parse_numbered_blocks(raw: str) -> Dict[int, str]:
@@ -32,7 +36,7 @@ def parse_numbered_blocks(raw: str) -> Dict[int, str]:
         idx = int(m.group(1))
         start = m.end()
         end = matches[k + 1].start() if k + 1 < len(matches) else len(raw)
-        out[idx] = raw[start:end].strip()
+        out[idx] = _STRAY_MARKER_RE.sub('', raw[start:end]).strip()
     return out
 
 
@@ -53,6 +57,22 @@ def normalize_numbered_output(raw: str, n: int, missing: str = '[Missing item {n
         text = blocks.get(i, '')
         out.append(text if text else missing.format(n=i))
     return out
+
+
+def contract_gap(raw: str, n: int) -> bool:
+    """True when a numbered response cannot be mapped 1:1 to ``n`` queries.
+
+    A dropped index, a duplicate index, or an extra block all mean the model merged or split lines, and
+    index-based normalization would then produce a page-wide line shift (seen live: page 2's translations moved
+    one region down, e.g. a Thai fragment about a goddess landed in the next balloon). One retry fixes it.
+    """
+    if n <= 1:
+        return False
+    matches = _BLOCK_RE.findall(raw or '')
+    if len(matches) != n:
+        return True
+    indices = [int(m) for m in matches]
+    return len(set(indices)) != n or set(indices) != set(range(1, n + 1))
 
 
 def is_deterministic_decode(temperature: Optional[float],

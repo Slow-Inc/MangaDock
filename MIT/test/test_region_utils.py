@@ -41,6 +41,17 @@ def test_textblock_with_texts_unchanged():
     assert tb.text == "hello"
 
 
+def test_an_unread_guessed_box_cannot_blank_the_line_it_merged_with():
+    """#881 review: the rescue keeps a box the OCR could not read with text=''. Once such a box merges with a
+    real line it can sort first, and taking texts[0] verbatim made the whole region read as '' — the dialogue
+    was silently lost. The first NON-EMPTY text is the line."""
+    tb = TextBlock(LINES, texts=["", "AND I DON'T KNOW WHAT FACE TO MAKE"])
+    assert tb.text == "AND I DON'T KNOW WHAT FACE TO MAKE"
+    # two real texts still join in order, with the empty one contributing nothing
+    tb = TextBlock(LINES, texts=["", "HELLO", "WORLD"])
+    assert tb.text == "HELLO WORLD"
+
+
 # ── U-3: mutable default ─────────────────────────────────────────────
 def test_shadow_offset_not_shared_between_instances():
     a = TextBlock(LINES, texts=["a"])

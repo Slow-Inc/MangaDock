@@ -98,6 +98,8 @@ class Ocr(str, Enum):
     ocr48px = "48px"
     ocr48px_ctc = "48px_ctc"
     mocr = "mocr"
+    # #1143 Track C: crop-level vision-to-text recogniser (Hayai OCR v2.5 Nova); see ocr/model_hayai.py
+    hayai = "hayai"
 
 class Translator(str, Enum):
     youdao = "youdao"
@@ -180,6 +182,21 @@ class RenderConfig(BaseModel):
     scaled up by the length-ratio heuristic into an oversized block that overflows its
     panel (matches MangaTranslator's small absolute fonts). SFX is exempt. 0 → no cap
     (byte-identical)."""
+    font_src_scale: float = 0.0
+    """#851: one dialogue font size per page, scaled from the source lettering — the page's size is
+    this x the median source font size of its non-SFX regions (a region far off the median keeps
+    this x its own). Clean layout starts from it instead of the absolute font_size_max, and a
+    sole-balloon fit never exceeds it; each still shrinks to fit. 0 → off (byte-identical)."""
+    fit_below_floor: bool = False
+    widen_vertical_columns: bool = False
+    """#1006 opt-in: a vertical Japanese source rendered to a horizontal-only target (Thai/Latin) may
+    grow its wrap width toward 1.5x the source column instead of squeezing to the original height —
+    fewer, longer lines allow a larger font on regions that currently land at the font floor (measured:
+    20 px from a 40 px source on the real JP pages). Off -> byte-identical renders."""
+    """#883: when a block cannot fit between its neighbours even at ``font_size_minimum``, shrink
+    below the floor to the size that fits instead of overlapping them. Off → current behavior
+    (a block taller than its gap is centred in it, overlapping). Opt-in: small text is a quality
+    call, so the default stays byte-identical."""
     anti_overlap: bool = False
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated
@@ -190,15 +207,11 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
-    reference_layout: bool = False
-    """#178 Phase-4: size clean-layout regions with the MangaTranslator-parity fit — binary-search
-    the font from the flat cap DOWN to the largest that fits BOTH axes of the balloon safe interior
-    (or the detection box for narration), keeping words whole. Replaces the source-column-referenced
-    clean_layout sizing for these regions. Requires clean_layout. Off → byte-identical."""
     knuth_plass: bool = False
     """#180 P8: use the Knuth-Plass holistic line-breaker (balanced columns, no mid-word/name splits)
     instead of the greedy packer, for every calc_horizontal call in the render pass. Off → the greedy
-    GreedyLineBreaker default (byte-identical)."""
+    GreedyLineBreaker default (byte-identical). Enabling changes wrap width / line count → a
+    render-parity change (needs sign-off)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
@@ -310,6 +323,23 @@ class TranslatorConfig(BaseModel):
     seam as series_context so every GPT-family translator carries it. The worker
     resets its own per-request memory, so this is the batch path's only carrier.
     Absent → prompts identical to today."""
+    name_glossary: Optional[str] = None
+    """#980: cross-page character-name glossary rendered by name_glossary.format_glossary
+(source name -> Thai spelling). Rides the same chatgpt_config seam as series_context/prev_context so
+every GPT-family translator appends it to its system prompt. Absent -> prompts byte-identical."""
+    api_key: Optional[str] = None
+    """#893: per-request credential the Backend sends when LLM_PROVIDER is not gemini
+    (Backend/.env LLM_API_KEY). Dropped silently before; the OpenAI-compatible client rebuilds
+    from it when present. Absent -> the translator keeps its .env client."""
+    api_url: Optional[str] = None
+    """#893: per-request endpoint (LLM_BASE_URL) for the same path. Absent -> .env base."""
+    concise_bubbles: bool = False
+    temperature: Optional[float] = None
+    """#762 follow-up: per-request sampling temperature. Absent -> the translator keeps its default (0.5)."""
+    """#892 (P7/#526): ask the translator for the shortest faithful phrasing — the #1 render defect
+    on tight bubbles is a translation physically too long for the balloon. The Backend has sent this
+    flag since #526 but Pydantic dropped it because the field was missing; it rides the same
+    chatgpt_config seam as the context fields now. False → prompts byte-identical."""
 
     # 译后检查配置项
     enable_post_translation_check: bool = True
@@ -352,6 +382,13 @@ class TranslatorConfig(BaseModel):
             overrides['series_context'] = self.series_context
         if self.prev_context:
             overrides['prev_context'] = self.prev_context
+        if self.name_glossary:
+            overrides['name_glossary'] = self.name_glossary
+        if self.concise_bubbles:
+            # #892: the Backend flag used to die here; carry it to the OmegaConf ConfigGPT reads.
+            overrides['concise_bubbles'] = True
+        if self.temperature is not None:
+            overrides['temperature'] = float(self.temperature)
         if overrides:
             ctx = OmegaConf.create(overrides)
             return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx
@@ -383,6 +420,11 @@ class DetectorConfig(BaseModel):
     bubbles → dialogue treated as narration + under-filled), synthesize one with a classical
     flood-fill, accepted only through acceptable_synth_bubble (encloses text, not a page leak).
     Requires det_bubble_seg. Off → byte-identical."""
+    det_bubble_merge: bool = True
+    """#757: detect balloons/captions BEFORE textline merge and coalesce line components that share
+    one container when one of them is a single line, so a caption whose lines are spaced 1.0-1.7x
+    the font size is translated as one block, not per-line fragments. Requires det_bubble_seg.
+    Default on since 2026-10-21 (corpus: 0 wrong merges); off → byte-identical to before."""
     det_sfx: bool = False
     """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
     and merge its boxes (IoA dedup) into the textline flow, so stylized katakana
@@ -416,6 +458,32 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    protect_figures: bool = False
+    """#540 (MIT_PROTECT_FIGURES): keep the full-page erase mask from swallowing a figure that
+    create_text_only_mask's dilate+MORPH_CLOSE swept in (a small drawing enclosed by surrounding
+    text — raw glyph polygons cover 0% of it, the closed mask 95%). Clips the mask to the raw
+    glyph polygons + margin (provenance, not a pixel heuristic). Off → byte-identical."""
+    selective_flux: bool = True
+    """#421 (MIT_SELECTIVE_FLUX): after the full-page LaMa inpaint, route only the erase-mask
+    components that sit over textured ART (a character's hair under dialogue text — where LaMa
+    leaves a gray smear it cannot synthesise back) to a Flux Klein repair pass, pasted mask-only
+    into the LaMa result. LaMa handles everything else. LaMa is unloaded before Flux loads
+    (VRAM), the pass is serialised by a lock, and any failure keeps the LaMa result.
+
+    On by default since the 2026-10-27 measurement (2026-10-27-selective-flux-adopted.md): on the
+    hand-lettered HUH over hair it replaces the gray smear with plausible art, costs ~16 s on that
+    page and nothing when a page has no text-over-art component. MIT_SELECTIVE_FLUX=0 turns it off
+    without a config change."""
+    restrict_fullpage_mask: bool = False
+    """#540 (MIT_RESTRICT_FULLPAGE_MASK): on the full-page inpaint path, clip the refined
+    (CRF) erase mask to the to-be-rendered textlines (dilated 8px) — parity with the per-crop
+    path — so CRF ink far from any textline (a figure's hair strokes inside an oversized
+    dialogue box) is not erased, killing the "boy-ghost" figure smear. Off → byte-identical."""
+    adaptive_dilate: bool = False
+    """Lever 1 (MIT_ADAPTIVE_DILATE): dilate each erase-mask component wider where the local
+    background is FLAT paper (removes the stroke stubs LaMa reconstructs into faint text ghosts)
+    but keep it tight over screentone/line-art (preserves the #248 no-over-erase guard). Pure CPU
+    (cv2/numpy), no extra VRAM. Off → byte-identical."""
     mask_tighten: bool = False
     """Patch path only (#268): shrink the inpaint mask to the actual ink strokes (local-contrast
     pixels) before LaMa runs, so it repaints thin strokes instead of the whole text rectangle and

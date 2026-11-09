@@ -41,21 +41,14 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
         ConfigGPT.__init__(self, config_key=_CONFIG_KEY)
         CommonTranslator.__init__(self)
 
-        if not OPENAI_API_KEY and check_openai_key:
-            raise MissingAPIKeyException('OPENAI_API_KEY environment variable required')
-
-        # 根据代理与基础URL等参数实例化 openai.AsyncOpenAI 客户端
-        client_args = {
-            "api_key": OPENAI_API_KEY,
-            "base_url": OPENAI_API_BASE
-        }
-        if OPENAI_HTTP_PROXY:
-            from httpx import AsyncClient
-            client_args["http_client"] = AsyncClient(proxies={
-                "all://*openai.com": f"http://{OPENAI_HTTP_PROXY}"
-            })
-
-        self.client = openai.AsyncOpenAI(**client_args)
+        # #893: the Backend can send per-request credentials (translator.api_key/api_url) when
+        # LLM_PROVIDER is not gemini; TranslatorConfig used to drop them and this client always used
+        # the .env endpoint. Build from env when a key exists, otherwise defer to parse_args and fail
+        # at request time with a message naming both sources.
+        self.client = None
+        self._require_key = check_openai_key
+        if OPENAI_API_KEY:
+            self._build_client(OPENAI_API_KEY, OPENAI_API_BASE)
         self.token_count = 0
         self.token_count_last = 0
         self._last_request_ts = 0
@@ -88,9 +81,27 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
     def set_prev_context(self, text: str = ""):
         self.prev_context = text or ""     
 
+    def _build_client(self, api_key: str, api_url: str):
+        """(Re)build the OpenAI-compatible client for the given credentials (#893)."""
+        client_args = {
+            "api_key": api_key,
+            "base_url": api_url,
+        }
+        if OPENAI_HTTP_PROXY:
+            from httpx import AsyncClient
+            client_args["http_client"] = AsyncClient(proxies={
+                "all://*openai.com": f"http://{OPENAI_HTTP_PROXY}"
+            })
+        self.client = openai.AsyncOpenAI(**client_args)
+
     def parse_args(self, args: CommonTranslator):
         """如果你有外部参数要解析，可在此对 self.config 做更新"""
         self.config = args.chatgpt_config
+        # #893: a request that carries credentials wins over .env (Backend LLM_API_KEY/LLM_BASE_URL).
+        api_key = getattr(args, 'api_key', None)
+        api_url = getattr(args, 'api_url', None)
+        if api_key or api_url:
+            self._build_client(api_key or OPENAI_API_KEY, api_url or OPENAI_API_BASE)
 
     async def _ratelimit_sleep(self):
         """
@@ -673,7 +684,7 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
                 
         # 构建 messages / Construct messages
         messages = [  
-            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},  
+            {'role': 'system', 'content': self.system_prompt(lang_name)},  
         ]  
 
         # 提取相关术语并添加到系统消息中  / Extract relevant terms and add them to the system message
@@ -721,6 +732,10 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
         
 
         # 发起请求 / Initiate the request
+        if self.client is None:
+            raise MissingAPIKeyException(
+                'no translation credentials: set OPENAI_API_KEY in MIT/.env or send translator.api_key '
+                'on the request (#893)')
         response = await self.client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,

@@ -135,6 +135,7 @@ class CommonDetector(InfererModule):
 
 
 class OfflineDetector(CommonDetector, ModelWrapper):
+    _OFFLOAD = True   # #1123: forward may run in a thread under the GPU lock (worker slots)
     _MODEL_SUB_DIR = 'detection'
 
     async def _detect(self, *args, **kwargs):

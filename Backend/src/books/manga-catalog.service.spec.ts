@@ -1,4 +1,5 @@
 import { MangaCatalogService } from './manga-catalog.service';
+import { OFF_SCOPE } from '../common/content-rating';
 
 /**
  * MangaDex catalog passthrough + search (#231, PRD #228 step 6). searchBooks
@@ -62,7 +63,7 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
 
     const out = await svc.searchBooks('naruto');
 
-    expect(mangaDex.fetchMangaByIds).toHaveBeenCalledWith(['b']);
+    expect(mangaDex.fetchMangaByIds).toHaveBeenCalledWith(['b'], OFF_SCOPE);
     expect(out).toEqual({ items: [{ id: 'a' }, { id: 'b' }], total: 2 });
     expect(cache.set).toHaveBeenCalledTimes(1);
   });
@@ -136,9 +137,18 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
     );
 
     await expect(svc.getMangaChapters('m1', true)).resolves.toEqual(['ch']);
-    expect(mangaDex.getMangaChapters).toHaveBeenCalledWith('m1', true);
+    expect(mangaDex.getMangaChapters).toHaveBeenCalledWith(
+      'm1',
+      true,
+      OFF_SCOPE,
+    );
     await svc.getNewReleases(2, 10, 'tag');
-    expect(mangaDex.getNewReleases).toHaveBeenCalledWith(2, 10, 'tag');
+    expect(mangaDex.getNewReleases).toHaveBeenCalledWith(
+      2,
+      10,
+      'tag',
+      OFF_SCOPE,
+    );
   });
 
   it('passes status param to MangaDex when provided', async () => {
@@ -164,6 +174,7 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
       100,
       0,
       'completed',
+      OFF_SCOPE,
     );
   });
 
@@ -333,6 +344,7 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
       100,
       0,
       undefined,
+      OFF_SCOPE,
     );
     expect(out).toEqual({ items: [{ id: 'a' }], total: 1 });
   });

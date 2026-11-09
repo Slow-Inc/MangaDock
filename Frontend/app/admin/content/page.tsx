@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, cacheClearByTag, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
 import AdminLoadError from '../components/AdminLoadError';
+import AdminDialog from '../components/AdminDialog';
 
 const savedContent = { search: '', filterCategory: '', filterAuthor: '', page: 1 };
 
@@ -178,8 +179,7 @@ export default function AdminContentPage() {
 
       {/* Delete confirm */}
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmDeleteId(null)} />
+        <AdminDialog label="Confirm delete" onClose={() => setConfirmDeleteId(null)}>
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Delete this post? This cannot be undone.</p>
             <div className="flex gap-3 justify-end">
@@ -187,7 +187,7 @@ export default function AdminContentPage() {
               <button onClick={confirmDelete} className="text-sm px-4 py-1.5 bg-danger text-bg rounded-lg hover:bg-danger/90 transition-colors font-medium">Delete</button>
             </div>
           </div>
-        </div>
+        </AdminDialog>
       )}
     </div>
   );

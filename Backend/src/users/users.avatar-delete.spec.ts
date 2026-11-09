@@ -12,7 +12,11 @@ function setup() {
     put: jest.fn(),
     delete: jest.fn().mockResolvedValue(undefined),
   };
-  const ctrl = new UsersController({} as UsersService, storage as never);
+  const ctrl = new UsersController(
+    {} as UsersService,
+    storage as never,
+    {} as never,
+  );
   const req = { supabaseUser: { uid: 'u1' } } as never;
   return { ctrl, storage, req };
 }

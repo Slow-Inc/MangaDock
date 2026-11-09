@@ -39,7 +39,8 @@ function fakeDb(data: unknown[]) {
     chain[m] = jest.fn().mockReturnValue(chain);
   chain.then = (resolve: (v: unknown) => void) =>
     resolve({ data, error: null });
-  return { client: chain } as unknown as SupabaseService;
+  const db = chain as SupabaseService['client'];
+  return { client: db, reads: db } as unknown as SupabaseService;
 }
 
 function fakeStorage(filesByDir: Record<string, string[]>, isRemote = false) {
@@ -172,5 +173,21 @@ describe('VersionsService — backendAvailable short-circuits on remote storage 
     expect(versions[0].backendAvailable).toBe(true);
     expect(storage.list).toHaveBeenCalledTimes(1);
     expect(storage.list).toHaveBeenCalledWith('uploads/chapters/v1');
+  });
+});
+
+describe('VersionsService.listVersionsByTitle reads through the timed client (#863)', () => {
+  test('it queries `reads`, not the untimed main client', async () => {
+    const reads = fakeDb([]) as unknown as { client: unknown };
+    const untimed = {
+      from: () => {
+        throw new Error('used the untimed client');
+      },
+    };
+    const svc = new VersionsService(
+      { client: untimed, reads: reads.client } as unknown as SupabaseService,
+      fakeStorage({}),
+    );
+    await expect(svc.listVersionsByTitle('t-1')).resolves.toEqual([]);
   });
 });

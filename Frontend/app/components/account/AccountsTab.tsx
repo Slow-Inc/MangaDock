@@ -144,12 +144,18 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-ok/10 text-ok">เชื่อมต่อแล้ว</span>
               ) : (
                 <div className="group relative flex items-center">
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent cursor-default select-none">
+                  {/* A button, so the hint below shows on keyboard focus too and the way to fix it is reachable (#1081) */}
+                  <button
+                    type="button"
+                    onClick={() => onTabChange("password")}
+                    aria-describedby="password-not-set-hint"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent select-none"
+                  >
                     ไม่ได้ตั้งค่า
-                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-[9px] font-bold leading-none">i</span>
-                  </span>
-                  <div className="absolute top-full right-0 pt-2 hidden group-hover:block z-50">
-                    <div className="w-52 rounded-xl border border-line bg-raised px-3 py-2 text-[11px] text-ink-2 shadow-xl">
+                    <span aria-hidden="true" className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-[9px] font-bold leading-none">i</span>
+                  </button>
+                  <div className="absolute top-full right-0 pt-2 hidden group-hover:block group-focus-within:block z-50">
+                    <div id="password-not-set-hint" className="w-52 rounded-xl border border-line bg-raised px-3 py-2 text-[11px] text-ink-2 shadow-xl">
                       ไปที่แท็บ{" "}
                       <strong
                         className="text-ink underline decoration-ink-3 cursor-pointer hover:text-accent hover:decoration-accent"

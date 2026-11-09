@@ -117,6 +117,47 @@ def refine_mask(rgbimg, rawmask):
     crf_mask = np.array(res * 255, dtype=np.uint8)
     return crf_mask
 
+_BILATERAL_D = 17
+
+
+def bilateral_region(img: np.ndarray, x: int, y: int, w: int, h: int) -> np.ndarray:
+    """``cv2.bilateralFilter(img, 17, 80, 80)[y:y+h, x:x+w]`` without filtering the whole image:
+    the filter only reads pixels within its radius, so filtering the rect plus that margin gives the
+    same pixels (image borders are the crop's borders too, so the edge handling matches) (#822)."""
+    r = _BILATERAL_D // 2
+    H, W = img.shape[:2]
+    x0, y0 = max(0, x - r), max(0, y - r)
+    x1, y1 = min(W, x + w + r), min(H, y + h + r)
+    out = cv2.bilateralFilter(np.ascontiguousarray(img[y0:y1, x0:x1]), _BILATERAL_D, 80, 80)
+    return out[y - y0:y - y0 + h, x - x0:x - x0 + w]
+
+
+def _component_textline(x1, y1, w1, h1, area1, polys, poly_areas, poly_bounds, textlines, keep_threshold):
+    """The textline a connected component (bbox x1, y1, w1, h1; ink area1) belongs to, or None to drop
+    it: the most-overlapped textline, else the nearest one within half a text unit. #872: the all-pairs
+    shapely work (1.2 s over 4 pages) is cut without changing the pick — a textline whose bbox is
+    disjoint from the component overlaps it by exactly 0, and distances are needed only when no
+    overlap clears ``keep_threshold``."""
+    cc_poly = Polygon([[x1, y1], [x1 + w1, y1], [x1 + w1, y1 + h1], [x1, y1 + h1]])
+    ratio = np.zeros(len(polys), dtype = np.float32)
+    for t, p in enumerate(polys):
+        bx1, by1, bx2, by2 = poly_bounds[t]
+        disjoint = bx2 < x1 or bx1 > x1 + w1 or by2 < y1 or by1 > y1 + h1
+        overlapping_area = 0.0 if disjoint else p.intersection(cc_poly).area
+        ratio[t] = overlapping_area / min(area1, poly_areas[t])
+    avg = np.argmax(ratio)
+    if area1 >= poly_areas[avg]:
+        return None
+    if ratio[avg] <= keep_threshold:
+        centroid = cc_poly.centroid
+        dist = np.array([p.distance(centroid) for p in polys], dtype = np.float32)
+        avg = np.argmin(dist)
+        unit = max(min([textlines[avg].font_size, w1, h1]), 10)
+        if dist[avg] >= 0.5 * unit:
+            return None
+    return avg
+
+
 def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilateral], keep_threshold = 1e-2, dilation_offset = 0,kernel_size=3):
     bboxes = [txtln.aabb.xywh for txtln in textlines]
     polys = [Polygon(txtln.pts) for txtln in textlines]
@@ -128,8 +169,8 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
     textline_ccs = [np.zeros_like(mask) for _ in range(M)]
     iinfo = np.iinfo(labels.dtype)
     textline_rects = np.full(shape = (M, 4), fill_value = [iinfo.max, iinfo.max, iinfo.min, iinfo.min], dtype = labels.dtype)
-    ratio_mat = np.zeros(shape = (num_labels, M), dtype = np.float32)
-    dist_mat = np.zeros(shape = (num_labels, M), dtype = np.float32)
+    poly_areas = [p.area for p in polys]
+    poly_bounds = [p.bounds for p in polys]
     valid = False
     for label in range(1, num_labels):
         # skip area too small
@@ -141,35 +182,9 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
         w1 = stats[label, cv2.CC_STAT_WIDTH]
         h1 = stats[label, cv2.CC_STAT_HEIGHT]
         area1 = stats[label, cv2.CC_STAT_AREA]
-        cc_pts = np.array([[x1, y1], [x1 + w1, y1], [x1 + w1, y1 + h1], [x1, y1 + h1]])
-        cc_poly = Polygon(cc_pts)
-
-        for tl_idx in range(M):
-            area2 = polys[tl_idx].area
-            overlapping_area = polys[tl_idx].intersection(cc_poly).area
-            ratio_mat[label, tl_idx] = overlapping_area / min(area1, area2)
-            dist_mat[label, tl_idx] = polys[tl_idx].distance(cc_poly.centroid)
-            # print(textlines[tl_idx].pts, cc_pts, '->', overlapping_area, min(area1, area2), '=', overlapping_area / min(area1, area2), '|', polys[tl_idx].distance(cc_poly))
-
-        avg = np.argmax(ratio_mat[label])
-        # print(avg, 'overlap:', ratio_mat[label, avg], '<=', keep_threshold)
-        area2 = polys[avg].area
-        if area1 >= area2:
+        avg = _component_textline(x1, y1, w1, h1, area1, polys, poly_areas, poly_bounds, textlines, keep_threshold)
+        if avg is None:
             continue
-        if ratio_mat[label, avg] <= keep_threshold:
-            avg = np.argmin(dist_mat[label])
-            area2 = polys[avg].area
-            unit = max(min([textlines[avg].font_size, w1, h1]), 10)
-            # print("unit", unit, textlines[avg].font_size, w1, h1)
-            # if area1 < 0.4 * w1 * h1:
-            #     # ccs is probably angled
-            #     unit /= 2
-            # if avg == 0:
-            # print('no intersect', area1, '>=', area2, dist_mat[label, avg], '>=', 0.5 * unit)
-            if dist_mat[label, avg] >= 0.5 * unit:
-                # print(dist_mat[label])
-                # print('CONTINUE')
-                continue
 
         textline_ccs[avg][y1:y1+h1, x1:x1+w1][labels[y1:y1+h1, x1:x1+w1] == label] = 255
         # if avg == 0:
@@ -190,7 +205,10 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
     textline_rects[:, 3] -= textline_rects[:, 1]
     
     final_mask = np.zeros_like(mask)
-    img = cv2.bilateralFilter(img, 17, 80, 80)
+    # #822: the filtered image is only read inside each textline rect — filter those (bilateral_region)
+    # instead of the whole page, unless the rects cover most of it anyway.
+    covered = sum(int(r[2]) * int(r[3]) for r in textline_rects)
+    filtered = cv2.bilateralFilter(img, _BILATERAL_D, 80, 80) if covered > 0.5 * img.shape[0] * img.shape[1] else None
     for i, cc in enumerate(tqdm(textline_ccs, '[mask]')):
         x1, y1, w1, h1 = textline_rects[i]
         text_size = min(w1, h1, textlines[i].font_size)
@@ -203,7 +221,8 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
         if cc_region.size == 0:
             continue
         # cv2.imshow('cc before', image_resize(cc_region, height = 800))
-        img_region = np.ascontiguousarray(img[y1: y1 + h1, x1: x1 + w1])
+        img_region = np.ascontiguousarray(filtered[y1: y1 + h1, x1: x1 + w1] if filtered is not None
+                                          else bilateral_region(img, x1, y1, w1, h1))
         # cv2.imshow('img', image_resize(img_region, height = 800))
         cc_region = refine_mask(img_region, cc_region)
         # cv2.imshow('cc after', image_resize(cc_region, height = 800))

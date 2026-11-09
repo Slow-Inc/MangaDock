@@ -16,6 +16,8 @@ The actual app reader render is only as good as the MIT_* env knobs set on the *
 `MIT_BUBBLE_SEG=1 MIT_BUBBLE_AREA_FIT=1 MIT_EN_COMIC_FONT=1 MIT_SUPERSAMPLING=4 MIT_OCR_PROB=0.03`
 Verify propagation in the worker log: a parity run prints `[BubbleSeg] N balloons, k/m regions tagged`. If BubbleSeg is absent, the knobs didn't reach the worker.
 
+**On by default since 2026-10-21 (was opt-in 2026-10-20):** container merge `det_bubble_merge` / `MIT_BUBBLE_MERGE` (#757, needs `MIT_BUBBLE_SEG`) — coalesces caption/balloon line fragments before translation (captions spaced 1.0–1.7× their font were translated per line). Diagnose any page's knob effect with `MIT/tools/doctor_page.py --set detector.<knob>=…` (Pipeline Doctor page mode, #756).
+
 Mirrors the worker-direct harness `MIT/tools/ab_parity.py` (same render code + config). See [[project-render-parity-direction]].
 
 **Driving the benchmark E2E via MCP_DOCKER:** the benchmark manga `/books/{id}` 404s (not in public catalog) and is **not deep-linkable** (book page reads `sessionStorage`). Reach it: navigate `hayateotsu.space/search?q=one%20punch` → click the 2nd "One Punch-Man" result → "อ่านตอนที่ Benchmark" → reader → translate dropdown → "→ EN" → "แปลหน้านี้". Note: MCP_DOCKER container screenshots do NOT sync to the host filesystem — use the worker-direct composite (`ab_parity.py` → host PNG) to view pixels instead.

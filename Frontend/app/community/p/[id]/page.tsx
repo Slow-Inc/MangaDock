@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from "react";
 import PostImage from "../../../components/PostImage";
+import PostImageViewer from "../../../components/PostImageViewer";
 import Mascot from "../../../components/mascot/Mascot";
 import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
@@ -85,6 +86,7 @@ export default function PostDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+  const [viewerAt, setViewerAt] = useState<number | null>(null); // the post image open full size (#1094)
 
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostTitle, setEditPostTitle] = useState("");
@@ -294,14 +296,14 @@ export default function PostDetailPage() {
   );
 
   return (
-    <div className="relative [overflow-x:clip]">
+    <div className="relative">
       {/* 
         Sticky Secondary Header (Bar) 
         - Always present back button
         - Dynamic background and title on scroll
       */}
       <div
-        className={`sticky top-16 z-50 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
+        className={`sticky top-16 z-40 -mx-4 px-4 lg:mx-0 lg:px-0 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
           headerScrolled
             ? "bg-surface/80 backdrop-blur-md border-line shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
             : "bg-transparent border-transparent"
@@ -450,7 +452,7 @@ export default function PostDetailPage() {
 
             {isEditingPost ? (
               <div className="mb-4 sm:mb-6 animate-in fade-in duration-200">
-                <input
+                <input aria-label="หัวข้อกระทู้"
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
                   maxLength={FORUM_LIMITS.title}
@@ -459,7 +461,7 @@ export default function PostDetailPage() {
                   placeholder="หัวข้อกระทู้"
                 />
                 <LimitCounter id={editTitleLimitId} value={editPostTitle} max={FORUM_LIMITS.title} />
-                <textarea
+                <textarea aria-label="เนื้อหากระทู้"
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
                   maxLength={FORUM_LIMITS.content}
@@ -536,12 +538,13 @@ export default function PostDetailPage() {
                   const trimmed = url.trim();
                   const safeUrl = /^\s*(javascript|data|vbscript|file):/i.test(trimmed) ? '#' : trimmed;
                   return (
-                  <a
+                  <button
                     key={i}
-                    href={safeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`relative block overflow-hidden bg-fill rounded-lg group ${
+                    type="button"
+                    onClick={() => setViewerAt(i)}
+                    disabled={post.category === 'spoiler' && !spoilerRevealed}
+                    aria-label={`ดูรูปที่ ${i + 1} ขนาดใหญ่`}
+                    className={`relative block w-full overflow-hidden bg-fill rounded-lg group ${
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
@@ -551,9 +554,12 @@ export default function PostDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </div>
-                  </a>
+                  </button>
                   );
                 })}
+                {viewerAt !== null && (
+                  <PostImageViewer urls={post.imageUrls} start={viewerAt} onClose={() => setViewerAt(null)} />
+                )}
               </div>
             )}
 

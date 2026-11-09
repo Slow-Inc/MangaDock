@@ -13,14 +13,51 @@ from typing import List
 import regex as re
 
 from .config import Translator
+from .translation_quality import is_letter_name_spelling, is_oversized_art_glyph
 
 logger = logging.getLogger('manga_translator')
 
 
 def filter_translated_regions(text_regions: List, config) -> list:
-    """Return the regions to keep after translation; logs each filtered one (when its
-    translation is non-blank) with the reason, exactly as the inline block did."""
+    """Return the regions to keep after translation. Kept behavior byte-identical;
+    delegates to :func:`filter_translated_regions_with_drops` (#535 Phase-0a)."""
+    kept, _ = filter_translated_regions_with_drops(text_regions, config)
+    return kept
+
+
+_BRACKETS = {'(': ')', '[': ']', '（': '）', '【': '】', '［': '］'}
+
+#: #1145: what a note ABOUT the line says - that there is nothing to translate, or nothing readable. Requiring a
+#: phrase is what keeps a real parenthesised translation alive: '(BAM!)' for ドン and '(sigh)' for はぁ… are the
+#: line, not a note (independent review, 2026-10-26: the shape test alone dropped all four).
+_NOTE_MARKERS = ('ไม่มีข้อความ', 'ไม่มีตัวอักษร', 'ไม่ชัดเจน', 'อ่านไม่ออก', 'มองไม่เห็น', 'ไม่ทราบ',
+                 'no text', 'no lettering', 'illegible', 'unclear', 'cannot read', "can't read", 'unreadable')
+
+
+def is_translator_note(src: str, dst: str) -> bool:
+    """True when the answer is a bracketed NOTE about the line (#1145): it says the line has no text or is
+    unreadable, and the source line is not itself bracketed. A bracketed translation of a bracketed source
+    ('(Myopia)' -> '(สายตาสั้น)') and a bracketed SFX ('(BAM!)', '(sigh)') are the line and are kept. Pure."""
+    dst, src = (dst or '').strip(), (src or '').strip()
+    if len(dst) < 2 or _BRACKETS.get(dst[0]) != dst[-1]:
+        return False
+    if src[:1] in _BRACKETS:
+        return False
+    inner = dst[1:-1]
+    if any(c in inner for c in '()[]（）【】［］'):
+        return False
+    lowered = inner.lower()
+    return any(marker in lowered for marker in _NOTE_MARKERS)
+
+
+def filter_translated_regions_with_drops(text_regions: List, config):
+    """#535 Phase-0a drop telemetry: like :func:`filter_translated_regions` but also
+    returns ``dropped`` as ``[(region, reason), …]`` and logs EVERY drop — including
+    blank translations, which the legacy logger silently skipped. A dropped region's
+    text can still be erased by a patch's refined inpaint mask (the empty-white-bubble
+    defect), so downstream needs the full drop list, not just the survivors."""
     new_text_regions = []
+    dropped = []
     for region in text_regions:
         should_filter = False
         filter_reason = ""
@@ -29,18 +66,35 @@ def filter_translated_regions(text_regions: List, config) -> list:
         # onomatopoeia, e.g. "LOOM"), which would trip the identical-to-source drop
         # below. Keep it as long as it has something to render, so the localized SFX
         # survives and its detection mask inpaints the original art.
-        if getattr(region, 'sfx_rescued', False):
+        # #881 review: a transcribed rescue is the same case as a rescued SFX — the line came from the vision
+        # model, so a translation identical to the source (TH "BOOM" for EN "BOOM") must not drop it.
+        if getattr(region, 'sfx_rescued', False) or getattr(region, 'vlm_transcribed', False):
             if region.translation.strip():
                 new_text_regions.append(region)
+            else:
+                filter_reason = "Translation contain blank areas"
+                dropped.append((region, filter_reason))
+                _log_drop(region, filter_reason)
             continue
 
         if not region.translation.strip():
             should_filter = True
             filter_reason = "Translation contain blank areas"
+        elif is_oversized_art_glyph(getattr(region, 'text', ''), getattr(region, 'font_size', 0),
+                                     getattr(region, 'sfx_rescued', False)
+                                     or getattr(region, 'vlm_transcribed', False)):
+            # #886: one or two CJK/Hangul glyphs at art scale are a piece of a logo/title, not
+            # dialogue - replacing a single glyph mangles the artwork, so keep the art.
+            should_filter = True
+            filter_reason = 'Oversized art glyph (logo/title)'
         elif config.translator.translator != Translator.none:
             if region.translation.isnumeric():
                 should_filter = True
                 filter_reason = "Numeric translation"
+            elif is_translator_note(getattr(region, 'text', ''), region.translation):
+                # #1145: '(ไม่มีข้อความ)' / '(เสียงไม่ชัดเจน)' is a note about the line, not the line
+                should_filter = True
+                filter_reason = "Translator note, not a translation"
             elif config.filter_text and re.search(config.re_filter_text, region.translation):
                 should_filter = True
                 filter_reason = f"Matched filter text: {config.filter_text}"
@@ -49,12 +103,24 @@ def filter_translated_regions(text_regions: List, config) -> list:
                 if text_equal:
                     should_filter = True
                     filter_reason = "Translation identical to original"
+                elif is_letter_name_spelling(region.text, region.translation):
+                    # #882: the translator spelled stylized art lettering out in Thai letter names
+                    # ('Siiig' -> 'ซีไอไอ'). Dropping keeps the original art instead of junk text.
+                    should_filter = True
+                    filter_reason = "Letter-name spelling of stylized art"
 
         if should_filter:
-            if region.translation.strip():
-                logger.info(f'Filtered out: {region.translation}')
-                logger.info(f'Reason: {filter_reason}')
+            dropped.append((region, filter_reason))
+            _log_drop(region, filter_reason)
         else:
             new_text_regions.append(region)
 
-    return new_text_regions
+    return new_text_regions, dropped
+
+
+def _log_drop(region, reason: str) -> None:
+    """One diagnosable line per dropped region: reason + box + source-text head."""
+    xyxy = getattr(region, 'xyxy', None)
+    src = (getattr(region, 'text', '') or '')[:40]
+    dst = (region.translation or '')[:40]
+    logger.info(f"[RegionDrop] reason={reason!r} xyxy={xyxy} src={src!r} dst={dst!r}")

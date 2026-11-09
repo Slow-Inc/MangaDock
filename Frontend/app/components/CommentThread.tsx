@@ -15,6 +15,7 @@ import LimitCounter from "./ui/LimitCounter";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { useModalTransition } from "../hooks/useModalTransition";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import type { ForumComment } from "../lib/types";
 
 function CommentThreadImpl({
@@ -93,6 +94,8 @@ function CommentThreadImpl({
   };
 
   const closeSheet = () => setSheetOpen(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useModalDialog(sheetRef, closeSheet, contextMenuOpen);
 
   const handleEditStart = () => {
     setEditContent(displayContent);
@@ -168,7 +171,7 @@ function CommentThreadImpl({
 
             {isEditing ? (
               <div className="mb-2 animate-in fade-in duration-200">
-                <textarea
+                <textarea aria-label="แก้ไขความคิดเห็น"
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   maxLength={FORUM_LIMITS.comment}
@@ -224,6 +227,18 @@ function CommentThreadImpl({
               ตอบกลับ
             </button>
 
+            {/* Phone: the edit/delete sheet also opens from a button, not only a long-press (#1083) */}
+            {isOwnComment && (
+              <button
+                type="button"
+                onClick={() => { setConfirmDelete(false); setSheetOpen(true); }}
+                aria-label="ตัวเลือกความคิดเห็น"
+                className="sm:hidden -my-1 px-1 text-base leading-none text-ink-3 hover:text-ink transition-colors"
+              >
+                <span aria-hidden="true">⋯</span>
+              </button>
+            )}
+
             {/* Desktop-only inline edit/delete */}
             {isOwnComment && !isEditing && (
               <div className="hidden sm:flex items-center gap-3">
@@ -272,7 +287,7 @@ function CommentThreadImpl({
 
           {isReplying && (
             <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-300">
-              <textarea
+              <textarea aria-label="เขียนข้อความตอบกลับ"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 readOnly={submitting}
@@ -305,7 +320,7 @@ function CommentThreadImpl({
 
       {/* Mobile long-press bottom sheet — portalled to body, sm:hidden */}
       {contextMenuOpen && typeof window !== "undefined" && createPortal(
-        <div className="sm:hidden">
+        <div ref={sheetRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="ตัวเลือกความคิดเห็น" className="sm:hidden outline-none">
           {/* Backdrop */}
           <div
             className={`fixed inset-0 z-50 bg-scrim/60 transition-opacity duration-300 ${sheetVisible ? "opacity-100" : "opacity-0"}`}

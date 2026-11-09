@@ -28,6 +28,7 @@ type MangaDexManga = {
     title?: Record<string, string>;
     description?: Record<string, string>;
     year?: number;
+    contentRating?: ContentRating;
     tags?: Array<{ attributes?: { name?: Record<string, string> } }>;
   };
   relationships?: Array<{
@@ -75,6 +76,11 @@ const MANGA_GENRE_TAGS: Record<string, string> = {
 };
 
 import { StatusService } from '../status/status.service';
+import {
+  OFF_SCOPE,
+  type ContentRating,
+  type RatingScope,
+} from '../common/content-rating';
 
 /** The MangaDex tag name → id map (getMangaTagId). */
 const TAG_MAP_KEY = 'mangadex:tags:v1';
@@ -141,9 +147,10 @@ export class MangaDexService {
   async getMangaChapters(
     mangaId: string,
     forceLocal = false,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<MangaChapter[]> {
     // v3: uses pagination to fetch ALL chapters (supports decimal sub-chapters like 13.1, 13.2)
-    const cacheKey = `manga:chapters:v3:${mangaId}`;
+    const cacheKey = `manga:chapters:v3:${mangaId}${scope.key}`;
     const cached = await this.cache.get<MangaChapter[]>(cacheKey);
     if (cached) {
       return await this.attachLocalStatus(cached.data, false, forceLocal);
@@ -176,8 +183,7 @@ export class MangaDexService {
         params.set('order[chapter]', 'asc');
         params.set('limit', String(PAGE_SIZE));
         params.set('offset', String(offset));
-        params.append('contentRating[]', 'safe');
-        params.append('contentRating[]', 'suggestive');
+        for (const r of scope.ratings) params.append('contentRating[]', r);
 
         const res = await this.mangadexFetch(
           `https://api.mangadex.org/manga/${mangaId}/feed?${params.toString()}`,
@@ -310,8 +316,11 @@ export class MangaDexService {
     }
   }
 
-  async getMangaPreview(mangaId: string): Promise<MangaPreview | null> {
-    const cacheKey = `manga:preview:${mangaId}`;
+  async getMangaPreview(
+    mangaId: string,
+    scope: RatingScope = OFF_SCOPE,
+  ): Promise<MangaPreview | null> {
+    const cacheKey = `manga:preview:${mangaId}${scope.key}`;
     const cached = await this.cache.get<MangaPreview | null>(cacheKey);
     if (cached) return cached.data;
 
@@ -322,8 +331,7 @@ export class MangaDexService {
       feedParams.append('translatedLanguage[]', 'en'); // fallback to english
       feedParams.set('order[chapter]', 'asc');
       feedParams.set('limit', '5');
-      feedParams.append('contentRating[]', 'safe');
-      feedParams.append('contentRating[]', 'suggestive');
+      for (const r of scope.ratings) feedParams.append('contentRating[]', r);
 
       const feedRes = await this.mangadexFetch(
         `https://api.mangadex.org/manga/${mangaId}/feed?${feedParams.toString()}`,
@@ -414,7 +422,8 @@ export class MangaDexService {
       throw new NotFoundException(`Manga ${mangaId} not found`);
 
     if (!info.failure) {
-      const { title, authors, artists, genres, description } = info;
+      const { title, authors, artists, genres, description, contentRating } =
+        info;
       const detail: MangaDetail = {
         id: mangaId,
         ...(title ? { title } : {}),
@@ -428,6 +437,7 @@ export class MangaDexService {
           [],
         genres,
         description,
+        ...(contentRating ? { contentRating } : {}),
       };
       if (covers) await this.cache.set(cacheKey, detail, CACHE_TTL_MS);
       const enhanced = await this.enhanceMangaDetail(mangaId, detail);
@@ -453,6 +463,7 @@ export class MangaDexService {
     page = 1,
     limit = 28,
     tag?: string,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{
     new: { items: LandingBook[]; total: number };
     latest: { items: LandingBook[]; total: number };
@@ -464,7 +475,7 @@ export class MangaDexService {
     // Never fall back to the untagged rows (or their cache entry) under a tag the user picked (#961);
     // a tag list that can't be loaded already threw 503 (#981)
     if (tag && !tagId) throw new NotFoundException(`Unknown tag: ${tag}`);
-    const cacheKey = `new-releases:v3:${page}:${limit}${tagId ? `:tag:${tagId}` : ''}`;
+    const cacheKey = `new-releases:v3:${page}:${limit}${tagId ? `:tag:${tagId}` : ''}${scope.key}`;
     const cached = await this.cache.get<{
       new: { items: LandingBook[]; total: number };
       latest: { items: LandingBook[]; total: number };
@@ -475,10 +486,16 @@ export class MangaDexService {
 
     const [newResult, latestResult, popularResult, topRatedResult] =
       await Promise.all([
-        this.fetchMangaForRow('createdAt', limit, offset, tagId),
-        this.fetchMangaForRow('latestUploadedChapter', limit, offset, tagId),
-        this.fetchMangaForRow('followedCount', limit, offset, tagId),
-        this.fetchMangaForRow('rating', limit, offset, tagId),
+        this.fetchMangaForRow('createdAt', limit, offset, tagId, scope),
+        this.fetchMangaForRow(
+          'latestUploadedChapter',
+          limit,
+          offset,
+          tagId,
+          scope,
+        ),
+        this.fetchMangaForRow('followedCount', limit, offset, tagId, scope),
+        this.fetchMangaForRow('rating', limit, offset, tagId, scope),
       ]);
 
     // An outage is a 503 when every row is down; a row that is down is served empty but never cached (#970)
@@ -513,12 +530,13 @@ export class MangaDexService {
     slug: string,
     page = 1,
     limit = 28,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{ items: LandingBook[]; total: number; slug: string }> {
     const tagId = MANGA_GENRE_TAGS[slug];
     if (!tagId) return { items: [], total: 0, slug };
 
     const offset = (page - 1) * limit;
-    const cacheKey = `genre:${slug}:${page}:${limit}`;
+    const cacheKey = `genre:${slug}:${page}:${limit}${scope.key}`;
     const cached = await this.cache.get<{
       items: LandingBook[];
       total: number;
@@ -532,8 +550,7 @@ export class MangaDexService {
     params.append('includes[]', 'cover_art');
     params.append('includedTags[]', tagId);
     params.append('availableTranslatedLanguage[]', this.getMangaLanguage());
-    params.append('contentRating[]', 'safe');
-    params.append('contentRating[]', 'suggestive');
+    for (const r of scope.ratings) params.append('contentRating[]', r);
     params.set('order[followedCount]', 'desc');
 
     let result: { items: LandingBook[]; total: number; slug: string };
@@ -567,6 +584,7 @@ export class MangaDexService {
     limit = 100,
     offset = 0,
     status?: 'ongoing' | 'completed' | 'hiatus',
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{ items: LandingBook[]; total: number; unavailable?: true }> {
     const params = new URLSearchParams();
     params.set('limit', String(Math.min(limit, 100))); // MangaDex API max is 100
@@ -574,8 +592,7 @@ export class MangaDexService {
     params.set('title', query);
     params.append('includes[]', 'cover_art');
     if (lang) params.append('availableTranslatedLanguage[]', lang);
-    params.append('contentRating[]', 'safe');
-    params.append('contentRating[]', 'suggestive');
+    for (const r of scope.ratings) params.append('contentRating[]', r);
     if (status) params.append('status[]', status);
 
     return this.fetchMangaWithParamsPaged(
@@ -584,16 +601,97 @@ export class MangaDexService {
     );
   }
 
+  /**
+   * The titles among `ids` with nothing to read: MangaDex can still list a title as translated after its chapters
+   * were removed, and its own `availableTranslatedLanguage`/`hasAvailableChapters` filters keep it (#1112). One
+   * `limit=1` feed request per uncached title (the languages getMangaChapters reads, every rating), five at a time,
+   * each answer cached for a day. A failed check is neither reported nor cached.
+   */
+  async findUnreadable(ids: string[]): Promise<Set<string>> {
+    const unreadable = new Set<string>();
+    const unique = [...new Set(ids)];
+    const check = async (id: string) => {
+      const key = `manga:readable:v1:${id}`;
+      const hit = await this.cache.get<boolean>(key);
+      if (hit) {
+        if (!hit.data) unreadable.add(id);
+        return;
+      }
+      const params = new URLSearchParams();
+      params.append('translatedLanguage[]', this.getMangaLanguage());
+      params.append('translatedLanguage[]', 'en');
+      params.set('limit', '1');
+      for (const r of ['safe', 'suggestive', 'erotica', 'pornographic'])
+        params.append('contentRating[]', r);
+      try {
+        const res = await this.mangadexFetch(
+          `https://api.mangadex.org/manga/${id}/feed?${params.toString()}`,
+        );
+        if (!res.ok) return;
+        const { total } = (await res.json()) as { total?: number };
+        if (typeof total !== 'number') return;
+        await this.cache.set(key, total > 0, 24 * 60 * 60 * 1000);
+        if (total === 0) unreadable.add(id);
+      } catch {
+        // unknown: keep the title
+      }
+    };
+    for (let i = 0; i < unique.length; i += 5)
+      await Promise.all(unique.slice(i, i + 5).map(check));
+    return unreadable;
+  }
+
+  /**
+   * The MangaDex content rating of titles known only by id (reading history), so their lists can respect the 18+
+   * level (#1105). Cached per title for a day; one MangaDex request for the uncached ones (≤ 100 ids). An id
+   * MangaDex does not return is left out — unknown, never guessed safe.
+   */
+  async getContentRatings(
+    ids: string[],
+  ): Promise<Record<string, ContentRating>> {
+    const out: Record<string, ContentRating> = {};
+    const missing: string[] = [];
+    const hits = await Promise.all(
+      ids.map((id) => this.cache.get<ContentRating>(`manga:rating:${id}`)),
+    );
+    ids.forEach((id, i) => {
+      const hit = hits[i];
+      if (hit) out[id] = hit.data;
+      else missing.push(id);
+    });
+    if (!missing.length) return out;
+    const params = new URLSearchParams();
+    for (const id of missing) params.append('ids[]', id);
+    params.set('limit', String(missing.length));
+    for (const r of ['safe', 'suggestive', 'erotica', 'pornographic'])
+      params.append('contentRating[]', r);
+    const res = await this.mangadexFetch(
+      `https://api.mangadex.org/manga?${params.toString()}`,
+    );
+    if (!res.ok)
+      throw new ServiceUnavailableException('MangaDex ratings unavailable');
+    const data = (await res.json()) as { data?: MangaDexManga[] };
+    for (const m of data.data ?? []) {
+      const rating = m.attributes?.contentRating;
+      if (!m.id || !rating) continue;
+      out[m.id] = rating;
+      await this.cache.set(`manga:rating:${m.id}`, rating, 24 * 60 * 60 * 1000);
+    }
+    return out;
+  }
+
   /** Fetch specific manga by IDs and return as LandingBook[]. */
-  async fetchMangaByIds(ids: string[]): Promise<LandingBook[]> {
+  async fetchMangaByIds(
+    ids: string[],
+    scope: RatingScope = OFF_SCOPE,
+  ): Promise<LandingBook[]> {
     if (!ids.length) return [];
     const params = new URLSearchParams();
     for (const id of ids) params.append('ids[]', id);
     params.set('limit', String(ids.length));
     params.append('includes[]', 'cover_art');
-    params.append('contentRating[]', 'safe');
-    params.append('contentRating[]', 'suggestive');
-    params.append('contentRating[]', 'erotica');
+    // the caller's ratings: this used to add erotica for everyone (#1101)
+    for (const r of scope.ratings) params.append('contentRating[]', r);
     const { items } = await this.fetchMangaWithParamsPaged(
       params,
       `byIds:${ids.length}`,
@@ -606,14 +704,14 @@ export class MangaDexService {
     limit = 10,
     offset = 0,
     tagId?: string,
+    scope: RatingScope = OFF_SCOPE,
   ): Promise<{ items: LandingBook[]; total: number; unavailable?: true }> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     if (offset > 0) params.set('offset', String(offset));
     params.append('includes[]', 'cover_art');
     params.append('availableTranslatedLanguage[]', this.getMangaLanguage());
-    params.append('contentRating[]', 'safe');
-    params.append('contentRating[]', 'suggestive');
+    for (const r of scope.ratings) params.append('contentRating[]', r);
     params.set(`order[${order}]`, 'desc');
     if (tagId) params.append('includedTags[]', tagId);
 
@@ -689,6 +787,7 @@ export class MangaDexService {
     artists: string[];
     genres: string[];
     description: string;
+    contentRating?: ContentRating;
     /** Set when the fields are empty because the fetch failed, not because the manga has none (#976). */
     failure?: 'notFound' | 'unavailable';
   }> {
@@ -745,12 +844,14 @@ export class MangaDexService {
       // Series title anchors the translator's series context (#157).
       const title = this.pickLocalized(data.data?.attributes?.title, lang);
 
+      const contentRating = data.data?.attributes?.contentRating;
       return {
         title,
         authors,
         artists,
         genres,
         description: description || '',
+        ...(contentRating ? { contentRating } : {}),
       };
     } catch (err) {
       this.logger.warn(
@@ -854,6 +955,9 @@ export class MangaDexService {
             categories: tags.slice(0, 3),
             averageRating: 0,
             ratingsCount: 0,
+            ...(manga.attributes?.contentRating
+              ? { contentRating: manga.attributes.contentRating }
+              : {}),
           } satisfies LandingBook;
         })
         .filter((b): b is LandingBook => b !== null) ?? []

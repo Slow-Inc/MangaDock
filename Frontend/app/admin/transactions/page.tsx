@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
 import AdminLoadError from '../components/AdminLoadError';
+import AdminDialog from '../components/AdminDialog';
 
 const savedTx = { filterUid: '', filterType: '', filterFrom: '', filterTo: '', page: 1 };
 
@@ -149,7 +150,9 @@ export default function AdminTransactionsPage() {
                 </td>
                 <td className="px-4 py-3.5 text-ink-3">{t.balanceAfter}</td>
                 <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3.5 text-ink-3 text-xs">Detail →</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs">
+                  <button onClick={e => { e.stopPropagation(); openDetail(t.id); }} className="hover:text-ink transition-colors smooth-hover-fast">Detail →</button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -167,10 +170,9 @@ export default function AdminTransactionsPage() {
 
       {/* Detail panel */}
       {detail && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetail(null)} />
+        <AdminDialog side label="Transaction detail" onClose={() => setDetail(null)}>
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
-            <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
+            <button onClick={() => setDetail(null)} aria-label="Close transaction detail" className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
               <h2 className="text-base font-semibold text-ink">Transaction Detail</h2>
               <p className="text-xs text-ink-3 mt-0.5 font-mono">{detail.id}</p>
@@ -192,7 +194,7 @@ export default function AdminTransactionsPage() {
               ))}
             </div>
           </div>
-        </div>
+        </AdminDialog>
       )}
     </div>
   );

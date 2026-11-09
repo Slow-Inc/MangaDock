@@ -8,7 +8,7 @@ import { useLang } from '../lang-context';
 
 export function nsClass(s: NodeState): string {
   if (s === 'active') return 'border-amber-400/60 bg-amber-500/[0.12] text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.10)]';
-  if (s === 'ok')     return 'border-emerald-400/50 bg-emerald-500/[0.10] text-emerald-200';
+  if (s === 'ok')     return 'border-emerald-400/50 bg-ok/[0.10] text-emerald-200';
   if (s === 'err')    return 'border-red-400/50 bg-red-500/[0.10] text-red-300';
   if (s === 'skip')   return 'border-white/[0.05] bg-transparent text-white/15';
   if (s === 'write')  return 'border-indigo-400/50 bg-indigo-500/[0.10] text-indigo-200';

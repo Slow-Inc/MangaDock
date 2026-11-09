@@ -178,7 +178,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
               <span className="text-sm text-ink-2">{rating} / 5</span>
             )}
           </div>
-          <textarea
+          <textarea aria-label="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             maxLength={5000} // the server's UpsertReviewDto cap (#1015)

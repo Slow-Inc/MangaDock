@@ -92,6 +92,18 @@ RuntimeError: MIT worker port 5004 is already in use - ... a restart must free B
 
 > เช็คความพร้อมด้วย `http://127.0.0.1:5003/ready` (worker พร้อมจริง) ไม่ใช่ `/health` (แค่ front ขึ้น)
 
+### หลาย worker (batch slots) — `MIT_WORKERS` / `MIT_WORKER_GPUS`
+
+หลักการ batch slots ของ Strata: front เดียวรับงานได้หลายหน้าถ้ามี worker มากกว่าหนึ่งตัว แต่ละตัวรับงานหน้าเดียวและลงทะเบียนกับ front อัตโนมัติ (เดิมต้องใส่ `--report` เอง):
+
+    MIT_WORKERS=2          # จำนวน worker ทั้งหมด (1..8), default 1 = พฤติกรรมเดิม
+    MIT_WORKER_GPUS=1,0    # การ์ดของแต่ละ worker (worker 1 ใช้ CUDA_VISIBLE_DEVICES ของ front)
+
+- worker หลักยังอยู่ที่ `port+1` (5004) และ worker เพิ่มเติมใช้ `port+2`, `port+3`, ... (5005, 5006)
+- front spawn + register ให้เอง และ **kill worker ทั้งหมด** เมื่อปิด front (atexit/signal); force-kill ยังต้องปิดพอร์ตเอง
+- วัดแล้ว: 2 หน้า concurrent 24.7s vs 33.0s sequential (1.34x, การ์ดเดียวกัน) / 25.3s vs 30.1s (คนละการ์ด) — กำไรจำกัดถ้าคอขวดคือ translation gateway; VRAM ~5-6 GB/worker
+- ถ้าพอร์ตใดถูกใช้อยู่ จะข้าม worker ตัวนั้นพร้อม log (ไม่ทำให้ front ล้ม)
+
 ### Docker
 
 ```bash
@@ -318,6 +330,15 @@ MANGA_TRANSLATOR_URL=http://10.0.0.25:5003
 | health ขึ้นว่า `status: "starting"` หรือ `workers = 0` | worker อาจยังไม่ register, ล้มระหว่างบูต, หรือรันโดยไม่ได้ส่ง `--start-instance` |
 
 ให้ปรับ translator และ target language ตามความต้องการของโปรเจกต์ที่นำไปใช้งาน
+
+### ผลแปลเพี้ยน — หาว่าเพี้ยนที่ stage ไหน (Pipeline Doctor page mode, #756)
+
+```bash
+.venv/Scripts/python.exe tools/doctor_page.py <page.png> [more…] --target THA --source ENG
+#   [--set detector.det_bubble_merge=true] [--tag _x] [--replay prev.doctor.json] [--out DIR] [--json]
+```
+
+รันหน้าเดียวผ่าน patches path (path เดียวกับ production) แล้วรายงาน `OK` / `WARN` / `FAIL` ของแต่ละ stage (`detect` → `ocr` → `merge` → `translate` → `render`) พร้อมหลักฐาน เช่น `gap/char` ของบรรทัดที่ถูกหั่นออกจากกล่องเดียวกัน · defect ที่เกิดใน stage ก่อนหน้าจะถูกนับเป็น *inherited* ใน stage ถัดไป รายงานจึงชี้ stage แรกที่พัง · ได้ไฟล์ `<stem>_<target>.doctor.png` (ต้นฉบับที่ตีกรอบ region ที่มีปัญหา คู่กับหน้าที่ render แล้ว), `.doctor.json` และ `.rendered.png` ใน `result/doctor/` · exit code เป็น 1 เมื่อมี `FAIL` · `--source` ตั้ง `source_lang` + `source_lang_only` เหมือนที่ backend ส่ง (ไม่ใส่ = auto-detect แล้วข้อความญี่ปุ่นในหน้าภาษาอังกฤษจะถูกแปลซึ่ง prod ไม่ทำ) · `--set` สลับ knob ทีละตัวสำหรับ A/B · `--replay` ใช้คำแปลจากรอบก่อน ทำให้ A/B ของโค้ด render deterministic
 
 ## การอ้างอิงต้นทาง
 

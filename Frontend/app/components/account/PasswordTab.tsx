@@ -97,15 +97,15 @@ export default function PasswordTab({ formState, dispatch }: PasswordTabProps) {
         <div className="space-y-4">
           <div>
             <label className={labelClass}>รหัสผ่านปัจจุบัน</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="รหัสผ่านปัจจุบัน" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>รหัสผ่านใหม่</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
+            <input aria-label="รหัสผ่านใหม่" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>ยืนยันรหัสผ่านใหม่</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="ยืนยันรหัสผ่านใหม่" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <button
             onClick={handleUpdatePassword}
@@ -122,11 +122,11 @@ export default function PasswordTab({ formState, dispatch }: PasswordTabProps) {
           </div>
           <div>
             <label className={labelClass}>รหัสผ่านใหม่</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
+            <input aria-label="รหัสผ่านใหม่" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="•••••••• (อย่างน้อย 6 ตัว)" className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>ยืนยันรหัสผ่าน</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+            <input aria-label="ยืนยันรหัสผ่าน" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
           </div>
           <button
             onClick={handleAddEmailPassword}

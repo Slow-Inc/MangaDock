@@ -3,6 +3,7 @@ import math
 from typing import Callable, List, Optional, Tuple, Union
 from collections import defaultdict
 import os
+import sys
 import shutil
 import cv2
 import numpy as np
@@ -17,10 +18,27 @@ from .xpos_relative_position import XPOS
 
 # Roformer with Xpos and Local Attention ViT
 
+
+#: #884, measured 2026-10-22 on this Win11 + RTX setup: with cuDNN enabled, each OCR chunk call
+#: inside the running pipeline spent ~2.2 s in host-side cuDNN work (an isolated process pays
+#: ~0.1 s), so the 48px model's 5 chunks cost ~10 s/page. Running ONLY this model's forward with
+#: cuDNN disabled measured 3-4x faster (4.0 -> 0.8 s and 9.6 -> 2.9 s per page) with identical OCR
+#: reads (62 regions over 5 pages); every other model keeps cuDNN (LaMa inpainting regressed 3-12x
+#: without it). The pathology has only been measured here, so non-Windows keeps cuDNN.
+#: ``MIT_OCR_CUDNN=1`` forces it back on, ``MIT_OCR_CUDNN=0`` forces it off.
+_OCR_USE_CUDNN = os.environ.get('MIT_OCR_CUDNN', '1' if sys.platform != 'win32' else '0') == '1'
+
+
+def _cudnn_flags():
+    """cuDNN on/off for THIS model's forward only (#884 — see ``_OCR_USE_CUDNN``). The other
+    models in the pipeline keep cuDNN; this context manager is scoped to the OCR call."""
+    return torch.backends.cudnn.flags(enabled=_OCR_USE_CUDNN)
+
 from .common import OfflineOCR
 from ..utils import TextBlock, Quadrilateral, chunks
 from ..utils.generic import AvgMeter
 from ..utils.bubble import is_ignore
+from ..ocr_vlm import keep_ocr_line
 
 # Roformer with Xpos
 
@@ -116,13 +134,24 @@ class Model48pxOCR(OfflineOCR):
             image_tensor = einops.rearrange(image_tensor, 'N H W C -> N C H W')
             if self.use_gpu:
                 image_tensor = image_tensor.to(self.device)
-            with torch.no_grad():
+            with torch.no_grad(), _cudnn_flags():
                 ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < threshold:
+                    # #881: a guessed box (det_sfx / placeholder) stays, unread, for the transcription rescue
+                    cur_region = quadrilaterals[indices[i]][0]
+                    if isinstance(cur_region, Quadrilateral) and keep_ocr_line(cur_region, below_floor=True):
+                        cur_region.text = ''
+                        cur_region.prob = prob
+                        out_regions.append(cur_region)
                     continue
-                has_fg = (fg_ind_pred[:, 1] > fg_ind_pred[:, 0])
-                has_bg = (bg_ind_pred[:, 1] > bg_ind_pred[:, 0])
+                # #872: the beam search returns GPU tensors and the loop below reads them one value at
+                # a time (several device syncs per character) — bring them over once; the float32
+                # arithmetic is the same on either device.
+                pred_chars_index = pred_chars_index.cpu().tolist()
+                fg_pred, bg_pred = fg_pred.cpu(), bg_pred.cpu()
+                has_fg = (fg_ind_pred[:, 1] > fg_ind_pred[:, 0]).cpu()
+                has_bg = (bg_ind_pred[:, 1] > bg_ind_pred[:, 0]).cpu()
                 seq = []
                 fr = AvgMeter()
                 fg = AvgMeter()
@@ -754,9 +783,12 @@ class OCR(nn.Module):
                     torch.exp(batch_log_probs[best_beam_idx]).item(), \
                     cached_activations[idx * beams_k + best_beam_idx] 
 
+            # #1119: one host read of the finished set and one index tensor (was a GPU membership test per row and
+            # six host->device copies of the same index list per step in which a line finished)
+            finished_set = set(finished_batch_indices.tolist())
             remaining_indexs = []
             for i in range(N_remaining):
-                if i not in finished_batch_indices:
+                if i not in finished_set:
                     for j in range(beams_k):
                         remaining_indexs.append(i * beams_k + j)
 
@@ -764,12 +796,13 @@ class OCR(nn.Module):
                 break
 
             N_remaining = int(len(remaining_indexs) / beams_k)
-            out_idx = out_idx.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            log_probs = log_probs.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            memory = memory.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            cached_activations = cached_activations.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            input_mask = input_mask.index_select(0, torch.tensor(remaining_indexs, device=img.device))
-            batch_index = batch_index.index_select(0, torch.tensor(remaining_indexs, device=img.device))
+            keep = torch.tensor(remaining_indexs, device=img.device)
+            out_idx = out_idx.index_select(0, keep)
+            log_probs = log_probs.index_select(0, keep)
+            memory = memory.index_select(0, keep)
+            cached_activations = cached_activations.index_select(0, keep)
+            input_mask = input_mask.index_select(0, keep)
+            batch_index = batch_index.index_select(0, keep)
 
         # Ensure we have the correct number of finished hypotheses for each sample
         if len(finished_hypos) < N: # Fallback if not enough finished hypos

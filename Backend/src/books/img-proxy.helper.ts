@@ -10,6 +10,21 @@ const UPSTREAM_HEADERS = {
   Referer: 'https://mangadex.org/',
 };
 
+/**
+ * The only image hosts the proxy fetches from (#959): MangaDex's uploads CDN (covers, fallback pages) and its
+ * MangaDex@Home nodes (chapter pages, any port). Measured against the data on 2026-10-24: every proxied cover and
+ * page is on one of these; profile photos and our own uploads never pass through the proxy.
+ */
+export function isAllowedImageHost(url: string): boolean {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === 'uploads.mangadex.org' || host.endsWith('.mangadex.network');
+}
+
 export type ImgProxyOk = {
   ok: true;
   httpStatus: number;
@@ -35,6 +50,9 @@ export async function fetchProxiedImage(
   if (!url || !/^https:\/\//.test(url)) {
     return { ok: false, httpStatus: 400, message: 'Invalid URL' };
   }
+  if (!isAllowedImageHost(url)) {
+    return { ok: false, httpStatus: 403, message: 'Host not allowed' };
+  }
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -43,6 +61,8 @@ export async function fetchProxiedImage(
     const upstream = await fetchFn(url, {
       signal: ac.signal,
       headers: UPSTREAM_HEADERS,
+      // a redirect could leave the allow-list: refuse it (fetch rejects → 502 below)
+      redirect: 'error',
     });
     clearTimeout(timer);
 

@@ -25,6 +25,8 @@ def _load():
     if _model is None:
         from huggingface_hub import hf_hub_download
         from ultralytics import YOLO
+        from .cv_threads import restore_opencv_threads
+        restore_opencv_threads()   # the import left OpenCV single-threaded (#872)
         path = hf_hub_download(repo_id=_REPO, filename=_FILE)
         _model = YOLO(path)
         logger.info(f"[BubbleSeg] loaded {_REPO}")
@@ -51,6 +53,23 @@ def detect_bubbles(img_rgb, device: str = "cuda", imgsz: int = 1024,
         logger.warning("[BubbleSeg] detection failed — proceeding without "
                        "balloons", exc_info=True)
         return []
+
+
+def preload(device: str = "cuda") -> bool:
+    """Load the balloon-seg weights onto `device` so the first page does not pay for it.
+
+    Best-effort: any failure (download/GPU) only logs and leaves the lazy path in place.
+    """
+    try:
+        import numpy as np
+        model = _load()
+        # A tiny warm-up predict is what actually moves the weights onto the device.
+        model.predict(np.zeros((64, 64, 3), dtype=np.uint8), imgsz=64, conf=0.99, device=device, verbose=False)
+        logger.info(f"[BubbleSeg] preloaded on {device}")
+        return True
+    except Exception:
+        logger.warning("[BubbleSeg] preload failed - it will lazy-load on the first page", exc_info=True)
+        return False
 
 
 def unload() -> None:

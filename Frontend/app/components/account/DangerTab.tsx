@@ -154,7 +154,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
           <p className="text-xs font-medium text-accent">เพื่อความปลอดภัย กรุณายืนยันตัวตนด้วยวิธีที่คุณเชื่อมต่อไว้</p>
           {hasPasswordProvider && (
             <div className="space-y-2">
-              <input
+              <input aria-label="รหัสผ่านของคุณ"
                 type="password"
                 value={reauthPassword}
                 onChange={(e) => setReauthPassword(e.target.value)}
@@ -239,7 +239,7 @@ export default function DangerTab({ formState, dispatch, onClose }: DangerTabPro
             <p className="text-[11px] text-ink-2">
               พิมพ์ <span className="font-mono font-semibold text-danger">ลบบัญชี</span> เพื่อยืนยัน
             </p>
-            <input
+            <input aria-label="พิมพ์ ลบบัญชี เพื่อยืนยัน"
               type="text"
               value={deleteConfirmText}
               onChange={(e) => { setDeleteConfirmText(e.target.value); dispatch({ type: "CLEAR" }); }}

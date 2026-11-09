@@ -62,3 +62,16 @@ def extract_header(buffer):
     expected_size = int.from_bytes(buffer[1:5], byteorder='big')
     return status, expected_size
 
+
+async def fetch_batch_data(url, images, config, headers: Mapping[str, str] = {}):
+    """#905: POST a pickled {images, config} batch to a worker and unpickle the result list."""
+    attributes = {"images": images, "config": config}
+    data = pickle.dumps(attributes)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, data=data, headers=headers) as response:
+            if response.status == 200:
+                body = await response.read()
+                return pickle.loads(body)
+            error = await response.text()
+            raise HTTPException(status_code=response.status, detail=error)

@@ -165,3 +165,32 @@ test("single-page request body carries mangaId when provided", async () => {
 
   expect(sentBody.mangaId).toBe("manga-123");
 });
+
+// #1137: a single page goes through the batch stream so the Reader gets live MIT stages.
+test("single page: live stages are forwarded and the page's patches are returned", async () => {
+  const { translatePageWithProgress } = await import("./mangaTranslatePage");
+  stubFetchSse([
+    { type: "progress", pageIndex: 3, stage: "detection" },
+    { type: "progress", pageIndex: 3, stage: "translating" },
+    { type: "progress", pageIndex: 3, stage: "rendering" },
+    { pageIndex: 3, patches: [{ xPct: 1, yPct: 2, wPct: 3, hPct: 4, url: "http://h/api/x.png" }] },
+  ]);
+  const stages: string[] = [];
+  const patches = await translatePageWithProgress("chapter-1", 3, "http://example.com/3.jpg", {}, (s) => stages.push(s));
+  expect(stages).toEqual(["detection", "translating", "rendering"]);
+  expect(patches.length).toBe(1);
+});
+
+test("single page: a page error is thrown, like the old single-page request", async () => {
+  const { translatePageWithProgress } = await import("./mangaTranslatePage");
+  stubFetchSse([{ pageIndex: 0, patches: [], error: "MIT failed" }]);
+  await expect(translatePageWithProgress("chapter-1", 0, "http://example.com/0.jpg", {}, () => {})).rejects.toThrow(
+    "MIT failed",
+  );
+});
+
+test("single page: a stream that ends without the page is an error", async () => {
+  const { translatePageWithProgress } = await import("./mangaTranslatePage");
+  stubFetchSse([{ type: "progress", pageIndex: 0, stage: "detection" }]);
+  await expect(translatePageWithProgress("chapter-1", 0, "http://example.com/0.jpg", {}, () => {})).rejects.toThrow();
+});

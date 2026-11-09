@@ -17,8 +17,9 @@ import { useCoverSrc } from "../hooks/useCoverSrc";
 import { lockPageScroll } from "../lib/scrollLock";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
-import { useDialogFocus } from "../hooks/useDialogFocus";
+import { useModalDialog } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
+import AdultBadge from "./ui/AdultBadge";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
@@ -133,8 +134,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const modalContentRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<Popup | null>(null);
-  // Focus in on open, Tab stays inside while this is the top-most popup, focus back on close (#837).
-  useDialogFocus(dialogRef, () => !!popupRef.current && modalStack.isTop(popupRef.current), mounted);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
   const router = useRouter();
@@ -224,10 +223,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       historyPushedRef.current = true;
     }
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && modalStack.isTop(popup)) handleClose(); // only the top-most popup
-    };
-    window.addEventListener("keydown", onKey);
     const releaseScroll = lockPageScroll(); // shared with the reader opened over it (#936)
 
     // Auto-translate description (#151) via the shared cached helper (F7): start
@@ -264,7 +259,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }
 
     return () => {
-      window.removeEventListener("keydown", onKey);
       modalStack.remove(popup);
       releaseScroll();
     };
@@ -306,6 +300,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       onClose();
     }, delay);
   };
+  // Focus in on open, Tab stays inside and Escape closes while this is the top-most popup, focus back on close (#837);
+  // a dialog inside it (the top-up) or over it (the login prompt) owns its own Escape (#1073)
+  useModalDialog(dialogRef, handleClose, mounted, () => !!popupRef.current && modalStack.isTop(popupRef.current));
 
   // A picked alternative cover wins; otherwise step through the book's own sources, and show the placeholder once none
   // is left (#923). A picked cover that fails goes back to the book's own cover without advancing its sources.
@@ -427,7 +424,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
                 {/* Title */}
                 <div className="mt-3 w-full text-center">
-                  <h2 className="text-xl font-black leading-tight text-ink">{book.title}</h2>
+                  <h2 className="text-xl font-black leading-tight text-ink">
+                    {book.title}
+                    <AdultBadge rating={book.contentRating ?? detail?.contentRating} className="ml-2 align-middle" />
+                  </h2>
                   {book.subtitle && (
                     <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">{book.subtitle}</p>
                   )}
@@ -478,7 +478,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                             <path d="M8 5v14l11-7z" />
                           </svg>
                         )}
-                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {loadingChapters ? "กำลังโหลด" : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )
                   ) : (
@@ -561,6 +561,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   <div>
                     <h2 className="text-2xl font-black leading-tight text-ink">
                       {book.title}
+                      <AdultBadge rating={book.contentRating ?? detail?.contentRating} className="ml-2 align-middle" />
                     </h2>
                     {book.subtitle && (
                       <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">
@@ -606,7 +607,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           )}
-                          {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : "ดูตอนทั้งหมด"}
+                          {loadingChapters ? "กำลังโหลด" : "ดูตอนทั้งหมด"}
                         </button>
                       )
                     ) : (
@@ -628,10 +629,15 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         disabled={chaptersEmpty || !firstReadableChapter}
                         className="flex items-center gap-2 rounded-lg border border-ink-3 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-fill disabled:opacity-40"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {/* one spinner, in the icon slot, as in the other buttons (#1088) */}
+                        {loadingChapters ? (
+                          <Loader context="inline" />
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                        )}
+                        {loadingChapters ? "กำลังโหลด" : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )}
                     <button

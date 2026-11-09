@@ -62,8 +62,13 @@ def test_absent_series_context_keeps_chatgpt_config_none():
 # ── ConfigGPT wiring (source inspection — importing it loads torch) ─────────
 
 def test_chat_system_template_appends_series_context():
-    src = (Path(__file__).parent.parent / 'manga_translator' / 'translators' / 'config_gpt.py').read_text(encoding='utf-8')
-    prop = re.search(r'def chat_system_template\(self\).*?(?=\n    @|\n    def )', src, re.S)
-    assert prop, 'chat_system_template property not found'
-    assert 'append_series_context' in prop.group(0)
-    assert "_config_get('series_context')" in prop.group(0)
+    """Behavioural (was a source scan of the property body, which broke when the template moved
+    into a shared assembler for per-language prompts, #762): the series context reaches both the
+    generic template and a language's own prompt."""
+    from omegaconf import OmegaConf
+    from manga_translator.translators.config_gpt import ConfigGPT
+    cfg = ConfigGPT(config_key='')
+    cfg.config = OmegaConf.create({'series_context': 'SERIES-CTX-MARKER'})
+    assert 'SERIES-CTX-MARKER' in cfg.chat_system_template
+    assert 'SERIES-CTX-MARKER' in cfg.system_prompt('Thai')
+    assert 'SERIES-CTX-MARKER' in cfg.system_prompt('English')

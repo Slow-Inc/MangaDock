@@ -23,6 +23,8 @@ import { memoryStorage } from 'multer';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
 import { MascotDto } from './mascot.dto';
+import { ContentSettingsDto } from './content-settings.dto';
+import { ContentLevelService } from '../content/content-level.service';
 import {
   PhotoHistoryDto,
   TranslatorProfileDto,
@@ -42,6 +44,7 @@ export class UsersController {
   constructor(
     private readonly users: UsersService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+    private readonly contentLevels: ContentLevelService,
   ) {}
 
   /** Called after login — creates/updates user doc (never overwrites displayName/photoURL) */
@@ -64,6 +67,21 @@ export class UsersController {
   ) {
     await this.users.updateUserProfile(req[USER_KEY].uid, body);
     return { ok: true };
+  }
+
+  /** The caller's 18+ content level and when they confirmed their age / accepted the Terms (#1101). */
+  @Get('me/content-settings')
+  getMyContentSettings(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return this.contentLevels.getSettings(req[USER_KEY].uid);
+  }
+
+  /** Change the level. Raising it is gated server-side (age for erotica, age + Terms for all) — 400 otherwise. */
+  @Put('me/content-settings')
+  setMyContentSettings(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Body() body: ContentSettingsDto,
+  ) {
+    return this.contentLevels.setLevel(req[USER_KEY].uid, body);
   }
 
   /** The caller's mascot (Epic D); null when they never dressed one. */

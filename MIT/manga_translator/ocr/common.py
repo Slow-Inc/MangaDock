@@ -51,6 +51,7 @@ class CommonOCR(InfererModule):
 
 
 class OfflineOCR(CommonOCR, ModelWrapper):
+    _OFFLOAD = True   # #1123: forward may run in a thread under the GPU lock (worker slots)
     _MODEL_SUB_DIR = 'ocr'
 
     async def _recognize(self, *args, **kwargs):
